@@ -4,7 +4,7 @@ This repository is a safe, local synthetic experiment for testing whether partic
 
 ## Run on Windows
 
-From `C:\Users\yuzho\Desktop\马嘉祺\REDTEAM`:
+From the repository root:
 
 ```powershell
 python -m unittest discover -s tests -v
@@ -32,7 +32,7 @@ Each run starts with 1,000 synthetic tokens in `treasury`; only `merchant` and `
 
 ## LLM adapter boundary
 
-The default agent is deterministic and makes no network calls. If an external adapter is added locally, configure its provider and credentials through environment variables (for example `REDTEAM_LLM_BASE_URL`, `REDTEAM_LLM_API_KEY`, and `REDTEAM_LLM_MODEL`), never source files or committed config. The adapter must be opt-in, bounded, and unable to execute tools, access arbitrary files/URLs, or authorize transfers; preserve the deterministic mode for reproducible tests. Never send real secrets, personal data, production prompts, or production transaction material.
+The default agent is deterministic and makes no network calls. The existing optional adapter requires `REDTEAM_LLM_ENABLED=1`. Configure its provider and credentials through environment variables (for example `REDTEAM_LLM_BASE_URL`, `REDTEAM_LLM_API_KEY`, and `REDTEAM_LLM_MODEL`), never source files or committed config. The adapter must be opt-in, bounded, and unable to execute tools, access arbitrary files/URLs, or authorize transfers; preserve the deterministic mode for reproducible tests. Never send real secrets, personal data, production prompts, or production transaction material.
 
 ## HTTP happy path
 
@@ -54,3 +54,11 @@ The default agent is deterministic and makes no network calls. If an external ad
 ## Honest limitations
 
 The Python tokens are local database integers, while the Hardhat tokens are local in-process ERC-20 test assets; neither is money or a production blockchain asset. This is not a sandbox against a malicious local OS user: the SQLite file, Python process, and local EVM are developer-controlled. The authoritative fixture is a source-code trust boundary, not cryptographic secrecy. The deterministic simulator is not evidence about an actual language model; the optional LLM adapter is advisory and cannot authorize transfers. Scenario labels and the evaluator are test fixtures, not unbiased real-world adjudication. Logs/export are local SQLite/JSON and local-chain events; no mainnet deployment, remote append-only signing, or production payment integration is claimed.
+
+## Versioned advisory prompt and project site
+
+`redteam/llm.py` loads `prompts/payment_agent_system_v1.txt` as the system-role message, independent of working directory, and reports `prompt_version` in adapter metadata. The response remains one `PAY INV-000 TO account AMOUNT integer` line or `NONE`. Participant text is sent as a user-role message. This is semantic guidance, not a security guarantee. The adapter does not receive trusted invoice or ledger state; without that evidence the prompt instructs it to abstain.
+
+`redteam/agents.py` currently ignores the returned LLM proposal in both modes; it parses participant text instead. Enabling the adapter sends synthetic participant text to your configured provider but does not integrate an LLM-driven payment chain or the independent local EVM demo. No trained model or mainnet deployment is claimed.
+
+Chinese introduction: https://fishman-free.github.io/REDTEAM/ . The standalone `docs/index.html` is published by the official GitHub Pages Actions artifact workflow after tests pass.
