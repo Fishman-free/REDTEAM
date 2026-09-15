@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from redteam.agents import decide_with_meta
-from redteam.llm import request_proposal
+from redteam.llm import request_proposal, load_system_prompt, PROMPT_VERSION
 
 
 class TestLLMAdapter(unittest.TestCase):
@@ -14,6 +14,11 @@ class TestLLMAdapter(unittest.TestCase):
 
     def tearDown(self):
         self.env.stop()
+
+    def test_versioned_prompt_is_loaded(self):
+        prompt = load_system_prompt()
+        self.assertIn("PROMPT_VERSION: payment-agent-system-v1", prompt)
+        self.assertIn("TRUST HIERARCHY", prompt)
 
     def test_network_disabled_by_default(self):
         with patch("redteam.llm.urllib.request.urlopen", side_effect=AssertionError("network")):
