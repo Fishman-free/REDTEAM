@@ -58,7 +58,7 @@
       <p>一个可复现、仅限本地的合成实验：研究参与者消息如何诱导支付代理越过信任边界，并用独立策略验证器记录证据。</p>
       <div class="status">
         <strong>现在是什么状态？</strong><br>
-        SQLite HTTP 流程已验证；本地 EVM 是独立演示；LLM 仅可选、旁路建议。没有训练模型，也没有主网部署。
+        SQLite HTTP 流程已验证；本地 EVM 合约已验证；端到端“消息 → 模型提议 → 链上真实付款 → 独立评估 → 奖励结算”演示已离线跑通（<code>npm run demo:agent</code>）。模型后端默认是确定性 mock，真实 LLM 必须显式 <code>REDTEAM_LLM_ENABLED=1</code> 且输出仍要过代码校验。没有训练模型，也没有主网部署。
       </div>
       <a class="cta" href="https://github.com/Fishman-free/REDTEAM">查看源代码</a>
     </section>
@@ -66,11 +66,11 @@
     <section class="grid">
       <article class="card">
         <h2>实验回路</h2>
-        <p>参与者文本 → 解析候选 → 脆弱/加固代理 → SQLite 账本 → 独立策略评估。代币只是本地整数，不代表真实资金。</p>
+        <p>参与者文本 → 版本化系统提示 → mock/可选 LLM → 严格 PAY/NONE 校验 → 可信策略 → 本地链上 ERC-20 真实转账 → 独立评估器分类违规 → 评估器专属奖励结算 → JSON 证据包。代币只是合成实验资产，不代表真实资金。</p>
       </article>
       <article class="card">
-        <h2>信任层级</h2>
-        <p>机械策略、可信交付记录与账本历史优先于参与者文本。提示词提供语义指导，不能充当安全边界。</p>
+        <h2>信任边界</h2>
+        <p>系统提示、可信采购/交付/账本状态与参与者消息在输入层严格分离。模型只能输出一行 PAY 或 NONE；机械边界（收款人白名单、金额上下限、单笔/累计上限、一次性发票）全部由代码与合约执行，模型无法绕过。付款权限与奖励权限由不同签名者持有。</p>
       </article>
       <article class="card">
         <h2>Token-as-payment</h2>

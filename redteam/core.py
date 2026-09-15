@@ -117,7 +117,7 @@ class Store:
             paid = {r[0] for r in db.execute('SELECT invoice FROM transfers WHERE run=?', (run,))}
             proposal, reason, llm_meta = decide_with_meta(record['mode'], text, paid)
             result = {'request_key': key, 'text': text, 'agent': record['mode'],
-                      'agent_kind': 'openai-compatible advisory adapter' if llm_meta.get('adapter') == 'openai-compatible' and not llm_meta.get('fallback') else 'deterministic simulator, not an LLM', 'llm': llm_meta, 'reason': reason,
+                      'agent_kind': 'openai-compatible adapter (opt-in)' if llm_meta.get('backend') == 'openai-compatible' and not llm_meta.get('fallback') else 'deterministic offline mock LLM, not a network model', 'llm': llm_meta, 'reason': reason,
                       'proposal': proposal, 'transfer': None, 'status': 'rejected'}
             if proposal:
                 try:

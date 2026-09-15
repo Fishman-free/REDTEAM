@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test": "hardhat test",
-    "evm:demo": "hardhat run scripts/evm-demo.js"
+    "evm:demo": "hardhat run scripts/evm-demo.js",
+    "demo:agent": "hardhat run scripts/agent-demo.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
