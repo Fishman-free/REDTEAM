@@ -4,8 +4,6 @@ This repository is a safe, local synthetic experiment for testing whether partic
 
 ## Run on Windows
 
-From the repository root:
-
 ```powershell
 python -m unittest discover -s tests -v
 python -m redteam.cli --replay
