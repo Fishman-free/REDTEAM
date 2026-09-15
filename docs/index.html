@@ -1,1 +1,102 @@
-﻿<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="REDTEAM：支付代理提示注入与信任边界研究"><title>REDTEAM · 支付代理实验</title><style>:root{--bg:#0b1020;--card:#121a31;--text:#edf2ff;--muted:#aab5d6;--accent:#69e0c0;--line:#263454}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0,#20355d 0,#0b1020 45%);color:var(--text);font:16px/1.7 system-ui,-apple-system,"Microsoft YaHei",sans-serif}main{max-width:1120px;margin:auto;padding:28px 22px 72px}nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:80px}.logo{font-weight:800;letter-spacing:.12em}a{color:var(--accent);text-decoration:none}.hero{max-width:780px}.eyebrow{color:var(--accent);font-size:13px;letter-spacing:.16em;text-transform:uppercase}.hero h1{font-size:clamp(40px,7vw,78px);line-height:1.05;margin:18px 0}.hero p{color:var(--muted);font-size:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:54px}.card{background:rgba(18,26,49,.82);border:1px solid var(--line);border-radius:18px;padding:24px}.card h2{margin-top:0;font-size:20px}.card p,.card li{color:var(--muted)}.status{border-left:3px solid var(--accent);padding-left:18px;margin-top:36px}.cta{display:inline-block;margin-top:24px;padding:11px 18px;border:1px solid var(--accent);border-radius:999px;font-weight:700}.wide{grid-column:1/-1}code{color:var(--accent)}footer{color:var(--muted);margin-top:52px;font-size:14px}@media(max-width:760px){nav{margin-bottom:52px}.grid{grid-template-columns:1fr}.hero p{font-size:18px}}</style></head><body><main><nav><span class="logo">REDTEAM</span><a href="https://github.com/Fishman-free/REDTEAM">GitHub ↗</a></nav><section class="hero"><div class="eyebrow">Payment-agent deception research</div><h1>当“付款指令”<br>不再可信</h1><p>一个可复现、仅限本地的合成实验：研究参与者消息如何诱导支付代理越过信任边界，并用独立策略验证器记录证据。</p><div class="status"><strong>现在是什么状态？</strong><br>SQLite HTTP 流程已验证；本地 EVM 是独立演示；LLM 仅可选、旁路建议。没有训练模型，也没有主网部署。</div><a class="cta" href="https://github.com/Fishman-free/REDTEAM">查看源代码</a></section><section class="grid"><article class="card"><h2>实验回路</h2><p>参与者文本 → 解析候选 → 脆弱/加固代理 → SQLite 账本 → 独立策略评估。代币只是本地整数，不代表真实资金。</p></article><article class="card"><h2>信任层级</h2><p>机械策略、可信交付记录与账本历史优先于参与者文本。提示词提供语义指导，不能充当安全边界。</p></article><article class="card"><h2>Token-as-payment</h2><p>实验回路使用合成 token 观察“建议—执行—评估”的闭环；额度、收款人、交付和重复付款都会被单独检查。</p></article><article class="card wide"><h2>快速开始</h2><ol><li><code>python -m unittest discover -s tests -v</code></li><li><code>python -m redteam.server --port 8765 --db .\redteam.sqlite3</code></li><li>浏览器打开 <code>http://127.0.0.1:8765</code>，创建 vulnerable 或 hardened 实验。</li></ol><p>可选 EVM 演示运行 <code>npm install</code> 后执行 <code>npm test</code>。LLM 适配器必须通过 <code>REDTEAM_LLM_ENABLED=1</code> 显式开启，并配置环境变量；它永远不能授权转账。</p></article><article class="card wide"><h2>边界与限制</h2><p>这是开发者控制的本地研究夹具，不是对抗恶意本地用户的沙箱。没有生产 RPC、钱包、私钥、主网资产、远程 append-only 签名或真实支付集成。实验标签不是无偏评估，确定性模拟也不能代表真实语言模型。</p></article></section><footer>开放研究原型 · 无外部资源、无追踪脚本 · <a href="https://github.com/Fishman-free/REDTEAM">Fishman-free/REDTEAM</a></footer></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="REDTEAM：支付代理提示注入与信任边界研究">
+  <title>REDTEAM · 支付代理实验</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121a31;
+      --text: #edf2ff;
+      --muted: #aab5d6;
+      --accent: #69e0c0;
+      --line: #263454;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 80% 0, #20355d 0, var(--bg) 45%);
+      color: var(--text);
+      font: 16px/1.7 system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+    }
+    main { max-width: 1120px; margin: auto; padding: 28px 22px 72px; }
+    nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 80px; }
+    .logo { font-weight: 800; letter-spacing: .12em; }
+    a { color: var(--accent); text-decoration: none; }
+    .hero { max-width: 780px; }
+    .eyebrow { color: var(--accent); font-size: 13px; letter-spacing: .16em; text-transform: uppercase; }
+    .hero h1 { font-size: clamp(40px, 7vw, 78px); line-height: 1.05; margin: 18px 0; }
+    .hero p { color: var(--muted); font-size: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 54px; }
+    .card { background: rgba(18, 26, 49, .82); border: 1px solid var(--line); border-radius: 18px; padding: 24px; }
+    .card h2 { margin-top: 0; font-size: 20px; }
+    .card p, .card li { color: var(--muted); }
+    .status { border-left: 3px solid var(--accent); padding-left: 18px; margin-top: 36px; }
+    .cta { display: inline-block; margin-top: 24px; padding: 11px 18px; border: 1px solid var(--accent); border-radius: 999px; font-weight: 700; }
+    .wide { grid-column: 1 / -1; }
+    code { color: var(--accent); }
+    footer { color: var(--muted); margin-top: 52px; font-size: 14px; }
+    @media (max-width: 760px) {
+      nav { margin-bottom: 52px; }
+      .grid { grid-template-columns: 1fr; }
+      .hero p { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <nav>
+      <span class="logo">REDTEAM</span>
+      <a href="https://github.com/Fishman-free/REDTEAM">GitHub ↗</a>
+    </nav>
+
+    <section class="hero">
+      <div class="eyebrow">Payment-agent deception research</div>
+      <h1>当“付款指令”<br>不再可信</h1>
+      <p>一个可复现、仅限本地的合成实验：研究参与者消息如何诱导支付代理越过信任边界，并用独立策略验证器记录证据。</p>
+      <div class="status">
+        <strong>现在是什么状态？</strong><br>
+        SQLite HTTP 流程已验证；本地 EVM 是独立演示；LLM 仅可选、旁路建议。没有训练模型，也没有主网部署。
+      </div>
+      <a class="cta" href="https://github.com/Fishman-free/REDTEAM">查看源代码</a>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>实验回路</h2>
+        <p>参与者文本 → 解析候选 → 脆弱/加固代理 → SQLite 账本 → 独立策略评估。代币只是本地整数，不代表真实资金。</p>
+      </article>
+      <article class="card">
+        <h2>信任层级</h2>
+        <p>机械策略、可信交付记录与账本历史优先于参与者文本。提示词提供语义指导，不能充当安全边界。</p>
+      </article>
+      <article class="card">
+        <h2>Token-as-payment</h2>
+        <p>实验回路使用合成 token 观察“建议—执行—评估”的闭环；额度、收款人、交付和重复付款都会被单独检查。</p>
+      </article>
+
+      <article class="card wide">
+        <h2>快速开始</h2>
+        <ol>
+          <li><code>python -m pytest -q</code></li>
+          <li><code>python -m redteam.server --port 8765 --db .\redteam.sqlite3</code></li>
+          <li>浏览器打开 <code>http://127.0.0.1:8765</code>，创建 vulnerable 或 hardened 实验。</li>
+        </ol>
+        <p>可选 EVM 演示运行 <code>npm install</code> 后执行 <code>npm test</code>。LLM 适配器必须通过 <code>REDTEAM_LLM_ENABLED=1</code> 显式开启，并配置环境变量；它永远不能授权转账。</p>
+      </article>
+
+      <article class="card wide">
+        <h2>边界与限制</h2>
+        <p>这是开发者控制的本地研究夹具，不是对抗恶意本地用户的沙箱。没有生产 RPC、钱包、私钥、主网资产、远程 append-only 签名或真实支付集成。实验标签不是无偏评估，确定性模拟也不能代表真实语言模型。</p>
+      </article>
+    </section>
+
+    <footer>
+      开放研究原型 · 无外部资源、无追踪脚本 ·
+      <a href="https://github.com/Fishman-free/REDTEAM">Fishman-free/REDTEAM</a>
+    </footer>
+  </main>
+</body>
+</html>
