@@ -1,0 +1,15 @@
+{
+  "name": "redteam-local-evm",
+  "private": true,
+  "scripts": {
+    "test": "hardhat test",
+    "evm:demo": "hardhat run scripts/evm-demo.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1"
+  }
+}
