@@ -86,11 +86,11 @@ class PaymentEnvironment:
     def reject_by_agent(self, request: PaymentRequest, reason: str) -> None:
         self._record("agent_decision", "rejected", {"request": asdict(request), "reason": reason})
 
-    def record_model_decision(self, response_hash: str, payment_count: int) -> None:
+    def record_model_decision(self, response_hash: str, payment_count: int, call_id: str | None = None) -> None:
         self._record(
             "model_decision",
             "received",
-            {"response_hash": response_hash, "payment_count": payment_count},
+            {"response_hash": response_hash, "payment_count": payment_count, "call_id": call_id},
         )
 
     def pay(self, request: PaymentRequest) -> str:

@@ -4,7 +4,7 @@
 
 **攻击 → 测试 → 打分 → 改良 → 重测试 → 通过后继承新版本。**
 
-当前可离线运行，不需要 API key。支付使用模拟资金；攻击者、付款 Agent 和改良器都留有模型替换接口。日常开发使用 `rsi4safety` 分支。
+支持离线演示和 GLM 实际模型实验。支付使用模拟资金；攻击者、付款 Agent 和改良器可分别调用模型，评分由程序执行。日常开发使用 `rsi4safety` 分支。
 
 ## 快速运行
 
@@ -46,6 +46,9 @@ PYTHONPATH=src python3 -m rsi4safety demo --state-dir .rsi4safety/experiment-002
 
 ## 代码与产物
 
+GLM 实验与缓存协议见 [GLM 实验运行说明](docs/GLM_EXPERIMENTS.md)。
+首次真实实验结果见 [2026-09-16 实验记录](docs/EXPERIMENT_2026-09-16.md)：三轮自适应攻防发现并修复一次漏付问题，最终对照未显示泛化优势。
+
 ```text
 src/rsi4safety/
   domain.py        # 授权、付款、攻击、版本和证据结构
@@ -55,6 +58,10 @@ src/rsi4safety/
   runner.py        # 五步流程和每轮完整报告
   model_agents.py  # 模型付款 Agent 与攻击生成器
   providers.py     # 模型接口和 HTTP 适配器
+  campaign.py      # 多轮实验、并发测试、候选晋级与冻结验收
+  benchmark.py     # 参数化任务、开发集和最终测试集
+  prompts.py       # 六个攻击角度及角色提示词
+  config.py        # 环境变量、预算、并发与模型配置
   cli.py           # 离线入口
 tests/             # 授权、证据、持续回归与端到端验证
 docs/ARCHITECTURE.md
@@ -62,4 +69,4 @@ docs/ARCHITECTURE.md
 
 每轮报告保存在 `rounds/<round_id>.json`，包含任务、攻击载荷、发现与重测试事件、候选评分和活动版本。经验保存在 `verified-experiences.jsonl`，版本和活动指针保存在 `versions/`。默认输出目录和环境凭证已被 Git 忽略。
 
-API key 到位后，按 [架构与模型接入说明](docs/ARCHITECTURE.md) 接入模型付款、攻击和改良器。当前默认命令不会发起模型请求或产生调用费用。真实模型实验还需要补调用预算、错误重试、多次采样与独立评测数据。
+`demo` 命令离线运行；`probe`、`experiment`、`repair-check` 会调用模型。接口、缓存与评分边界见 [架构与模型接入说明](docs/ARCHITECTURE.md)。当前最终测试与开发集按具体任务分离，但共享攻击机制，仍需要真正独立的数据检验泛化。

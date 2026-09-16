@@ -17,7 +17,8 @@ from .domain import (
     VersionManifest,
     stable_hash,
 )
-from .providers import ChatModel
+from .providers import ChatModel, ModelCallError, complete_json
+from .prompts import IMPROVEMENT_SYSTEM
 from .scenarios import Scenario, default_challenge
 
 
@@ -95,8 +96,8 @@ class ExperienceStore:
     ) -> Experience:
         if scenario.attack is None:
             raise ValueError("a verified attack experience requires an attack payload")
-        if not evidence.actual_unauthorized:
-            raise ValueError("only a verified unauthorized state change may become an experience")
+        if not (evidence.actual_unauthorized or evidence.attempted_unauthorized or not evidence.utility_success):
+            raise ValueError("only a verified safety or task-completion failure may become an experience")
         if evidence.task_id != scenario.task.task_id or evidence.attack_id != scenario.attack.attack_id:
             raise ValueError("evidence does not belong to the supplied regression scenario")
         if evidence.task_spec_hash != stable_hash(scenario.task) or evidence.attack_hash != stable_hash(scenario.attack):
@@ -347,6 +348,7 @@ class ReflectiveCandidateProposer:
         "enforce_budget",
         "require_confirmation_for_untrusted",
         "block_all_payments",
+        "instructions",
     }
 
     def __init__(self, model: ChatModel, max_candidates: int = 4) -> None:
@@ -356,13 +358,15 @@ class ReflectiveCandidateProposer:
     def propose(
         self, parent: DefensePolicy, evidence: VerificationRecord, experiences: tuple[Experience, ...] = ()
     ) -> tuple[DefensePolicy, ...]:
-        response = self.model.complete(
-            "You propose bounded payment-agent policy changes. Return strict JSON only.",
-            json.dumps(
-                {
+        payload = complete_json(
+            self.model,
+            IMPROVEMENT_SYSTEM,
+            {
                     "schema": {"candidates": [{"name": "short-name", "patch": {"allowed_boolean_field": True}}]},
                     "allowed_fields": sorted(self.ALLOWED_FIELDS),
                     "parent_policy": asdict(parent),
+                    "max_candidates": self.max_candidates,
+                    "field_types": {"instructions": "string, max 3000 characters; all other fields boolean"},
                     "verified_evidence": asdict(evidence),
                     "verified_memory": [
                         {"family": item.failure_family, "lesson": item.lesson, "violation_codes": item.violation_codes}
@@ -372,20 +376,25 @@ class ReflectiveCandidateProposer:
                         "Do not modify the verifier, authorization truth, evaluation tasks, or credentials.",
                         "Preserve legitimate payment utility.",
                     ],
-                },
-                ensure_ascii=False,
-                default=lambda value: value.value if hasattr(value, "value") else str(value),
-            ),
+            },
         )
-        payload = json.loads(response)
         candidates: list[DefensePolicy] = []
-        for item in payload.get("candidates", [])[: self.max_candidates]:
+        items = payload.get("candidates")
+        if not isinstance(items, list):
+            raise ModelCallError("improver must return a candidates array")
+        for item in items[: self.max_candidates]:
+            if not isinstance(item, dict):
+                continue
             patch = item.get("patch", {})
-            if not patch or not set(patch).issubset(self.ALLOWED_FIELDS):
+            if not isinstance(patch, dict) or not patch or not set(patch).issubset(self.ALLOWED_FIELDS):
                 continue
-            if any(not isinstance(value, bool) for value in patch.values()):
+            if any(
+                not (isinstance(value, str) and 1 <= len(value) <= 3000)
+                if key == "instructions" else not isinstance(value, bool)
+                for key, value in patch.items()
+            ):
                 continue
-            candidate_id = f"candidate-model-{stable_hash((parent.policy_id, item.get('name'), patch, evidence.evidence_hash))[:12]}"
+            candidate_id = f"candidate-model-{stable_hash((parent.content_hash, item.get('name'), patch, evidence.evidence_hash, experiences))[:12]}"
             candidates.append(
                 replace(parent, policy_id=candidate_id, parent_policy_id=parent.policy_id, **patch)
             )

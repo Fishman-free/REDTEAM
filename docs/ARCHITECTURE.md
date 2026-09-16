@@ -49,13 +49,13 @@
 
 因此“全部拒付”和“只在攻击出现时拒付”都不能晋级。候选未通过则保留旧活动版本；出现模型异常时向调用者报错，活动版本不被替换。
 
-有效反例绑定任务内容、攻击内容、证据和来源版本。经验库保存可重放的攻击，后续评估动态读取它们。规则改良器依据历史违规类型生成一个经验驱动候选，并与固定示例补丁一起测试；模型改良器获得反例轨迹与历史经验摘要，输出白名单内的布尔策略补丁。
+有效反例绑定任务内容、攻击内容、证据和来源版本。经验库保存可重放的攻击，后续评估动态读取它们。规则改良器依据历史违规类型生成一个经验驱动候选，并与固定示例补丁一起测试；模型改良器获得反例轨迹与历史经验摘要，输出白名单内的布尔策略补丁及受长度限制的 `instructions` 文本。
 
-候选只能修改付款策略，不能修改验证器、任务授权或评分门槛。经验与档案支持顺序实验及重启恢复；当前没有并发写入、多进程锁或分布式调度。版本摘要覆盖策略与经验，正式模型实验还应冻结代码、模型和运行配置。
+候选只能修改付款策略，不能修改验证器、任务授权或评分门槛。实验通过线程池并发调用模型；预算预留和调用日志写入加锁，经验与版本更新顺序执行。一个实验目录仅支持一个进程写入。模型实验记录代码指纹、模型、配置和提示词版本，配置变化时要求使用新目录。
 
 ## 模型接入
 
-API key 通过环境变量 `OPENAI_API_KEY` 提供。模型名和端点配置在适配器中，三个角色可使用不同模型：
+GLM API key 通过本地 `.env` 或环境变量 `GLM_API_KEY` 提供；通用适配器也兼容 `OPENAI_API_KEY`。CLI 自动读取 `.env`，不会覆盖已设置的环境变量。三个角色可使用不同模型，Python 接入示例如下：
 
 ```python
 from pathlib import Path
@@ -65,7 +65,11 @@ from rsi4safety.model_agents import ModelAttackGenerator, ModelPaymentAgent
 from rsi4safety.providers import OpenAICompatibleChatModel
 from rsi4safety.runner import ContinuousSafetyRunner
 
-model = OpenAICompatibleChatModel(model="MODEL_NAME")
+model = OpenAICompatibleChatModel(
+    model="glm-5.3-flash",
+    base_url="https://open.bigmodel.cn/api/coding/paas/v4",
+    disable_thinking=True,
+)
 runner = ContinuousSafetyRunner(
     Path(".rsi4safety/model-run"),
     agent_factory=lambda policy: ModelPaymentAgent(policy, model),
@@ -76,7 +80,9 @@ result = runner.run_round()
 print(runner.summary(result))
 ```
 
-运行以上代码时会调用模型。无 key 时使用默认 CLI 或 `OfflineChatModel`。适配器支持 OpenAI-compatible Chat Completions，具体服务协议待 API 信息到位后联调。当前模型输出格式错误会停止该轮；调用费用、限流、重试及实验采样记录是后续工作。
+运行以上代码时会调用模型。无 key 时使用 `demo` 或 `OfflineChatModel`。完整多轮实验使用 `experiment` 命令，提供调用预算、限流退避、一次 JSON 格式纠正、重复测试和完整日志。401 等鉴权错误不自动重试，429/部分 5xx 和网络错误最多重试两次；所有实际请求都计入预算。
+
+攻击生成与候选生成可按请求内容复用缓存，命中日志引用原调用编号。付款评测及最终验收强制新请求。响应缺少 token 用量时保留保守预留量，不能将该估算当作服务商账单。详细运行步骤、报告字段与实验边界见 [GLM_EXPERIMENTS.md](GLM_EXPERIMENTS.md)。
 
 ## 方法依据与实验边界
 
