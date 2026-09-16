@@ -9,6 +9,9 @@ description = "A payment-agent safety and bounded recursive improvement research
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+arena = ["docker>=7.0"]
+
 [project.scripts]
 rsi4safety = "rsi4safety.cli:main"
 

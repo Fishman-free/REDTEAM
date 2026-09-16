@@ -11,9 +11,48 @@ from .campaign import ExperimentRunner
 from .config import ExperimentConfig, load_env
 
 
+def _arena_parser(subparsers) -> None:
+    arena = subparsers.add_parser(
+        "arena", help="three-agent (attacker/defender/judge) campaign with Docker and audit chain")
+    arena_sub = arena.add_subparsers(dest="arena_command", required=True)
+    def add_common(command):
+        parser = arena_sub.add_parser(command)
+        parser.add_argument("--campaign", default="arena-001")
+        parser.add_argument("--state-dir", type=Path, default=None)
+        parser.add_argument("--env-file", type=Path, default=Path(".env"))
+        parser.add_argument("--rounds", type=int, default=3)
+        parser.add_argument("--repetitions", type=int, default=2)
+        parser.add_argument("--attacker-model", default=None)
+        parser.add_argument("--defender-model", default=None)
+        parser.add_argument("--judge-model", default=None)
+        parser.add_argument("--attacker-max-turns", type=int, default=None)
+        parser.add_argument("--defender-max-turns", type=int, default=None)
+        parser.add_argument("--judge-max-turns", type=int, default=None)
+        parser.add_argument("--seed", type=int, default=17)
+        return parser
+    run = add_common("run")
+    run.add_argument("--dry-run", action="store_true",
+                     help="scripted agents + in-process SUT; no Docker, no API calls")
+    run.add_argument("--judge-mode", default="programmatic", choices=("programmatic", "claude"),
+                     help="programmatic verdicts by default; claude = opt-in LLM adjudication")
+    run.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
+    run.add_argument("--no-resume", action="store_true", help="start a fresh session per round")
+    verify = arena_sub.add_parser("verify")
+    verify.add_argument("--campaign", default="arena-001")
+    verify.add_argument("--state-dir", type=Path, default=None)
+    down = arena_sub.add_parser("down")
+    down.add_argument("--campaign", default="arena-001")
+    down.add_argument("--state-dir", type=Path, default=None)
+    down.add_argument("--volumes", action="store_true", help="also remove persistent workspaces")
+    smoke = add_common("smoke")
+    smoke.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
+    smoke.set_defaults(rounds=1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Payment safety RSI research harness")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    _arena_parser(subparsers)
     demo = subparsers.add_parser("demo", help="run offline attack, test, score, improve and retest rounds")
     demo.add_argument("--state-dir", type=Path, default=Path(".rsi4safety/demo"))
     demo.add_argument("--json", action="store_true", help="print machine-readable output")
@@ -40,8 +79,72 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_arena(args) -> None:
+    from .arena.config import ArenaConfig, glm_api_key
+    from .arena.audit import HashChain
+    state_dir = args.state_dir or Path(".rsi4safety/arena") / args.campaign
+    config = ArenaConfig(
+        campaign_id=args.campaign, state_dir=state_dir,
+        rounds=getattr(args, "rounds", 1),
+        repetitions=getattr(args, "repetitions", 1),
+        attacker_model=getattr(args, "attacker_model", None) or "glm-5.3-flash",
+        defender_model=getattr(args, "defender_model", None) or "glm-5.3-flash",
+        judge_model=getattr(args, "judge_model", None) or "glm-5.3-flash",
+        attacker_max_turns=getattr(args, "attacker_max_turns", None) or 40,
+        defender_max_turns=getattr(args, "defender_max_turns", None) or 96,
+        judge_max_turns=getattr(args, "judge_max_turns", None) or 24,
+        seed=getattr(args, "seed", 17), dry_run=getattr(args, "dry_run", False),
+        judge_mode=getattr(args, "judge_mode", "programmatic"),
+        sut_llm_mode=getattr(args, "sut_llm_mode", "deterministic"),
+        resume_sessions=not getattr(args, "no_resume", False),
+        repo_root=Path.cwd(),
+    )
+    if args.arena_command == "verify":
+        result = HashChain.verify(config.audit_dir / "chain.jsonl")
+        print(json.dumps({"ok": result.ok, "checked": result.checked,
+                          "first_bad_seq": result.first_bad_seq, "reason": result.reason},
+                         ensure_ascii=False))
+        raise SystemExit(0 if result.ok else 1)
+    if args.arena_command == "down":
+        from .arena.docker_host import DockerHost
+        removed = DockerHost(config).down(remove_volumes=getattr(args, "volumes", False))
+        print(json.dumps({"removed": removed}, ensure_ascii=False))
+        return
+    # run / smoke
+    from .arena.docker_host import DockerHost
+    from .arena.orchestrator import ArenaOrchestrator
+    from .arena.runtime import StubAgentRuntime
+    docker_host = None
+    runtime = StubAgentRuntime()
+    if not config.dry_run:
+        load_env(args.env_file)
+        docker_host = DockerHost(config)
+        docker_host.ping()
+        if not glm_api_key():
+            raise SystemExit("GLM_API_KEY missing: put it in .env before a real campaign")
+        runtime = None  # the orchestrator wires ClaudeCodeRuntime once containers are up
+    def progress(phase: str, data: dict) -> None:
+        print(json.dumps({"phase": phase, **data}, ensure_ascii=False), file=sys.stderr, flush=True)
+    orchestrator = ArenaOrchestrator(config, runtime=runtime, docker_host=docker_host,
+                                     progress=progress)
+    report = orchestrator.run()
+    summary = {
+        "status": report["status"], "stop_reason": report.get("stop_reason"),
+        "chain_head": report.get("chain_head"),
+        "report": str(config.state_dir / "report.md"),
+    }
+    if args.arena_command == "smoke":
+        summary["preflight_note"] = "smoke run completed; teardown with: rsi4safety arena down"
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    if report["status"] != "completed":
+        raise SystemExit(1)
+
+
 def main() -> None:
     args = build_parser().parse_args()
+    if args.command == "arena":
+        _run_arena(args)
+        return
     if args.command in {"probe", "experiment", "repair-check"}:
         load_env(args.env_file)
         config = ExperimentConfig(

@@ -6,6 +6,17 @@
 
 支持离线演示和 GLM 实际模型实验。支付使用模拟资金；攻击者、付款 Agent 和改良器可分别调用模型，评分由程序执行。日常开发使用 `rsi4safety` 分支。
 
+## RSI Arena（三主体重 agent 攻防平台）
+
+在上述协议骨架之上，Arena 把三方升级为**独立 Docker 容器中的无头 Claude Code 重 agent**（后端 GLM Coding Plan）：攻击者/改进者/评判者各有持久工作区、记忆、技能、知识与专属 MCP 工具，对预置 8 个真实代码级漏洞的 PayGate 支付服务（FastAPI + SQLite）多轮攻防；全程哈希链审计，程序化授权检查为不可篡改的宪法层。
+
+```bash
+PYTHONPATH=src python3 -m rsi4safety arena run --campaign drycheck --rounds 2 --dry-run  # 零依赖协议自检
+PYTHONPATH=src python3 -m rsi4safety arena smoke --campaign smoke1                       # Docker + GLM 真实 1 轮
+```
+
+详见 [Arena 运行手册](docs/ARENA.md) 与 [内部契约规范](docs/ARENA_SPEC.md)。
+
 ## 快速运行
 
 需要 Python 3.11 或更高版本，无第三方运行时依赖。在仓库根目录执行：

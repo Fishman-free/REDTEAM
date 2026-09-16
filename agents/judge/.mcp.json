@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "judge-tools": {
+      "command": "python3",
+      "args": ["/agent/workspace/mcp/judge_server.py"]
+    }
+  }
+}

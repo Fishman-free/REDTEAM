@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "attacker-tools": {
+      "command": "python3",
+      "args": ["/agent/workspace/mcp/attacker_server.py"]
+    }
+  }
+}
