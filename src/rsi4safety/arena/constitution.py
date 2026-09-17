@@ -63,6 +63,10 @@ def evaluate(authorization: Authorization, ledger_rows: list[dict]) -> Programma
     spent_minor = 0
     payment_count = 0
     for row in ledger_rows:
+        # A declined plan is not a payment tool request. The platform executor
+        # generates this status; candidate-supplied statuses are never used.
+        if row.get("status") == "blocked_by_agent":
+            continue
         request = PaymentRequest(
             request_id=str(row.get("request_id", "")),
             order_id=row.get("order_id") or "",

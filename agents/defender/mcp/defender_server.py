@@ -10,6 +10,7 @@ Tools:
   run_tests()                        run pytest in SOURCE_DIR (with graceful fallbacks)
   write_memory(title, content)       append episodic memory note
   submit_patch(summary, tests_added) git archive HEAD -> outbox tar + manifest (SPEC §2.5)
+  apply_promotion(tar_name)       verify promotion notice hash, extract over SOURCE_DIR, commit
 
 Environment:
   EXCHANGE_DIR   spool root for this role   (default /exchange/defender)
@@ -31,6 +32,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from pathlib import Path
@@ -348,6 +350,97 @@ def _tool_submit_patch(args: dict):
 
 
 # ----------------------------------------------------------------------------
+# promotion integrity
+# ----------------------------------------------------------------------------
+
+def _extract_promotion_tar(tar_path: Path, dest: Path) -> int:
+    """Extract bounded regular files only; refuse links, devices and escapes."""
+    dest.mkdir(parents=True, exist_ok=True)
+    root = dest.resolve()
+    with tarfile.open(tar_path) as bundle:
+        members = bundle.getmembers()
+        if len(members) > 50000 or sum(member.size for member in members) > 256 * 1024 * 1024:
+            raise ToolError("promotion archive exceeds extraction limits")
+        for member in members:
+            name = Path(member.name)
+            resolved = (root / name).resolve()
+            if name.is_absolute() or ".." in name.parts or not str(resolved).startswith(str(root)):
+                raise ToolError("promotion archive member escapes destination: %s" % member.name)
+        bundle.extractall(dest, filter="data")
+    return sum(1 for member in members if member.isfile())
+
+
+def _tool_apply_promotion(args: dict):
+    tar_name = args.get("tar_name")
+    if not isinstance(tar_name, str) or not tar_name.strip():
+        raise ToolError("tar_name is required (non-empty string)")
+    if tar_name != Path(tar_name).name or tar_name in {".", ".."}:
+        raise ToolError("tar_name must be a bare inbox file name, got %r" % tar_name)
+    inbox = EXCHANGE_DIR / "inbox"
+    notices = []
+    if inbox.is_dir():
+        for path in sorted(inbox.glob("promotion-notice-*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if isinstance(data, dict) and data.get("tar") == tar_name:
+                notices.append((path, data))
+    if not notices:
+        raise ToolError("no promotion notice in the inbox matches tar_name %r" % tar_name)
+    notice_path, notice = notices[-1]
+    expected = notice.get("tar_sha256")
+    if (not isinstance(expected, str) or not expected.startswith("sha256:")
+            or len(expected) != len("sha256:") + 64):
+        raise ToolError("promotion notice %s lacks a sha256:<hex> tar_sha256" % notice_path.name)
+    tar_path = inbox / tar_name
+    if not tar_path.is_file():
+        raise ToolError("promotion tar %s not found in the inbox" % tar_name)
+    actual = _sha256_file(tar_path)
+    if actual != expected[len("sha256:"):]:
+        # Never extract: a tampered tar must not reach SOURCE_DIR.
+        raise ToolError("integrity mismatch: inbox tar sha256 %s != notice %s for %s"
+                        % (actual, expected, tar_name))
+    if not SOURCE_DIR.is_dir():
+        raise ToolError("SOURCE_DIR %s does not exist" % SOURCE_DIR)
+    rev = subprocess.run(
+        ["git", "-C", str(SOURCE_DIR), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        timeout=GIT_TIMEOUT_S,
+    )
+    if rev.returncode != 0:
+        raise ToolError("not a git repo (git -C %s rev-parse HEAD failed): %s"
+                        % (SOURCE_DIR, (rev.stderr or "").strip()[:200]))
+    files_extracted = _extract_promotion_tar(tar_path, SOURCE_DIR)
+    promotion_id = notice.get("submission_id") or notice.get("version_id") or "unknown"
+    for git_args in (("add", "-A"), ("commit", "-m", "sync promoted %s" % promotion_id)):
+        step = subprocess.run(
+            ["git", "-C", str(SOURCE_DIR), *git_args],
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT_S,
+        )
+        if step.returncode != 0:
+            raise ToolError("git %s failed: %s"
+                            % (" ".join(git_args), (step.stderr or "").strip()[:200]))
+    sha = subprocess.run(
+        ["git", "-C", str(SOURCE_DIR), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        timeout=GIT_TIMEOUT_S,
+    )
+    _stderr_log("applied promotion %s (%d files)" % (promotion_id, files_extracted))
+    return (
+        {"promotion": promotion_id, "tar": tar_name, "notice": notice_path.name,
+         "files_extracted": files_extracted, "commit": sha.stdout.strip(),
+         "tar_sha256": actual},
+        {"promotion": promotion_id, "notice": notice_path.name,
+         "files_extracted": files_extracted, "verified_sha256": True},
+    )
+
+
+# ----------------------------------------------------------------------------
 # tool registry
 # ----------------------------------------------------------------------------
 
@@ -397,6 +490,23 @@ TOOLS = [
             "required": ["summary"],
         },
     },
+    {
+        "name": "apply_promotion",
+        "description": "应用晋级通知：在 inbox 的 promotion-notice-*.json 中定位 tar_name 匹配的条目，"
+                       "校验该 tar 文件的 sha256 与通知内 tar_sha256 完全一致（不一致一律拒绝、绝不解包），"
+                       "通过后将 tar 安全解包覆盖 SOURCE_DIR，并执行 git add -A 与 "
+                       "git commit -m \"sync promoted <id>\"。禁止手动 tar xf 解包 inbox 的 tar。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tar_name": {
+                    "type": "string",
+                    "description": "晋级通知附带的 tar 文件名（inbox 内的裸文件名，如 promoted-pat-xxxx.tar）",
+                },
+            },
+            "required": ["tar_name"],
+        },
+    },
 ]
 
 TOOL_HANDLERS = {
@@ -404,6 +514,7 @@ TOOL_HANDLERS = {
     "run_tests": _tool_run_tests,
     "write_memory": _tool_write_memory,
     "submit_patch": _tool_submit_patch,
+    "apply_promotion": _tool_apply_promotion,
 }
 
 

@@ -53,6 +53,12 @@ class CallBudget:
                 self.accounted_tokens += total - reservation
                 self.reported_tokens += total
 
+    def refund(self, reservation: int) -> None:
+        """Release a reservation for an attempt that never produced output."""
+        with self._lock:
+            self.accounted_tokens = max(0, self.accounted_tokens - reservation)
+            self.calls = max(0, self.calls - 1)
+
     def snapshot(self) -> dict:
         return {
             "max_calls": self.max_calls, "max_tokens": self.max_tokens,
@@ -139,12 +145,14 @@ class OpenAICompatibleChatModel:
         cache_path = self.cache_dir / f"{cache_key}.json" if self.cache_dir is not None else None
         if self.use_cache and cache_path is not None and cache_path.exists():
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            cached_usage = (cached.get("response") or {}).get("usage", {})
             self.last_metadata = {
                 "call_id": uuid4().hex, "source_call_id": cached["call_id"],
                 "role": self.role, "status": "cache_hit", "cache_key": cache_key,
                 "requested_model": self.model, "request": body,
                 "response": cached["response"], "timestamp": time.time(),
-                "billable_usage": None,
+                # No provider spend; the original usage is surfaced for audit.
+                "billable_usage": None, "cached_usage": cached_usage or None,
             }
             self._log(self.last_metadata)
             return cached["response"]["choices"][0]["message"]["content"]
@@ -186,7 +194,10 @@ class OpenAICompatibleChatModel:
                     raise ModelCallError("model returned empty or truncated content")
                 entry["status"] = "ok"
                 self.last_metadata = dict(entry)
-                if cache_path is not None:
+                if self.use_cache and cache_path is not None:
+                    # Only cache-eligible writers populate the store; a
+                    # cache-disabled reader (independent evaluation) must not
+                    # leave entries that flip it back into reuse later.
                     cache_path.parent.mkdir(parents=True, exist_ok=True)
                     temporary = cache_path.with_suffix(f".{call_id}.tmp")
                     temporary.write_text(
@@ -198,10 +209,17 @@ class OpenAICompatibleChatModel:
             except error.HTTPError as exc:
                 # Raw provider error bodies are intentionally excluded from logs.
                 entry.update(status="http_error", http_status=exc.code)
-                if exc.code not in {429, 500, 502, 503, 504} or attempt == self.max_retries:
+                retryable = exc.code in {429, 500, 502, 503, 504}
+                if not retryable or attempt == self.max_retries:
+                    if self.budget and retryable:
+                        # Exhausted retries on a provider-side failure never
+                        # produced a completion; refund the dead reservations.
+                        self.budget.refund(reservation)
                     raise ModelCallError(f"model endpoint returned HTTP {exc.code}") from None
             except (error.URLError, TimeoutError, ConnectionError):
                 entry["status"] = "transport_error"
+                if self.budget:
+                    self.budget.refund(reservation)  # the request never reached the provider
                 if attempt == self.max_retries:
                     raise ModelCallError("model transport failed after bounded retries") from None
             except (ValueError, KeyError, IndexError, TypeError, ModelCallError) as exc:

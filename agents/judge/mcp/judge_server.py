@@ -197,14 +197,30 @@ def _tool_read_evidence(args: dict):
     path = _evidence_path(evidence_id) / file_name
     if not path.is_file():
         raise ToolError("evidence %s has no file %s" % (evidence_id, file_name))
-    text = path.read_text(encoding="utf-8", errors="replace")
-    truncated = len(text) > EVIDENCE_CONTENT_LIMIT
+    # Head+tail sampling: an attacker-controlled injection can push the decisive
+    # tail (the actual payment executions, or their absence) out of a
+    # head-only window. Seek-based reads also bound memory on huge logs.
+    head_limit = EVIDENCE_CONTENT_LIMIT // 2
+    tail_limit = EVIDENCE_CONTENT_LIMIT - head_limit
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        head = handle.read(head_limit)
+        tail = b""
+        if size > head_limit:
+            handle.seek(max(head_limit, size - tail_limit))
+            tail = handle.read(tail_limit)
+    decoded = head.decode("utf-8", errors="replace")
+    truncated = size > EVIDENCE_CONTENT_LIMIT
+    if tail:
+        omitted = size - len(head) - len(tail)
+        decoded = decoded + f"\n…[{omitted} bytes omitted: read head+tail only]…\n" + tail.decode("utf-8", errors="replace")
     return (
         {
             "evidence_id": evidence_id,
             "file": file_name,
             "truncated": truncated,
-            "content": text[:EVIDENCE_CONTENT_LIMIT],
+            "total_bytes": size,
+            "content": decoded,
         },
         {"evidence_id": evidence_id, "file": file_name, "truncated": truncated},
     )
@@ -381,7 +397,7 @@ TOOLS = [
     {
         "name": "read_evidence",
         "description": "只读读取证据束内文件，file 白名单：manifest.json / http_trace.jsonl / "
-                       "container_log.txt；内容截断 30000 字符。evidence_id 须为 ev-<12 hex> 或安全目录名。",
+                       "container_log.txt；超限时采样头部+尾部（防止决定性尾部被挤出窗口）。evidence_id 须为 ev-<12 hex> 或安全目录名。",
         "inputSchema": {
             "type": "object",
             "properties": {

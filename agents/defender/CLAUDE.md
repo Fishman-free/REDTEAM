@@ -34,6 +34,9 @@
 - `write_memory(title, content)`：情景记忆。
 - `submit_patch(summary, tests_added)`：把 `git archive HEAD` 打包成 outbox 的 patch.tar
   + manifest。**提交前必须先 commit**；同一 commit 只能提交一次。
+- `apply_promotion(tar_name)`：应用晋级通知——校验 inbox tar 的 sha256 与通知内
+  `tar_sha256` 一致后解包覆盖 SOURCE_DIR 并自动 `git commit "sync promoted <id>"`；
+  不一致即报错拒绝解包。
 
 ## 每轮工作循环
 
@@ -72,9 +75,11 @@
   `git log --grep="evidence:<id>"` 追溯到修复 commit。
 - 回滚也是改动：某个修法被晋级门禁拒绝或引发回归时，用 `git revert <commit>` 生成
   新 commit，不删除历史——失败路径同样是审计证据。
-- inbox 出现 `promotion-notice-*.json` 时：把附带 tar 在 `/agent/source` 解包覆盖
-  （`tar xf <tar> -C /agent/source`），检查 diff 后 `git add -A && git commit -m
-  "sync promoted <submission_id>"`，再开始下一轮工作；你的仓库必须始终与活动版本对齐。
+- inbox 出现 `promotion-notice-*.json` 时：**必须**用 `apply_promotion(tar_name)` 工具应用
+  （工具会校验 tar 的 sha256 与通知内 `tar_sha256` 一致，不一致直接拒绝解包；通过则解包覆盖
+  SOURCE_DIR 并自动 `git add -A && git commit -m "sync promoted <submission_id>"`）。
+  **禁止**手动 `tar xf` 解包 inbox 的 tar——没有哈希校验的解包等于允许向你的源码投毒。
+  应用后用 `git log` / diff 检查 sync commit，再开始下一轮工作；你的仓库必须始终与活动版本对齐。
 - 会话结束前 `git status` 必须干净；`git log --oneline` 是你向审计者陈述改动史的
   第一手材料。
 

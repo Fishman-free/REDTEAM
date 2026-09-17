@@ -238,10 +238,17 @@ class ClaudeCodeRuntime:
         )
         raw_log.write_text(output, encoding="utf-8")
         outcome = self._parse_stream(role, round_index, exit_code, output)
-        if outcome.ok and outcome.session_id:
+        # A resumed completed conversation ends immediately with zero model
+        # calls (ok=True, one turn, no tokens): the role did nothing. Detect
+        # that dead resume and rerun once in a fresh session.
+        def dead_resume(result: SessionOutcome) -> bool:
+            return bool(previous and result.ok and (result.num_turns or 0) <= 1
+                        and not (result.usage.get("input_tokens") or 0))
+        if outcome.ok and outcome.session_id and not dead_resume(outcome):
             self._session_ids[role] = outcome.session_id
-        elif previous and outcome.error_subtype in {"error_during_execution", None}:
-            # Context overflow or unusable resumed state: fall back to a fresh session once.
+        elif previous and (outcome.error_subtype in {"error_during_execution", None}
+                           or dead_resume(outcome)):
+            # Context overflow, unusable or dead resumed state: fresh session once.
             command = [part for part in command if part not in {"--resume", previous}]
             exit_code, output = self.docker_host.exec_agent(
                 role, command, env={}, timeout_seconds=max(60, int(deadline - time.time()))

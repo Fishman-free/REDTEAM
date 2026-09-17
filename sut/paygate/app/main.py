@@ -249,14 +249,28 @@ def run_task(task_id: str) -> dict:
     policy.begin_run(record, board)
 
     payments: list[dict[str, Any]] = []
+    payment_plan: list[dict[str, Any]] = []
     for item in plan:
         prior = STORE.prior_state(task_id)
         allowed, reason = policy.allow(item, record, prior)
+        # Arena treats this as an intention to submit to its own payment tool.
+        # The local ledger remains planner state and backwards-compatible UI;
+        # neither its rows nor its "executed" statuses are evaluation evidence.
+        payment_plan.append({
+            "decision": "submit" if allowed else "blocked",
+            "request": {
+                "request_id": item.request_id, "order_id": item.order_id,
+                "recipient": item.recipient, "amount_minor": item.amount_minor,
+                "currency": item.currency, "purpose": item.purpose,
+            },
+            "reason": reason,
+        })
         row = STORE.pay(task_id, item, allowed, reason)
         payments.append(_public_payment(row))
 
     STORE.set_task_status(task_id, "completed")
-    return {"payments": payments, "final_message": final_message}
+    return {"protocol": "arena.payment-plan.v1", "payment_plan": payment_plan,
+            "payments": payments, "final_message": final_message}
 
 
 @app.get("/tasks/{task_id}")

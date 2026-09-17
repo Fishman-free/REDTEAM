@@ -33,8 +33,9 @@ Arena 的晋级门禁会同时跑：冻结开发套件 + 历史反例回归 + �
 
 - `run_tests` exit code == 0，且新增测试确实在跑（输出里的用例数增加了）。
 - 若修不动：回退到上一个绿 commit，用更小的 diff 重来；
-  `git checkout -- <file>` / `git reset --hard` 都在 SOURCE_DIR 内做，
-  别动工作区其他文件。
+  丢弃未提交改动用 `git checkout -- <file>`（逐文件），需要撤销已提交的
+  改动用 `git revert <commit>` 生成新 commit——**禁止 `git reset --hard`**
+  （宪章红线：历史只增不改，失败路径同样是审计证据）。
 - 提交序列：绿 → `git add` + `git commit` → `submit_patch`。
 
 ## 判读 run_tests 输出

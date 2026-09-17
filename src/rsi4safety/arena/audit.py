@@ -71,6 +71,13 @@ class HashChain:
                 if not isinstance(entry, dict):
                     raise ValueError(f"audit chain line {index} is not an object")
                 self._entries.append(entry)
+            # Never append onto a chain that fails its own verification: a
+            # tampered history must stop the campaign, not extend it.
+            if self._entries:
+                result = self.verify(self.path)
+                if not result.ok:
+                    raise RuntimeError(
+                        f"audit chain failed verification at seq {result.first_bad_seq}: {result.reason}")
 
     def append(self, actor: str, kind: str, **payload: Any) -> dict:
         seq = len(self._entries) + 1

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import os
+import re
 from pathlib import Path
 
 DEFAULT_GLM_ANTHROPIC_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
@@ -58,6 +59,11 @@ class ArenaConfig:
     dry_run: bool = False
     judge_mode: str = "programmatic"          # programmatic | claude (claude = opt-in LLM adjudication)
     use_execution_cache: bool = True
+    attacker_experiment_budget: int = 8       # in-session experiments per attacker session
+    max_candidates: int = 3
+    repair_attempts: int = 2
+    max_submissions: int = 12
+    max_sut_executions: int = 1000
     sut_llm_mode: str = "deterministic"          # deterministic | llm
     docker_memory: str = "4g"
     glm_base_url: str = DEFAULT_GLM_ANTHROPIC_BASE_URL
@@ -68,12 +74,19 @@ class ArenaConfig:
     attacker_hints: tuple[str, ...] = DEFAULT_ATTACKER_HINTS
 
     def __post_init__(self) -> None:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", self.campaign_id):
+            raise ValueError("campaign_id must be a safe alphanumeric identifier")
+        object.__setattr__(self, "state_dir", self.state_dir.resolve())
+        object.__setattr__(self, "repo_root", self.repo_root.resolve())
         for name in ("rounds", "repetitions", "attacker_max_turns", "defender_max_turns",
-                     "judge_max_turns", "session_deadline_seconds", "seed", "final_seed"):
+                     "judge_max_turns", "session_deadline_seconds", "seed", "final_seed",
+                     "max_candidates", "repair_attempts", "max_submissions", "max_sut_executions"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise ValueError(f"{name} must be a positive integer")
         if self.rounds > 20:
             raise ValueError("arena campaigns are bounded to at most 20 rounds")
+        if self.max_candidates > 8 or self.repair_attempts > 4 or self.max_submissions > 100:
+            raise ValueError("candidate, repair or submission limit exceeds the supported budget")
         if self.sut_llm_mode not in {"deterministic", "llm"}:
             raise ValueError("sut_llm_mode must be deterministic or llm")
         if self.dry_run and self.sut_llm_mode == "llm":
@@ -122,10 +135,17 @@ class ArenaConfig:
     def max_turns_for(self, role: str) -> int:
         return getattr(self, f"{role}_max_turns")
 
-    def agent_container_env(self, role: str, api_key: str | None) -> dict[str, str]:
-        """Container environment for a Claude Code agent; the key never enters logs."""
+    def agent_container_env(self, role: str, api_key: str | None,
+                            gateway_token: str | None = None) -> dict[str, str]:
+        """Container environment for a Claude Code agent.
+
+        Agents never hold the raw GLM key: every model call goes through the
+        platform gateway with a per-campaign shared token (rate limited and
+        model-allowlisted there). The raw key exists only inside the gateway.
+        """
         env = {
-            "ANTHROPIC_BASE_URL": self.glm_base_url,
+            "ANTHROPIC_BASE_URL": "http://llm-gateway:8080",
+            "ANTHROPIC_AUTH_TOKEN": gateway_token or "",
             "ANTHROPIC_MODEL": self.model_for(role),
             "ANTHROPIC_DEFAULT_HAIKU_MODEL": HAIKU_FALLBACK_MODEL,
             "ANTHROPIC_DEFAULT_SONNET_MODEL": SONNET_FALLBACK_MODEL,
@@ -140,12 +160,13 @@ class ArenaConfig:
             "WORKSPACE_DIR": "/agent/workspace",
             "PAYGATE_URL": "http://paygate:8000",
         }
-        if api_key:
-            env["ANTHROPIC_AUTH_TOKEN"] = api_key
+        # The raw api_key intentionally never enters an agent container.
         if role == "defender":
             env["SOURCE_DIR"] = "/agent/source"
         if role == "judge":
             env["EVIDENCE_DIR"] = "/evidence"
+        if role == "attacker":
+            env["EXPERIMENT_BUDGET"] = str(self.attacker_experiment_budget)
         return env
 
     def public_dict(self) -> dict:
@@ -157,7 +178,12 @@ class ArenaConfig:
             "seed": self.seed, "final_seed": self.final_seed,
             "dry_run": self.dry_run, "judge_mode": self.judge_mode,
             "use_execution_cache": self.use_execution_cache,
+            "attacker_experiment_budget": self.attacker_experiment_budget,
             "attacker_hints": list(self.attacker_hints),
             "sut_llm_mode": self.sut_llm_mode,
             "session_deadline_seconds": self.session_deadline_seconds,
+            "max_candidates": self.max_candidates, "repair_attempts": self.repair_attempts,
+            "max_submissions": self.max_submissions, "max_sut_executions": self.max_sut_executions,
+            "glm_base_url": self.glm_base_url, "glm_openai_base_url": self.glm_openai_base_url,
+            "claude_code_version": self.claude_code_version, "docker_memory": self.docker_memory,
         }
