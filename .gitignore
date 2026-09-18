@@ -9,3 +9,8 @@ build/
 .env
 .env.*
 !.env.example
+
+# Machine-local agent-tool state (scanner ledgers, plugin caches) -- never commit
+.mimosa/
+.v2c/
+.video_agent/

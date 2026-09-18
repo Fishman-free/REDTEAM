@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "defender-tools": {
-      "command": "python3",
-      "args": ["/agent/workspace/mcp/defender_server.py"]
-    }
-  }
-}
