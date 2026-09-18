@@ -11,3 +11,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Claude Code spec-workflow plugin state
+.spec-workflow/
