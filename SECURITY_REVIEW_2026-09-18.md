@@ -81,6 +81,10 @@
 - 后果：`python -m py_compile` 直接 SyntaxError → uvicorn 导入 `app.main` 失败 → **PayGate SUT 在任何平台（含 macOS/Linux）都无法启动** → 编排器全部 9 个端到端测试失败（6 个 "SUT not healthy" + 3 个下游断言失败），且每个失败要空等 60 秒健康检查。
 - 修复：把 5 行防护代码重新缩进回函数体内（12 空格处恢复为 if 的 body，8 空格处恢复为函数体）。这是**意外损坏**，不是预置漏洞——预置的 8 个漏洞是逻辑层的（见 `docs/arena/SEEDED_VULNS.md`），语法错误让整个 SUT 根本跑不起来，必须修。
 
+**F12. CI 工作流顺序错误——Core suite 缺 SUT 依赖（CI 一直红的真正根因）**
+- `.github/workflows/tests.yml` 里 `fastapi/uvicorn/httpx` 只在**第二个步骤**（SUT suite）安装，但**第一个步骤**（Core suite，159 个 unittest）内部就会 spawn PayGate SUT（uvicorn）——依赖缺失 → CI 上每个 SUT 测试都以 `SUT not healthy: Connection refused` 失败（与 F11 叠加时表现相同，F11 修完后这层依然拦着 CI，实测 run 35320161128 复现）。
+- 修复（已提交 `32d445c`）：把依赖安装提为独立步骤、放在两个套件之前；SUT 步骤不再重复安装。
+
 ### 3.2 🟠 已修复（Windows 兼容 + 仓库卫生）
 
 **F3. `os.killpg` POSIX 专用**（`arena/sut_driver.py`）
