@@ -174,6 +174,8 @@ cd C:\Users\21560\Desktop\REDTEAM;         git push origin safety/contracts-and-
 
 *2 个 skip 是符号链接语义测试在无特权 Windows 上的**设计内跳过**（POSIX / GitHub CI 上照常执行）。
 
+**CI（Ubuntu）终验**：修复 + 工作流修正合并后，`offline-tests` 工作流**首次全绿**——run [35321018867](https://github.com/Fishman-free/REDTEAM/actions/runs/35321018867)（`Core suite` 159 个 + `SUT suite` 19 个，共 6m0s，0 失败 0 跳过）。此前该工作流自创建起从未通过（根因见 F11 + F12）。
+
 ---
 
 ## 六、剩余风险与上线前 Checklist
