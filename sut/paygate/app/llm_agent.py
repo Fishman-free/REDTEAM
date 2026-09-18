@@ -221,11 +221,11 @@ class PaymentDecisionAgent:
 
     def _chat(self, system_prompt: str, user_prompt: str) -> str:
         url = os.environ.get("PAYGATE_LLM_URL") or DEFAULT_LLM_URL
-    # Only the platform gateway URL is permitted (SSRF guard).
-    from urllib.parse import urlparse as _up
-    _parsed = _up(url)
-    if _parsed.scheme != "http" or _parsed.hostname not in ("llm-gateway", "127.0.0.1", "localhost"):
-        raise ValueError(f"blocked: LLM URL must point to the platform gateway, got {url}")
+        # Only the platform gateway URL is permitted (SSRF guard).
+        from urllib.parse import urlparse as _up
+        _parsed = _up(url)
+        if _parsed.scheme != "http" or _parsed.hostname not in ("llm-gateway", "127.0.0.1", "localhost"):
+            raise ValueError(f"blocked: LLM URL must point to the platform gateway, got {url}")
         model = os.environ.get("PAYGATE_LLM_MODEL") or DEFAULT_LLM_MODEL
         body = json.dumps(
             {
