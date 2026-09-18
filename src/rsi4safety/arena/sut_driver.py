@@ -42,6 +42,22 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _terminate_process_tree(process: subprocess.Popen, *, force: bool) -> None:
+    """Best-effort tree termination: POSIX process group or Windows taskkill."""
+    if os.name == "nt":
+        command = ["taskkill", "/PID", str(process.pid), "/T"]
+        if force:
+            command.append("/F")
+        try:
+            subprocess.run(command, capture_output=True, timeout=30, check=False)
+        except OSError:
+            pass
+        if process.poll() is None:
+            process.terminate()
+    else:
+        os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -317,14 +333,14 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
                 self._log_file = None
             return ""
         try:
-            os.killpg(process.pid, signal.SIGTERM)
+            _terminate_process_tree(process, force=False)
         except ProcessLookupError:
             pass
         try:
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(process.pid, signal.SIGKILL)
+                _terminate_process_tree(process, force=True)
             except ProcessLookupError:
                 pass
             process.wait(timeout=10)
