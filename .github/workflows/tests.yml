@@ -14,10 +14,12 @@ jobs:
         with:
           python-version: "3.11"
       # Core + arena host modules are stdlib-only; the offline suite needs no
-      # Docker, no API keys and no network.
+      # Docker, no API keys and no network. The core suite spawns the PayGate
+      # SUT in-process (uvicorn), so the SUT runtime dependencies must be
+      # installed before it runs.
+      - name: Install SUT runtime dependencies
+        run: python3 -m pip install --quiet "fastapi==0.141.1" "uvicorn==0.53.0" httpx pytest
       - name: Core suite (rsi4safety)
         run: PYTHONPATH=src python3 -m unittest discover -s tests -v
       - name: SUT suite (PayGate)
-        run: |
-          python3 -m pip install --quiet "fastapi==0.141.1" "uvicorn==0.53.0" httpx pytest
-          cd sut/paygate && python3 -m pytest tests/ -q
+        run: cd sut/paygate && python3 -m pytest tests/ -q
