@@ -1,0 +1,926 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260917T145014003Z-63219-8bf35f28dfaf",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "candidate-select",
+      "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/app/assistant.py",
+      "reason": "candidate_limit_exceeded: 12 changed reviewable file(s) were not scanned because the limit is 20"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/arena/docker_host.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/cli.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "supply-chain-check",
+      "target": ".",
+      "reason": "stop_budget_exhausted: focused supply-chain check was not run before the gate budget"
+    },
+    {
+      "stage": "agent-check",
+      "target": ".",
+      "reason": "stop_budget_exhausted: focused agent configuration check was not run before the gate budget"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": true,
+      "captured_files": 571,
+      "candidate_limit": 5000,
+      "truncated": false,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 3
+    },
+    "change_tracking": {
+      "touched_observed": 3,
+      "touched_retained": 3,
+      "truncated": false,
+      "bash_mutation": true,
+      "bash_discovered": 32,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 32,
+      "selected_files": 20,
+      "limit": 20,
+      "truncated": true
+    },
+    "scanning": {
+      "required_files": 13,
+      "scanned_files": 0,
+      "skipped_files": 0,
+      "failed_files": 13,
+      "project_checks_required": 2,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 0,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": false
+    },
+    "reason_counts": {
+      "candidate_limit_exceeded": 1,
+      "baseline_snapshot_unreadable": 17,
+      "scanner_failed": 13,
+      "stop_budget_exhausted": 2,
+      "project_check_failed": 33
+    },
+    "reasons": [
+      {
+        "code": "candidate_limit_exceeded",
+        "stage": "candidate-select",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/app/assistant.py",
+        "detail": "12 changed reviewable file(s) were not scanned because the limit is 20",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/docker_host.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/cli.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "stop_budget_exhausted",
+        "stage": "supply-chain-check",
+        "target": ".",
+        "detail": "focused supply-chain check was not run before the gate budget",
+        "affects_completion": true
+      },
+      {
+        "code": "stop_budget_exhausted",
+        "stage": "agent-check",
+        "target": ".",
+        "detail": "focused agent configuration check was not run before the gate budget",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "candidate-select",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/app/assistant.py",
+        "detail": "candidate_limit_exceeded: 12 changed reviewable file(s) were not scanned because the limit is 20",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/docker_host.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/cli.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": true
+  },
+  "generated_at": "2026-09-17T14:50:14.003Z",
+  "session_id": "sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab",
+  "target": ".",
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "rules_version": "unavailable",
+  "diff_hash": "060f3bdf2e1ef304a108d3e8b44f5c1f0088d1843e4e976bf94ca8ffadddcbe6",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 17,
+    "changed_files": [
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/patches/pat-83a72f78c235/src/tests/test_payassist.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 884
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "d3621c6eb1a26cbd47af5c3612e4c13dce095b8ccf6a0a041d3bf14b17ef7f94"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 451
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "1ff9159b7822149ace2070e69e8ebc3ec1dd0494027fbb32282fe14c86066023"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 304
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "82abbbae760f19cca77c656cd860f83d40a415f049609db2571bb39e224b2988"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 31
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "afb2d53dad9ab73ce1532092b8438118bad5f18a999b52b4df2059a172e6c9e1"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 284
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b16917d367457e66023da23170004ff87b30f5fb42b7451656a162fd14cf7613"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 544
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "2e5aeb521275ac3aba894dc2061b26cfb52c4806aec42e021507b181b938d8fd"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/assistant.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 451
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "1ff9159b7822149ace2070e69e8ebc3ec1dd0494027fbb32282fe14c86066023"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/main.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 304
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "82abbbae760f19cca77c656cd860f83d40a415f049609db2571bb39e224b2988"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/prompts.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 31
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "afb2d53dad9ab73ce1532092b8438118bad5f18a999b52b4df2059a172e6c9e1"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/app/store.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 284
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b16917d367457e66023da23170004ff87b30f5fb42b7451656a162fd14cf7613"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/ds-reasoner/version-store/repository/source/tests/test_payassist.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 544
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "2e5aeb521275ac3aba894dc2061b26cfb52c4806aec42e021507b181b938d8fd"
+      },
+      {
+        "file": "agents/attacker/CLAUDE.md",
+        "ranges": [
+          {
+            "start": 64,
+            "end": 65
+          }
+        ],
+        "before_hash": "30243c9c4adac42af9bacead1e3e22a39d06d05a9aa5ad7e50cf73ba9481a10b",
+        "after_hash": "db5adf2f65cf876946b4e6eeeb10dc5a0675af0a40b61fffc0fadf6daf641f5a"
+      },
+      {
+        "file": "src/rsi4safety/arena/docker_host.py",
+        "ranges": [
+          {
+            "start": 465,
+            "end": 466
+          }
+        ],
+        "before_hash": "57a7eae19fe9032e7261b0c6836f6cb5fb740d0b5bc529313249e7b6462695ac",
+        "after_hash": "50badf4e8f79167add80407ebfce6b5e6220956fe9997b0ea4c388cb82e5242b"
+      },
+      {
+        "file": "src/rsi4safety/cli.py",
+        "ranges": [
+          {
+            "start": 46,
+            "end": 47
+          },
+          {
+            "start": 165,
+            "end": 167
+          }
+        ],
+        "before_hash": "01dd38eebe00c121255b53d3505e501ad89c1262d198f323f84825bcca15e207",
+        "after_hash": "65d44a56c05cb1f61b4658dafa9c36e378ce7680c1c65f6db3eeb543ac02c125"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-17T14:50:11.768Z",
+    "completed_at": "2026-09-17T14:50:14.003Z",
+    "duration_ms": 2235,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 2235,
+    "peakMemoryBytes": 120111104,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 0,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 0,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [],
+  "findings": [],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T145014003Z-63219-8bf35f28dfaf.json",
+    "latest_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab.json",
+    "history_summary": ".mimosa/history/run-20260917T145014003Z-63219-8bf35f28dfaf.json"
+  }
+}

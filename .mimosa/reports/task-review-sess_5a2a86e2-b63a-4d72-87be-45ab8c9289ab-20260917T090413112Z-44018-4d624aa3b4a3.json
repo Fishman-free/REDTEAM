@@ -1,0 +1,446 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260917T090413112Z-44018-4d624aa3b4a3",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/arena/config.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/arena/runtime.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "docker/llm-gateway/gateway.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/arena/orchestrator.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/cli.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "scan",
+      "target": "src/rsi4safety/arena/benchmark.py",
+      "reason": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+    },
+    {
+      "stage": "agent-check",
+      "target": ".",
+      "reason": "stop_budget_exhausted: focused agent configuration check was not run before the gate budget"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": true,
+      "captured_files": 526,
+      "candidate_limit": 5000,
+      "truncated": false,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 7
+    },
+    "change_tracking": {
+      "touched_observed": 7,
+      "touched_retained": 7,
+      "truncated": false,
+      "bash_mutation": false,
+      "bash_discovered": 0,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 7,
+      "selected_files": 7,
+      "limit": 20,
+      "truncated": false
+    },
+    "scanning": {
+      "required_files": 6,
+      "scanned_files": 0,
+      "skipped_files": 0,
+      "failed_files": 6,
+      "project_checks_required": 1,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 0,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": false
+    },
+    "reason_counts": {
+      "scanner_failed": 6,
+      "stop_budget_exhausted": 1,
+      "project_check_failed": 7
+    },
+    "reasons": [
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/config.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/runtime.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "docker/llm-gateway/gateway.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/orchestrator.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/cli.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/benchmark.py",
+        "detail": "spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "stop_budget_exhausted",
+        "stage": "agent-check",
+        "target": ".",
+        "detail": "focused agent configuration check was not run before the gate budget",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/config.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/runtime.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "docker/llm-gateway/gateway.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/orchestrator.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/cli.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "src/rsi4safety/arena/benchmark.py",
+        "detail": "scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "agent-check",
+        "target": ".",
+        "detail": "stop_budget_exhausted: focused agent configuration check was not run before the gate budget",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-17T09:04:13.112Z",
+  "session_id": "sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab",
+  "target": ".",
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "rules_version": "unavailable",
+  "diff_hash": "0b7a19aa17fa1efb12f003c8510494004131edc1fb7e0e9bb5f9a829f1280461",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 7,
+    "changed_files": [
+      {
+        "file": "agents/defender/CLAUDE.md",
+        "ranges": [
+          {
+            "start": 3,
+            "end": 3
+          },
+          {
+            "start": 5,
+            "end": 5
+          },
+          {
+            "start": 7,
+            "end": 7
+          },
+          {
+            "start": 9,
+            "end": 9
+          },
+          {
+            "start": 11,
+            "end": 16
+          },
+          {
+            "start": 18,
+            "end": 18
+          },
+          {
+            "start": 20,
+            "end": 27
+          },
+          {
+            "start": 29,
+            "end": 29
+          },
+          {
+            "start": 31,
+            "end": 37
+          },
+          {
+            "start": 39,
+            "end": 39
+          },
+          {
+            "start": 41,
+            "end": 42
+          },
+          {
+            "start": 44,
+            "end": 46
+          },
+          {
+            "start": 48,
+            "end": 63
+          },
+          {
+            "start": 65,
+            "end": 68
+          },
+          {
+            "start": 72,
+            "end": 118
+          },
+          {
+            "start": 122,
+            "end": 125
+          }
+        ],
+        "before_hash": "7d8e0a03d6671a379b5d9957257942904c8b123e05b9effdbf9e8b394b00e368",
+        "after_hash": "bc08e88ff76a2170b1c65848331a094aa91b24a4dde4a850396b8f767c25ad3c"
+      },
+      {
+        "file": "docker/llm-gateway/gateway.py",
+        "ranges": [
+          {
+            "start": 50,
+            "end": 51
+          },
+          {
+            "start": 347,
+            "end": 349
+          },
+          {
+            "start": 351,
+            "end": 383
+          }
+        ],
+        "before_hash": "7823394b6d16ac6a5223a48391310d78aa6d0ed6c88eb0fe7811eb582d94624e",
+        "after_hash": "1d8cb626e50b2d9cb009a653d49e2dc9da754d67646b3554602554402384853b"
+      },
+      {
+        "file": "src/rsi4safety/arena/benchmark.py",
+        "ranges": [
+          {
+            "start": 96,
+            "end": 123
+          },
+          {
+            "start": 135,
+            "end": 141
+          },
+          {
+            "start": 150,
+            "end": 151
+          }
+        ],
+        "before_hash": "e25e55ea956bceba980c0b56214decdc65661aff0a4c4eaea81d2bb312f310e4",
+        "after_hash": "be07c52a34f07313c4de0a0d3cede673b924bfc051b906eb22f700ed75567316"
+      },
+      {
+        "file": "src/rsi4safety/arena/config.py",
+        "ranges": [
+          {
+            "start": 53,
+            "end": 60
+          },
+          {
+            "start": 77,
+            "end": 77
+          },
+          {
+            "start": 148,
+            "end": 153
+          },
+          {
+            "start": 201,
+            "end": 201
+          }
+        ],
+        "before_hash": "ce12e33abcd7c376def406f5776b5e807308c95c97e3a9c8f4177be5b1c81027",
+        "after_hash": "7ab450a1d19a6f5248dff55d24f72a4c4551ea16adc9d30cb8d317598bf1f948"
+      },
+      {
+        "file": "src/rsi4safety/arena/orchestrator.py",
+        "ranges": [
+          {
+            "start": 747,
+            "end": 857
+          },
+          {
+            "start": 872,
+            "end": 872
+          },
+          {
+            "start": 913,
+            "end": 920
+          },
+          {
+            "start": 1182,
+            "end": 1208
+          }
+        ],
+        "before_hash": "ba7523b18aca47ab2e5abb54b9f5b0411fe0bccc6e0ba4f8a9b67641c9f78630",
+        "after_hash": "a285a55b75c71220117445a1f358a537b67aa3baf5523cadc1c203557e0ec2ba"
+      },
+      {
+        "file": "src/rsi4safety/arena/runtime.py",
+        "ranges": [
+          {
+            "start": 222,
+            "end": 223
+          },
+          {
+            "start": 237,
+            "end": 246
+          },
+          {
+            "start": 248,
+            "end": 248
+          },
+          {
+            "start": 274,
+            "end": 317
+          }
+        ],
+        "before_hash": "b8bd5ee5776d803a10565f85fe690f86ac197f0129e531aeaa5f16600880ba2e",
+        "after_hash": "fedf70605cd6b1a5baa810ae8d226557ba6e5825e85610945b3b5c7da190f331"
+      },
+      {
+        "file": "src/rsi4safety/cli.py",
+        "ranges": [
+          {
+            "start": 42,
+            "end": 45
+          },
+          {
+            "start": 108,
+            "end": 108
+          }
+        ],
+        "before_hash": "3cb92adb63be5c2b9e757cef34d3e680f16d455cc55c461d4fe01e902346e732",
+        "after_hash": "a5fa9484a0e18b7e96a8fbbf33e2e5b0fe28f597ddfe0087058737f1d55eeaba"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-17T09:04:10.865Z",
+    "completed_at": "2026-09-17T09:04:13.112Z",
+    "duration_ms": 2247,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 2247,
+    "peakMemoryBytes": 115015680,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 0,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 0,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [],
+  "findings": [],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T090413112Z-44018-4d624aa3b4a3.json",
+    "latest_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab.json",
+    "history_summary": ".mimosa/history/run-20260917T090413112Z-44018-4d624aa3b4a3.json"
+  }
+}

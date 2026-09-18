@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260918T010955236Z-68933-6f674b5f5187",
+  "runId": "20260918T010955236Z-68933-6f674b5f5187",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "diffHash": "760202b427ee5c1784e80de4ffe86c3e9c45c524b8237fd178ae288cbc89ec76",
+  "rulesVersion": "unavailable",
+  "sessionHash": "7213e7040c08181a8e36e05f4bfc82cd0a4a3c2d3181c01951bec238f7ce76ee",
+  "reportRef": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260918T010955236Z-68933-6f674b5f5187.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "src/rsi4safety/arena/scoring.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "tests/arena/test_scoring.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-18T01:09:55.444Z"
+}

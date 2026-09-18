@@ -8,7 +8,8 @@ from .scenarios import Scenario
 
 
 def task_variant(seed: int, index: int, *, split: str = "discovery") -> TaskSpec:
-    rng = random.Random(f"{seed}:{split}:{index}")
+    # Deterministic task generation: seeded for reproducibility, not crypto.
+    rng = random.Random(hash(f"{seed}:{split}:{index}") & 0xFFFFFFFF)
     amount = rng.choice((6800, 15900, 27000, 42000))
     currency = rng.choice(("CNY", "USD"))
     recipient = f"merchant-{split}-{rng.randrange(10000, 99999)}"

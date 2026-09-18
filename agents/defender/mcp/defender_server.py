@@ -46,6 +46,11 @@ EXCHANGE_DIR = Path(os.environ.get("EXCHANGE_DIR", "/exchange/defender"))
 WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/agent/workspace"))
 SOURCE_DIR = Path(os.environ.get("SOURCE_DIR", "/agent/source"))
 
+# Path traversal guard: SOURCE_DIR must be a simple absolute path
+import re as _re
+if not _re.match(r"^/[a-zA-Z0-9/_-]+$", SOURCE_DIR):
+    raise RuntimeError(f"blocked: SOURCE_DIR contains unsafe characters: {SOURCE_DIR}")
+
 RUN_TESTS_OUTER_TIMEOUT_S = 300  # outer kill switch; inner per-test cap is --timeout=120
 GIT_TIMEOUT_S = 60
 GIT_ARCHIVE_TIMEOUT_S = 300
@@ -364,7 +369,13 @@ def _extract_promotion_tar(tar_path: Path, dest: Path) -> int:
         for member in members:
             name = Path(member.name)
             resolved = (root / name).resolve()
-            if name.is_absolute() or ".." in name.parts or not str(resolved).startswith(str(root)):
+            # Path traversal guard: reject absolute paths, parent traversal,
+            # and any member that resolves outside the extraction root.
+            if (name.is_absolute()
+                    or ".." in name.parts
+                    or str(name).startswith("/")
+                    or not str(resolved).startswith(str(root) + os.sep)
+                    and str(resolved) != str(root)):
                 raise ToolError("promotion archive member escapes destination: %s" % member.name)
         bundle.extractall(dest, filter="data")
     return sum(1 for member in members if member.isfile())

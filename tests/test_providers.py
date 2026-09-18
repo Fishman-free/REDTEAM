@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 import io
 import json
@@ -20,7 +21,7 @@ class ProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             budget = CallBudget(2, 10_000)
-            model = OpenAICompatibleChatModel("glm-5.3-flash", api_key="test-private-secret", budget=budget,
+            model = OpenAICompatibleChatModel("glm-5.3-flash", api_key=os.environ.get("TEST_API_KEY", "test-not-real"), budget=budget,
                                              audit_log=root / "calls.jsonl", cache_dir=root / "cache", use_cache=True)
             with patch("rsi4safety.providers.request.build_opener") as factory:
                 factory.return_value.open.return_value = response()

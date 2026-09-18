@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260917T120728167Z-40810-4c8659269e13",
+  "runStatus": "inconclusive",
+  "errors": [
+    "candidate-select:.rsi4safety/arena/bench-a01/version-store/repository/source/app/assistant.py: candidate_limit_exceeded: 11 changed reviewable file(s) were not scanned because the limit is 20",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/requirements.txt: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/tests/test_payassist.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/__init__.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/assistant.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/main.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/prompts.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/store.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-a01/version-store/repository/source/requirements.txt: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-a01/version-store/repository/source/tests/test_payassist.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "baseline-read:.rsi4safety/arena/bench-a01/version-store/repository/source/app/__init__.py: baseline_snapshot_unreadable: file is missing from task baseline",
+    "scan:src/rsi4safety/cli.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:src/rsi4safety/arena/benchmark_runner.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:src/rsi4safety/arena/sut_driver.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/repository/source/tests/test_payassist.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/assistant.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/main.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/prompts.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/repository/source/app/store.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-baseline/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:.rsi4safety/arena/bench-a01/version-store/repository/source/tests/test_payassist.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "supply-chain-check:.: stop_budget_exhausted: focused supply-chain check was not run before the gate budget"
+  ],
+  "target": ".",
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "diffHash": "76b9592d0cdabe9fb4d3a7ce5565a00d8a5fd0b95cecbd5a0f9619fc4a323e5a",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-17T12:07:28.167Z",
+  "timing": {
+    "startedAt": "2026-09-17T12:07:25.933Z",
+    "completedAt": "2026-09-17T12:07:28.167Z",
+    "durationMs": 2234
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "candidate_limit_exceeded": 1,
+      "baseline_snapshot_unreadable": 17,
+      "scanner_failed": 14,
+      "stop_budget_exhausted": 1,
+      "project_check_failed": 33
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T120728167Z-40810-4c8659269e13.json"
+}

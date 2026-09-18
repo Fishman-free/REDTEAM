@@ -1,3 +1,4 @@
+import os
 """Security regression tests for docker/llm-gateway/gateway.py.
 
 The gateway lives outside the importable package tree, so it is loaded by
@@ -21,8 +22,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 GATEWAY_FILE = Path(__file__).resolve().parents[2] / "docker" / "llm-gateway" / "gateway.py"
-STUB_API_KEY = "stub-upstream-key"
-TOKEN = "unit-test-gateway-token"
+STUB_API_KEY = os.environ.get("TEST_UPSTREAM_KEY", "stub-not-real")
+TOKEN = os.environ.get("TEST_GATEWAY_TOKEN", "unit-test-not-real")
 STUB_REQUESTS: list = []  # appended by the stub upstream, read by assertions
 
 

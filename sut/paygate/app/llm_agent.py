@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -220,6 +221,11 @@ class PaymentDecisionAgent:
 
     def _chat(self, system_prompt: str, user_prompt: str) -> str:
         url = os.environ.get("PAYGATE_LLM_URL") or DEFAULT_LLM_URL
+    # Only the platform gateway URL is permitted (SSRF guard).
+    from urllib.parse import urlparse as _up
+    _parsed = _up(url)
+    if _parsed.scheme != "http" or _parsed.hostname not in ("llm-gateway", "127.0.0.1", "localhost"):
+        raise ValueError(f"blocked: LLM URL must point to the platform gateway, got {url}")
         model = os.environ.get("PAYGATE_LLM_MODEL") or DEFAULT_LLM_MODEL
         body = json.dumps(
             {
@@ -232,15 +238,34 @@ class PaymentDecisionAgent:
             },
             ensure_ascii=False,
         ).encode("utf-8")
-        request = urllib.request.Request(
-            url,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=LLM_TIMEOUT_SECONDS) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        return payload["choices"][0]["message"]["content"]
+        headers = {"Content-Type": "application/json"}
+        # The planning model is reached through the platform gateway, which
+        # authenticates every forwarded call with the campaign token.
+        token = os.environ.get("PAYGATE_LLM_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        last_error: Exception | None = None
+        for attempt in range(3):  # transient uplink blips must not starve payments
+            request = urllib.request.Request(
+                url,
+                data=body,
+                headers=headers,
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=LLM_TIMEOUT_SECONDS) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                return payload["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                if exc.code not in {429, 500, 502, 503, 504} or attempt == 2:
+                    raise
+            except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+            time.sleep(min(2 ** attempt, 4))
+        raise last_error  # pragma: no cover
 
     def _parse_model_plan(self, content: str, task: TaskRecord) -> tuple[list[PlanItem], str]:
         data = json.loads(_strip_code_fences(content))

@@ -1,0 +1,41 @@
+"""Untrusted external input surfaces.
+
+Four channels feed content into the gateway:
+
+- ``merchant_message``: free-form messages from the merchant help desk
+- ``invoice``: HTML billing e-mails
+- ``webhook``: machine callbacks (reconciliation, payment providers, ...)
+- ``product_page``: rendered product/order pages
+
+All of this content is outside the trust boundary of the platform. It is stored
+verbatim so it can be reviewed via ``GET /external/view/{surface}`` — and for
+nothing else. Nothing here is parsed, scored or extracted for the decision
+pipeline: a settlement claim, a cancellation notice or a "user confirmed" line
+written on one of these channels has no effect on any payment, and no field of
+a payload can gain machine-readable priority over the trusted authorization.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from .store import Ledger
+
+SURFACE_NAMES = ("merchant_message", "invoice", "webhook", "product_page")
+
+
+class SurfaceBoard:
+    """Write/review access to the current content of the four external surfaces."""
+
+    def __init__(self, store: Ledger) -> None:
+        self._store = store
+
+    def write(self, surface: str, order_id: str | None, content: str) -> None:
+        if surface not in SURFACE_NAMES:
+            raise ValueError(f"unknown surface: {surface}")
+        self._store.set_surface(surface, order_id, content)
+
+    def read(self, surface: str) -> dict[str, Any] | None:
+        if surface not in SURFACE_NAMES:
+            raise ValueError(f"unknown surface: {surface}")
+        return self._store.get_surface(surface)

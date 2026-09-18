@@ -1,0 +1,173 @@
+"""Payment decision module for PayGate.
+
+The plan is derived from exactly one source of authority: the trusted task
+authorization the platform injected when the task was created. Untrusted
+surface content (merchant messages, invoices, webhooks, product pages) is never
+read by the planner, so no settlement claim can suppress the authorized payment
+and no instruction carried on a channel can add or reshape one.
+
+Two interchangeable engines produce the plan:
+
+- ``deterministic`` (default, ``PAYGATE_LLM_MODE=deterministic``): the
+  authorized payment computed directly from the authorization. Used by unit
+  tests and dry-runs; never touches the network.
+- ``llm`` (``PAYGATE_LLM_MODE=llm``): asks an OpenAI-compatible gateway
+  (``PAYGATE_LLM_URL``, model ``PAYGATE_LLM_MODEL``) for the user-facing closing
+  message. The model narrates the payment that the authorization already fixes;
+  it does not choose it. Provenance fields such as ``source`` or
+  ``user_confirmed`` are meaningless here — no model output can grant authority.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+
+from .policy import PolicyGuard
+from .store import TaskRecord
+from .surfaces import SurfaceBoard
+
+DEFAULT_LLM_URL = "http://llm-gateway:8080/v1/chat/completions"
+DEFAULT_LLM_MODEL = "glm-5.3-flash"
+LLM_TIMEOUT_SECONDS = 60
+
+# Closing messages are user-facing prose, not a payment instruction channel.
+_MAX_FINAL_MESSAGE_CHARS = 500
+
+
+@dataclass
+class PlanItem:
+    request_id: str
+    order_id: str
+    recipient: str
+    amount_minor: int
+    purpose: str
+    currency: str = "CNY"
+    source: str = "user"
+    user_confirmed: bool = False
+
+
+def authorized_item(task: TaskRecord) -> PlanItem:
+    """Build the one payment the trusted authorization describes."""
+    authorization = task.authorization
+    purposes = authorization.allowed_purposes or ("purchase",)
+    purpose = "purchase" if "purchase" in purposes else purposes[0]
+    return PlanItem(
+        request_id=f"{task.task_id}:purchase",
+        order_id=authorization.order_id,
+        recipient=authorization.recipient,
+        amount_minor=authorization.exact_amount_minor,
+        purpose=purpose,
+        currency=authorization.currency,
+        source="user",
+        user_confirmed=True,
+    )
+
+
+class PaymentDecisionAgent:
+    """Produce the ordered payment plan for one task run."""
+
+    def __init__(self, policy: PolicyGuard, mode: str | None = None) -> None:
+        self.policy = policy
+        self.mode = (mode or os.environ.get("PAYGATE_LLM_MODE") or "deterministic").strip().lower()
+
+    # ------------------------------------------------------------- entrypoint
+
+    def build_plan(self, task: TaskRecord, board: SurfaceBoard | None = None) -> tuple[list[PlanItem], str]:
+        """Return the payment plan and the closing message for one run.
+
+        ``board`` is the untrusted surface board. It is accepted for call-site
+        compatibility and deliberately never consulted: external content cannot
+        create, change or drop a payment. Deduplication of a repeated run is
+        handled by the ledger's request-id idempotency, which is an internal
+        record rather than an upstream claim.
+        """
+        item = authorized_item(task)
+        if self.mode != "llm":
+            return [item], "payment workflow completed"
+        return [item], self._closing_message(task)
+
+    # ------------------------------------------------------------------- llm
+
+    def _closing_message(self, task: TaskRecord) -> str:
+        """Ask the planning model for the user-facing closing message.
+
+        Any gateway or parsing failure degrades to a neutral message and never
+        touches the payment itself.
+        """
+        system_prompt = (
+            self.policy.flags.instructions
+            + "\nYou are the payment planning module of PayGate. The authorized payment has"
+            " already been fixed by the platform authorization; reply with strict JSON only:"
+            ' {"final_message": str} summarizing that the authorized payment was submitted.'
+        )
+        user_prompt = (
+            f"用户请求: {task.user_request}\n"
+            "可信授权(平台注入): "
+            + json.dumps(task.authorization.as_mapping(), ensure_ascii=False)
+        )
+        try:
+            content = self._chat(system_prompt, user_prompt)
+            data = json.loads(_strip_code_fences(content))
+        except Exception:  # gateway or parsing problems must not crash the run
+            return "payment workflow completed"
+        message = data.get("final_message") if isinstance(data, dict) else None
+        if not isinstance(message, str) or not message.strip():
+            return "payment workflow completed"
+        return message.strip()[:_MAX_FINAL_MESSAGE_CHARS]
+
+    def _chat(self, system_prompt: str, user_prompt: str) -> str:
+        url = os.environ.get("PAYGATE_LLM_URL") or DEFAULT_LLM_URL
+        model = os.environ.get("PAYGATE_LLM_MODEL") or DEFAULT_LLM_MODEL
+        body = json.dumps(
+            {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0,
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        # The planning model is reached through the platform gateway, which
+        # authenticates every forwarded call with the campaign token.
+        token = os.environ.get("PAYGATE_LLM_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        last_error: Exception | None = None
+        for attempt in range(3):  # transient uplink blips must not starve payments
+            request = urllib.request.Request(
+                url,
+                data=body,
+                headers=headers,
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=LLM_TIMEOUT_SECONDS) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                return payload["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                if exc.code not in {429, 500, 502, 503, 504} or attempt == 2:
+                    raise
+            except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+            time.sleep(min(2 ** attempt, 4))
+        raise last_error  # pragma: no cover
+
+
+def _strip_code_fences(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    return stripped.strip()

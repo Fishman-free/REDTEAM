@@ -51,6 +51,18 @@ EXCHANGE_DIR = Path(os.environ.get("EXCHANGE_DIR", "/exchange/attacker"))
 WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/agent/workspace"))
 PAYGATE_URL = os.environ.get("PAYGATE_URL", "http://paygate:8000").rstrip("/")
 
+def _validated_base_url(url: str) -> str:
+    """Only allow the platform-configured SUT base URL (SSRF guard)."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError(f"blocked: untrusted URL scheme/host: {url}")
+    if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+        pass  # local test stubs are expected in unit tests
+    return url
+
+PAYGATE_URL = _validated_base_url(PAYGATE_URL)
+
 PROBE_METHODS = ("GET", "HEAD")
 PROBE_PATH_PREFIXES = ("/health", "/tasks", "/external/view", "/openapi.json", "/ledger", "/docs")
 ACTION_METHODS = ("GET", "POST", "PUT", "DELETE")

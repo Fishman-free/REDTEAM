@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-delivery-20260917T050741530Z-89980-8a1453897977",
+  "runId": "20260917T050741530Z-89980-8a1453897977",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "StopDelivery"
+  },
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "diffHash": "d7b11dbf9d5ea5bd6fbb9149aa4c6de173deea5a2de460db6a528ef97b9989ac",
+  "rulesVersion": "unavailable",
+  "sessionHash": "7213e7040c08181a8e36e05f4bfc82cd0a4a3c2d3181c01951bec238f7ce76ee",
+  "reportRef": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T050741530Z-89980-8a1453897977.json",
+  "events": [
+    {
+      "eventId": "hook-70d9aae20838d2135f20397191988c92",
+      "findingId": "mimosa-aec975f60bfafe93ce7922e5",
+      "type": "finding_blocked",
+      "at": "2026-09-17T05:07:41.745Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 251,
+      "endLine": 251,
+      "reasonCode": "stop_rewake",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-745be069f6d61b7798a242dc18314c93",
+      "findingId": "mimosa-20c6eb7deed2744bafb36b82",
+      "type": "finding_blocked",
+      "at": "2026-09-17T05:07:41.745Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 153,
+      "endLine": 153,
+      "reasonCode": "stop_rewake",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 1
+    },
+    {
+      "eventId": "hook-304774518ac04fedb03be8aa5d888a34",
+      "findingId": "mimosa-7228672ec34bb0ba5a8ed039",
+      "type": "finding_blocked",
+      "at": "2026-09-17T05:07:41.745Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 169,
+      "endLine": 169,
+      "reasonCode": "stop_rewake",
+      "reportedToAgent": true,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7"
+      },
+      "sequence": 2
+    }
+  ],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-09-17T05:07:41.947Z"
+}

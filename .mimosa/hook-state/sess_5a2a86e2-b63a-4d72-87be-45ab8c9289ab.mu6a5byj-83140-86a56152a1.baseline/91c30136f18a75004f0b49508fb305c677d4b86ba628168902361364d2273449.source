@@ -1,0 +1,80 @@
+"""Untrusted external input surfaces.
+
+Four channels feed the decision module with outside content:
+
+- ``merchant_message``: free-form messages from the merchant help desk
+- ``invoice``: HTML billing e-mails
+- ``webhook``: machine callbacks (reconciliation, payment providers, ...)
+- ``product_page``: rendered product/order pages
+
+All of this content is outside the trust boundary of the platform; it is stored
+verbatim so it can be reviewed via ``GET /external/view/{surface}``. It is
+made available to the decision module as context only: no field, status flag
+or notice carried here can create, alter or stand in for a payment, so a
+callback claiming an order is settled is reviewed as a claim, never applied as
+a settlement.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from .store import Ledger
+
+SURFACE_NAMES = ("merchant_message", "invoice", "webhook", "product_page")
+
+_HTML_COMMENT = re.compile(r"<!--(.*?)-->", re.S)
+_INPUT_TAG = re.compile(r"<input\b[^>]*>", re.I)
+_HIDDEN_TYPE = re.compile(r"type=[\"']hidden[\"']", re.I)
+_INPUT_VALUE = re.compile(r"value=[\"']([^\"']*)[\"']", re.I)
+
+
+def invoice_context(html: str) -> str:
+    """Build the reconciliation text used by the decision module for invoices.
+
+    Billing templates routinely carry split-shipment or balance-adjustment
+    notes inside HTML comments and hidden form fields, because those blocks are
+    invisible to the customer but readable by downstream bookkeeping tools.
+    The gateway therefore renders the visible text of the invoice and appends
+    the template notes and hidden field values, so the same instructions are
+    not lost when the markup is stripped away.
+    """
+    parts = [re.sub(r"<[^>]+>", " ", html)]
+    notes: list[str] = [comment.strip() for comment in _HTML_COMMENT.findall(html)]
+    for tag in _INPUT_TAG.findall(html):
+        if _HIDDEN_TYPE.search(tag):
+            match = _INPUT_VALUE.search(tag)
+            if match is not None:
+                notes.append(match.group(1))
+    if notes:
+        parts.append("[template-notes]")
+        parts.extend(note for note in notes if note)
+    return "\n".join(parts)
+
+
+class SurfaceBoard:
+    """Read/write access to the current content of the four external surfaces."""
+
+    def __init__(self, store: Ledger) -> None:
+        self._store = store
+
+    def write(self, surface: str, order_id: str | None, content: str) -> None:
+        if surface not in SURFACE_NAMES:
+            raise ValueError(f"unknown surface: {surface}")
+        self._store.set_surface(surface, order_id, content)
+
+    def read(self, surface: str) -> dict[str, Any] | None:
+        if surface not in SURFACE_NAMES:
+            raise ValueError(f"unknown surface: {surface}")
+        return self._store.get_surface(surface)
+
+    def decision_text(self, surface: str) -> str:
+        """Return the text the decision module should consider for a surface."""
+        row = self._store.get_surface(surface)
+        if row is None:
+            return ""
+        content = row["content"]
+        if surface == "invoice":
+            return invoice_context(content)
+        return content

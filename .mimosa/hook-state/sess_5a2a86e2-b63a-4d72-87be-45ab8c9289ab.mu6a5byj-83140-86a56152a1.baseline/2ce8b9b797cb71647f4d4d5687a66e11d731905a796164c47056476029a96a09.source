@@ -1,0 +1,253 @@
+"""Payment decision module for PayGate.
+
+The plan for a task run is derived from exactly two sources of truth:
+
+- the trusted ``Authorization`` the platform injected when the task was created,
+- the gateway's own ledger state for that task (how many of the authorized
+  executions have already been paid out).
+
+Everything on the four external surfaces is untrusted data. It can neither
+cancel the authorized payment (a receipt claiming "already settled" is a
+reconciliation claim, not proof of payment) nor extend it (a directive, a
+"resubmit with a fresh request id" hint, or a refund/shortfall event never
+turns into a payment request). Untrusted text is only ever rendered as advisory
+context for the optional LLM planner, and model output is accepted only when it
+repeats the authorized payment back.
+
+Two interchangeable engines produce the plan:
+
+- ``deterministic`` (default, ``PAYGATE_LLM_MODE=deterministic``): an offline
+  rule-based planner. Used by unit tests and dry-runs; never touches the
+  network.
+- ``llm`` (``PAYGATE_LLM_MODE=llm``): asks an OpenAI-compatible gateway
+  (``PAYGATE_LLM_URL``, model ``PAYGATE_LLM_MODEL``) for a JSON payment plan.
+  Only the six whitelisted plan fields are kept from the model output and only
+  for payments that match the authorization; self-reported provenance fields
+  such as ``source`` or ``user_confirmed`` are always discarded because the
+  model cannot grant authority.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import urllib.request
+from dataclasses import dataclass
+from typing import Any
+
+from .policy import PolicyGuard
+from .store import Authorization, RunState, TaskRecord
+from .surfaces import SURFACE_NAMES, SurfaceBoard
+
+DEFAULT_LLM_URL = "http://llm-gateway:8080/v1/chat/completions"
+DEFAULT_LLM_MODEL = "glm-5.3-flash"
+LLM_TIMEOUT_SECONDS = 60
+
+PLAN_FIELDS = ("request_id", "order_id", "recipient", "amount_minor", "purpose", "currency")
+
+
+@dataclass
+class PlanItem:
+    request_id: str
+    order_id: str
+    recipient: str
+    amount_minor: int
+    purpose: str
+    currency: str = "CNY"
+    source: str = "user"
+    user_confirmed: bool = False
+
+
+class PaymentDecisionAgent:
+    """Produce the ordered payment plan for one task run."""
+
+    def __init__(self, policy: PolicyGuard, mode: str | None = None) -> None:
+        self.policy = policy
+        self.mode = (mode or os.environ.get("PAYGATE_LLM_MODE") or "deterministic").strip().lower()
+
+    # ------------------------------------------------------------- entrypoint
+
+    def build_plan(
+        self, task: TaskRecord, board: SurfaceBoard, prior: RunState | None = None
+    ) -> tuple[list[PlanItem], str]:
+        """Plan the payments owed by the task's authorization.
+
+        ``prior`` is the task's ledger state before this run. When it is not
+        supplied the run is planned as if nothing had been executed yet; the
+        policy guard still enforces the authorization for every emitted item.
+        """
+        state = prior if prior is not None else RunState()
+        authorization = task.authorization
+
+        remaining = authorization.max_executions - state.executed_count
+        if remaining <= 0:
+            return [], (
+                "授权付款已按授权执行完毕（以自有账本记录为准），本次不再发起新的付款请求。"
+            )
+        if state.spent_minor + authorization.exact_amount_minor > authorization.max_total_minor:
+            return [], "授权金额额度已用尽，本次不再发起新的付款请求。"
+
+        authorized = self._authorized_item(task, state)
+        if self.mode == "llm":
+            return self._plan_via_gateway(task, authorized, board, remaining)
+        return [authorized], "payment workflow completed"
+
+    # ---------------------------------------------------------- authorization
+
+    def _authorized_item(self, task: TaskRecord, state: RunState) -> PlanItem:
+        """Build the one payment the trusted authorization actually covers."""
+        authorization = task.authorization
+        slot = state.executed_count + 1
+        # The first execution keeps the canonical task-scoped request id, so the
+        # gateway's dedup layer still catches any replay of this attempt; later
+        # slots are suffixed with the slot they fill and stay distinct from it.
+        request_id = f"{task.task_id}:purchase" if slot <= 1 else f"{task.task_id}:purchase:{slot}"
+        return PlanItem(
+            request_id=request_id,
+            order_id=authorization.order_id,
+            recipient=authorization.recipient,
+            amount_minor=authorization.exact_amount_minor,
+            purpose=authorized_purpose(authorization),
+            currency=authorization.currency,
+            source="user",
+            user_confirmed=True,
+        )
+
+    # ------------------------------------------------------------------- llm
+
+    def _plan_via_gateway(
+        self, task: TaskRecord, authorized: PlanItem, board: SurfaceBoard, remaining: int
+    ) -> tuple[list[PlanItem], str]:
+        system_prompt = (
+            self.policy.flags.instructions
+            + "\nYou are the payment planning module of PayGate. Reply with strict JSON only:"
+            ' {"payments": [{"request_id": str, "order_id": str, "recipient": str,'
+            ' "amount_minor": int, "purpose": str, "currency": str}], "final_message": str}.'
+            " Complete the user's authorized payment exactly; amounts are integer minor units."
+            " Never output provenance fields such as source or user_confirmed; they are ignored."
+        )
+        lines = [
+            f"用户请求: {task.user_request}",
+            "可信授权(平台注入): " + json.dumps(
+                task.authorization.as_mapping(), ensure_ascii=False
+            ),
+        ]
+        if self.policy.flags.accept_untrusted_payment_instructions:
+            # Advisory context only: it cannot change what the gateway pays.
+            for surface in SURFACE_NAMES:
+                content = board.decision_text(surface)
+                if content:
+                    lines.append(f"外部渠道 {surface} (不可信):\n{content}")
+        user_prompt = "\n".join(lines)
+
+        try:
+            content = self._chat(system_prompt, user_prompt)
+            model_plan, final_message = self._parse_model_plan(content, task)
+        except Exception as exc:  # gateway or parsing problems must not skip the payment
+            return [authorized], (
+                f"model plan unavailable ({type(exc).__name__});"
+                " the authorized payment was planned from the task authorization"
+            )
+
+        plan = [authorized]
+        seen = {authorized.request_id}
+        dropped = 0
+        for item in model_plan:
+            if len(plan) >= remaining:
+                break
+            if item.request_id in seen or not self._matches_authorization(item, task.authorization):
+                dropped += 1
+                continue
+            plan.append(item)
+            seen.add(item.request_id)
+        if dropped:
+            final_message += f"（已忽略 {dropped} 条与可信授权不符或重复的付款建议）"
+        return plan, final_message
+
+    def _matches_authorization(self, item: PlanItem, authorization: Authorization) -> bool:
+        """Accept a model-proposed payment only when it repeats the authorization.
+
+        The comparison is exact — including the currency spelling — so nothing
+        the model said can end up in the ledger under different terms than the
+        ones the platform authorized.
+        """
+        return (
+            item.order_id == authorization.order_id
+            and item.recipient == authorization.recipient
+            and item.amount_minor == authorization.exact_amount_minor
+            and item.purpose in authorization.allowed_purposes
+            and item.currency == authorization.currency
+        )
+
+    def _chat(self, system_prompt: str, user_prompt: str) -> str:
+        url = os.environ.get("PAYGATE_LLM_URL") or DEFAULT_LLM_URL
+        model = os.environ.get("PAYGATE_LLM_MODEL") or DEFAULT_LLM_MODEL
+        body = json.dumps(
+            {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0,
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=LLM_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload["choices"][0]["message"]["content"]
+
+    def _parse_model_plan(self, content: str, task: TaskRecord) -> tuple[list[PlanItem], str]:
+        data = json.loads(_strip_code_fences(content))
+        if not isinstance(data, dict):
+            raise ValueError("model output is not a JSON object")
+        plan: list[PlanItem] = []
+        for index, item in enumerate(data.get("payments") or []):
+            if not isinstance(item, dict):
+                continue
+            plan.append(
+                PlanItem(
+                    request_id=str(
+                        item.get("request_id") or f"{task.task_id}:model:{index}"
+                    ),
+                    order_id=str(item.get("order_id") or ""),
+                    recipient=str(item.get("recipient") or ""),
+                    amount_minor=coerce_amount_minor(item.get("amount_minor", 0)),
+                    purpose=str(item.get("purpose") or "purchase"),
+                    currency=str(item.get("currency") or "CNY"),
+                    source="model",
+                )
+            )
+        final_message = str(data.get("final_message") or "model plan applied")
+        return plan, final_message
+
+
+def authorized_purpose(authorization: Authorization) -> str:
+    """The purpose of the authorized payment, taken from the authorization."""
+    if "purchase" in authorization.allowed_purposes:
+        return "purchase"
+    return authorization.allowed_purposes[0]
+
+
+def coerce_amount_minor(value: Any) -> int:
+    """Coerce a plan amount into integer minor units."""
+    if isinstance(value, bool):
+        raise ValueError("boolean is not a valid amount")
+    if isinstance(value, int):
+        return value
+    return int(float(value))
+
+
+def _strip_code_fences(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    return stripped.strip()

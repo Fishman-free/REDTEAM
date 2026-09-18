@@ -1,0 +1,1494 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260917T050741530Z-89980-8a1453897977",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "candidate-select",
+      "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/main.py",
+      "reason": "candidate_limit_exceeded: 44 changed reviewable file(s) were not scanned because the limit is 20"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/tests/test_paygate.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/main.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/policy.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/surfaces.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/tests/test_paygate.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/main.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/policy.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/surfaces.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/tests/test_paygate.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": true,
+      "captured_files": 391,
+      "candidate_limit": 5000,
+      "truncated": false,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 0
+    },
+    "change_tracking": {
+      "touched_observed": 0,
+      "touched_retained": 0,
+      "truncated": false,
+      "bash_mutation": true,
+      "bash_discovered": 64,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 64,
+      "selected_files": 20,
+      "limit": 20,
+      "truncated": true
+    },
+    "scanning": {
+      "required_files": 14,
+      "scanned_files": 14,
+      "skipped_files": 0,
+      "failed_files": 0,
+      "project_checks_required": 1,
+      "project_checks_completed": 1
+    },
+    "notification": {
+      "eligible_findings": 17,
+      "detailed_findings": 3,
+      "detail_limit": 3,
+      "truncated": true
+    },
+    "reason_counts": {
+      "candidate_limit_exceeded": 1,
+      "baseline_snapshot_unreadable": 20,
+      "project_check_failed": 21
+    },
+    "reasons": [
+      {
+        "code": "candidate_limit_exceeded",
+        "stage": "candidate-select",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/main.py",
+        "detail": "44 changed reviewable file(s) were not scanned because the limit is 20",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/tests/test_paygate.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/policy.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/surfaces.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/tests/test_paygate.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/policy.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/surfaces.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/tests/test_paygate.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "candidate-select",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/main.py",
+        "detail": "candidate_limit_exceeded: 44 changed reviewable file(s) were not scanned because the limit is 20",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/tests/test_paygate.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/policy.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/surfaces.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/tests/test_paygate.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/policy.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/surfaces.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/tests/test_paygate.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-17T05:07:41.530Z",
+  "session_id": "sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab",
+  "target": ".",
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "rules_version": "unavailable",
+  "diff_hash": "d7b11dbf9d5ea5bd6fbb9149aa4c6de173deea5a2de460db6a528ef97b9989ac",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 17,
+    "changed_files": [
+      {
+        "file": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 295
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "44ff82eec9f3168de6c8d5d97dd63e652a9a2b7f96d5f8bd9c210d351835135e"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget2/version-store/repository/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget2/version-store/repository/source/tests/test_paygate.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 590
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "087a76282da2391c53b4cf239d22251c4919e3eaf5493c3a196e97b3550535c4"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 295
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "44ff82eec9f3168de6c8d5d97dd63e652a9a2b7f96d5f8bd9c210d351835135e"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/main.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 295
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "1de08b99e8cb7aef906dc4627ebfd2abaab04620ba022c89e4fc12ecfc83478b"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/policy.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 227
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "a4280076d4a48a0151c3bd2438e106bc752731472d08e66dd0d3cee6686fe81d"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 298
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "3f8c20b69f18cf153ae895a98e6797e5338f0bd9cc6054fa7d2089055bcd7879"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/surfaces.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 175
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "06049d024841138cc495e6ffb0a56adafca00ef7e6bee8a99b7e87fa811fb3c3"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/tests/test_paygate.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 590
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "087a76282da2391c53b4cf239d22251c4919e3eaf5493c3a196e97b3550535c4"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 295
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "44ff82eec9f3168de6c8d5d97dd63e652a9a2b7f96d5f8bd9c210d351835135e"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/main.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 295
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "1de08b99e8cb7aef906dc4627ebfd2abaab04620ba022c89e4fc12ecfc83478b"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/policy.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 227
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "a4280076d4a48a0151c3bd2438e106bc752731472d08e66dd0d3cee6686fe81d"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 298
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "3f8c20b69f18cf153ae895a98e6797e5338f0bd9cc6054fa7d2089055bcd7879"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/surfaces.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 175
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "06049d024841138cc495e6ffb0a56adafca00ef7e6bee8a99b7e87fa811fb3c3"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/tests/test_paygate.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 590
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "087a76282da2391c53b4cf239d22251c4919e3eaf5493c3a196e97b3550535c4"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-17T05:07:39.608Z",
+    "completed_at": "2026-09-17T05:07:41.530Z",
+    "duration_ms": 1922,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 1922,
+    "peakMemoryBytes": 221577216,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 14,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 17,
+  "rewake_finding_count": 3,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [
+    {
+      "finding_id": "mimosa-9efc6e51a84339c21c0f1f35",
+      "file": "scripts/parallel_grid.py",
+      "line": 32,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "命令注入",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-09-17T05:01:03.918Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "81b7699ee9820b5e2116bff2289551d6f915b10b556344ebe9f4d6ddc2409b4a",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-0e4555a02023bcae07082407",
+      "file": "scripts/parallel_grid.py",
+      "line": 32,
+      "rule_id": "security",
+      "severity": "high",
+      "category": "命令注入",
+      "status": "blocked",
+      "decision": "deny",
+      "at": "2026-09-17T05:01:51.961Z",
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "d6f196db816cc7c2f99c55c0f6a1c32fd4213ac6723b346da090a072c12d3278",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-aec975f60bfafe93ce7922e5",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+      "line": 251,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-20c6eb7deed2744bafb36b82",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 153,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-7228672ec34bb0ba5a8ed039",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 169,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-20c6eb7deed2744bafb36b82",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 206,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-ed111840d150c04f093bdd1b",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 248,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-20c6eb7deed2744bafb36b82",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 266,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-7228672ec34bb0ba5a8ed039",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 276,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-7c28a07533c4f2f7c166801d",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 285,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-1769a74b7593c624385fae9f",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+      "line": 251,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-8406a17da2b8c3c622f2e617",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 153,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-403cdb40b29a4adb98bfbd79",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 169,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-8406a17da2b8c3c622f2e617",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 206,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-5a54bf8a7df2ac5882de424d",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 248,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-8406a17da2b8c3c622f2e617",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 266,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-403cdb40b29a4adb98bfbd79",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 276,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-de1bc0bd454dffc9e5581890",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 285,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-18de575b17a721c03044f7de",
+      "file": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+      "line": 251,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T05:07:41.530Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "runtime_oracle": false
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "mimosa-aec975f60bfafe93ce7922e5",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+      "line": 251,
+      "end_line": 251,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/llm_agent.py",
+          "line": 251,
+          "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-20c6eb7deed2744bafb36b82",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 153,
+      "end_line": 153,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 153,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-7228672ec34bb0ba5a8ed039",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 169,
+      "end_line": 169,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 169,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-20c6eb7deed2744bafb36b82",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 206,
+      "end_line": 206,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 206,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-ed111840d150c04f093bdd1b",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 248,
+      "end_line": 248,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 248,
+          "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-20c6eb7deed2744bafb36b82",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 266,
+      "end_line": 266,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 266,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-7228672ec34bb0ba5a8ed039",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 276,
+      "end_line": 276,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 276,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-7c28a07533c4f2f7c166801d",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+      "line": 285,
+      "end_line": 285,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/repository/source/app/store.py",
+          "line": 285,
+          "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-1769a74b7593c624385fae9f",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+      "line": 251,
+      "end_line": 251,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/llm_agent.py",
+          "line": 251,
+          "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-8406a17da2b8c3c622f2e617",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 153,
+      "end_line": 153,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 153,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-403cdb40b29a4adb98bfbd79",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 169,
+      "end_line": 169,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 169,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-8406a17da2b8c3c622f2e617",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 206,
+      "end_line": 206,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 206,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-5a54bf8a7df2ac5882de424d",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 248,
+      "end_line": 248,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 248,
+          "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-8406a17da2b8c3c622f2e617",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 266,
+      "end_line": 266,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 266,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-403cdb40b29a4adb98bfbd79",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 276,
+      "end_line": 276,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 276,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-de1bc0bd454dffc9e5581890",
+      "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+      "line": 285,
+      "end_line": 285,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget3/version-store/projections/seeded-v0-92ca3bc3edd9af62/source/app/store.py",
+          "line": 285,
+          "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-18de575b17a721c03044f7de",
+      "file": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+      "line": 251,
+      "end_line": 251,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/llmtarget2/version-store/repository/source/app/llm_agent.py",
+          "line": 251,
+          "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    }
+  ],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T050741530Z-89980-8a1453897977.json",
+    "latest_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab.json",
+    "history_summary": ".mimosa/history/run-20260917T050741530Z-89980-8a1453897977.json"
+  }
+}

@@ -1,0 +1,1223 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260917T131725834Z-92076-e863da146099",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "baseline-read",
+      "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": true,
+      "captured_files": 557,
+      "candidate_limit": 5000,
+      "truncated": false,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 0
+    },
+    "change_tracking": {
+      "touched_observed": 0,
+      "touched_retained": 0,
+      "truncated": false,
+      "bash_mutation": true,
+      "bash_discovered": 14,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 14,
+      "selected_files": 14,
+      "limit": 20,
+      "truncated": false
+    },
+    "scanning": {
+      "required_files": 10,
+      "scanned_files": 10,
+      "skipped_files": 0,
+      "failed_files": 0,
+      "project_checks_required": 1,
+      "project_checks_completed": 1
+    },
+    "notification": {
+      "eligible_findings": 16,
+      "detailed_findings": 3,
+      "detail_limit": 3,
+      "truncated": true
+    },
+    "reason_counts": {
+      "baseline_snapshot_unreadable": 14,
+      "project_check_failed": 14
+    },
+    "reasons": [
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-09-17T13:17:25.834Z",
+  "session_id": "sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab",
+  "target": ".",
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "rules_version": "unavailable",
+  "diff_hash": "16b34d2c4879218deece87dc68a451fe17eda67191c1ac17034070e3f5877c8b",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 12,
+    "changed_files": [
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 451
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "1ff9159b7822149ace2070e69e8ebc3ec1dd0494027fbb32282fe14c86066023"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 304
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "82abbbae760f19cca77c656cd860f83d40a415f049609db2571bb39e224b2988"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 31
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "afb2d53dad9ab73ce1532092b8438118bad5f18a999b52b4df2059a172e6c9e1"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 284
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b16917d367457e66023da23170004ff87b30f5fb42b7451656a162fd14cf7613"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 544
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "2e5aeb521275ac3aba894dc2061b26cfb52c4806aec42e021507b181b938d8fd"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 451
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "1ff9159b7822149ace2070e69e8ebc3ec1dd0494027fbb32282fe14c86066023"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 304
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "82abbbae760f19cca77c656cd860f83d40a415f049609db2571bb39e224b2988"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 31
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "afb2d53dad9ab73ce1532092b8438118bad5f18a999b52b4df2059a172e6c9e1"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 284
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b16917d367457e66023da23170004ff87b30f5fb42b7451656a162fd14cf7613"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/requirements.txt",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 2
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a"
+      },
+      {
+        "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 544
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "2e5aeb521275ac3aba894dc2061b26cfb52c4806aec42e021507b181b938d8fd"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-09-17T13:17:23.962Z",
+    "completed_at": "2026-09-17T13:17:25.834Z",
+    "duration_ms": 1872,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 1872,
+    "peakMemoryBytes": 209371136,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 10,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 16,
+  "rewake_finding_count": 3,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [
+    {
+      "finding_id": "mimosa-27a9faea0f823b99be2e24b3",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+      "line": 422,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-ab65b98054bfdb42375a1829",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 148,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-9b49a129fe547bc29e1cb1c9",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 164,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-ab65b98054bfdb42375a1829",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 191,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-f43b198c69aefb35d9f633ae",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 234,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-ab65b98054bfdb42375a1829",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 252,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-9b49a129fe547bc29e1cb1c9",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 262,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "blocked",
+      "decision": "stop_rewake",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-3ed7550f31b1d9e301508f4e",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 271,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-6895423714163a29a79c7d0c",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+      "line": 422,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-4860a1c9b6063eec727a536d",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 148,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-eca91652f363cb53020e3c09",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 164,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-4860a1c9b6063eec727a536d",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 191,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-bc0f320451a0f77124707662",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 234,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-4860a1c9b6063eec727a536d",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 252,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-eca91652f363cb53020e3c09",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 262,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "runtime_oracle": false
+      }
+    },
+    {
+      "finding_id": "mimosa-cc717f39055e4d56d22a1876",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 271,
+      "severity": "high",
+      "category": "SQL 注入",
+      "status": "candidate",
+      "decision": "observe",
+      "at": "2026-09-17T13:17:25.834Z",
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "source": "semgrep",
+        "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+        "runtime_oracle": false
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "mimosa-27a9faea0f823b99be2e24b3",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+      "line": 422,
+      "end_line": 422,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+          "line": 422,
+          "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-ab65b98054bfdb42375a1829",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 148,
+      "end_line": 148,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 148,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-9b49a129fe547bc29e1cb1c9",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 164,
+      "end_line": 164,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 164,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-ab65b98054bfdb42375a1829",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 191,
+      "end_line": 191,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 191,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-f43b198c69aefb35d9f633ae",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 234,
+      "end_line": 234,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 234,
+          "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-ab65b98054bfdb42375a1829",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 252,
+      "end_line": 252,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 252,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-9b49a129fe547bc29e1cb1c9",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 262,
+      "end_line": 262,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "blocked",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 262,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": true
+    },
+    {
+      "finding_id": "mimosa-3ed7550f31b1d9e301508f4e",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "line": 271,
+      "end_line": 271,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+          "line": 271,
+          "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-6895423714163a29a79c7d0c",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+      "line": 422,
+      "end_line": 422,
+      "severity": "high",
+      "category": "SSRF 服务端请求伪造",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+          "line": 422,
+          "evidence_hash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-4860a1c9b6063eec727a536d",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 148,
+      "end_line": 148,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 148,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-eca91652f363cb53020e3c09",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 164,
+      "end_line": 164,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 164,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-4860a1c9b6063eec727a536d",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 191,
+      "end_line": 191,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 191,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-bc0f320451a0f77124707662",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 234,
+      "end_line": 234,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 234,
+          "evidence_hash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-4860a1c9b6063eec727a536d",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 252,
+      "end_line": 252,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 252,
+          "evidence_hash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-eca91652f363cb53020e3c09",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 262,
+      "end_line": 262,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 262,
+          "evidence_hash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    },
+    {
+      "finding_id": "mimosa-cc717f39055e4d56d22a1876",
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "line": 271,
+      "end_line": 271,
+      "severity": "high",
+      "category": "SQL 注入",
+      "kind": "semgrep",
+      "advisory": false,
+      "status": "candidate",
+      "evidence_boundary": "candidate",
+      "evidence": [
+        {
+          "kind": "static_scan",
+          "boundary": "candidate",
+          "producer": "deterministic",
+          "source": "semgrep",
+          "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+          "line": 271,
+          "evidence_hash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+          "runtime_oracle": false
+        }
+      ],
+      "already_reported_to_agent": false,
+      "selected_for_rewake": false
+    }
+  ],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T131725834Z-92076-e863da146099.json",
+    "latest_report": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab.json",
+    "history_summary": ".mimosa/history/run-20260917T131725834Z-92076-e863da146099.json"
+  }
+}

@@ -1,0 +1,14 @@
+"""Shared test setup: one temporary ledger per test session.
+
+Set here, before any test module (and therefore before ``app.main``) is
+imported, so every module in this directory agrees on the ledger location.
+An externally configured ``PAYGATE_DB`` always wins.
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+
+_TMP_DIR = tempfile.mkdtemp(prefix="paygate-tests-")
+os.environ.setdefault("PAYGATE_DB", os.path.join(_TMP_DIR, "paygate.sqlite"))

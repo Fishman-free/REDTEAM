@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260917T091343427Z-51873-b5d2b4699d45",
+  "runId": "20260917T091343427Z-51873-b5d2b4699d45",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "diffHash": "a3670ad3c31d5641ade4006749a7b018cca5dbda9fac440b7c05239af9398ff7",
+  "rulesVersion": "unavailable",
+  "sessionHash": "7213e7040c08181a8e36e05f4bfc82cd0a4a3c2d3181c01951bec238f7ce76ee",
+  "reportRef": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T091343427Z-51873-b5d2b4699d45.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "src/rsi4safety/arena/benchmark_seeds.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/rsi4safety/arena/benchmark_runner.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "src/rsi4safety/cli.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-17T09:13:43.627Z"
+}

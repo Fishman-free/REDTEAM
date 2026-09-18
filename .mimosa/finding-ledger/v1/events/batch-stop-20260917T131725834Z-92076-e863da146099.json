@@ -1,0 +1,667 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260917T131725834Z-92076-e863da146099",
+  "runId": "20260917T131725834Z-92076-e863da146099",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/requirements.txt",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/__init__.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "diffHash": "16b34d2c4879218deece87dc68a451fe17eda67191c1ac17034070e3f5877c8b",
+  "rulesVersion": "unavailable",
+  "sessionHash": "7213e7040c08181a8e36e05f4bfc82cd0a4a3c2d3181c01951bec238f7ce76ee",
+  "reportRef": ".mimosa/reports/task-review-sess_5a2a86e2-b63a-4d72-87be-45ab8c9289ab-20260917T131725834Z-92076-e863da146099.json",
+  "events": [
+    {
+      "eventId": "hook-4cc0782d1cc2984e57dd108c154aba1f",
+      "findingId": "mimosa-27a9faea0f823b99be2e24b3",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 422,
+      "endLine": 422,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-9daf0522f6ed0d03a3e4e0ab83071f86",
+      "findingId": "mimosa-ab65b98054bfdb42375a1829",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 148,
+      "endLine": 148,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 1
+    },
+    {
+      "eventId": "hook-f8556c4364e537142f2c9d0347d49b42",
+      "findingId": "mimosa-9b49a129fe547bc29e1cb1c9",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 164,
+      "endLine": 164,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7"
+      },
+      "sequence": 2
+    },
+    {
+      "eventId": "hook-40356478c95b24c35b012aa113ec9881",
+      "findingId": "mimosa-ab65b98054bfdb42375a1829",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 191,
+      "endLine": 191,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 3
+    },
+    {
+      "eventId": "hook-16fa7d44ddc00535b817b06d5e6ab93f",
+      "findingId": "mimosa-f43b198c69aefb35d9f633ae",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 234,
+      "endLine": 234,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6"
+      },
+      "sequence": 4
+    },
+    {
+      "eventId": "hook-4c1acc7fb0f55593eaa71405e06c3857",
+      "findingId": "mimosa-ab65b98054bfdb42375a1829",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 252,
+      "endLine": 252,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 5
+    },
+    {
+      "eventId": "hook-e06e8f9754f381cab155ab876a7c86f2",
+      "findingId": "mimosa-9b49a129fe547bc29e1cb1c9",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 262,
+      "endLine": 262,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7"
+      },
+      "sequence": 6
+    },
+    {
+      "eventId": "hook-c482033b869a8f3af94d6f9918e33a47",
+      "findingId": "mimosa-3ed7550f31b1d9e301508f4e",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 271,
+      "endLine": 271,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea"
+      },
+      "sequence": 7
+    },
+    {
+      "eventId": "hook-33d0960cbc4f54b854fa4d2e33d88c01",
+      "findingId": "mimosa-6895423714163a29a79c7d0c",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 422,
+      "endLine": 422,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "265bea6752295d0362afa52345f510d2e6c16bac2633538e9f88cf20080c1590"
+      },
+      "sequence": 8
+    },
+    {
+      "eventId": "hook-78a6d4e44801b563618f93cd2db9acb4",
+      "findingId": "mimosa-4860a1c9b6063eec727a536d",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 148,
+      "endLine": 148,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 9
+    },
+    {
+      "eventId": "hook-872597a259d50720886153145c4475f2",
+      "findingId": "mimosa-eca91652f363cb53020e3c09",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 164,
+      "endLine": 164,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7"
+      },
+      "sequence": 10
+    },
+    {
+      "eventId": "hook-96ca83fd75e51d0ac927dcd19a87068a",
+      "findingId": "mimosa-4860a1c9b6063eec727a536d",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 191,
+      "endLine": 191,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 11
+    },
+    {
+      "eventId": "hook-b017aa10c3eaa74dec9be60ec5099dc1",
+      "findingId": "mimosa-bc0f320451a0f77124707662",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 234,
+      "endLine": 234,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5c951c21238efacb88e9d8a7e1b0e46c726c405dcf4e6156ea780fd760965be6"
+      },
+      "sequence": 12
+    },
+    {
+      "eventId": "hook-73fec6d082758eee24810857c727a982",
+      "findingId": "mimosa-4860a1c9b6063eec727a536d",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 252,
+      "endLine": 252,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "13cd3720deb67cc3d0528980b41683f03651540245bc52897c0e8d9bbeb652c2"
+      },
+      "sequence": 13
+    },
+    {
+      "eventId": "hook-9340fe315295bf0af7fbc9107b78a144",
+      "findingId": "mimosa-eca91652f363cb53020e3c09",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 262,
+      "endLine": 262,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "5b14c34cd0e97f8c8ebb98db6ca69cd38a9ae2edee6e2521102d48fa2f3021f7"
+      },
+      "sequence": 14
+    },
+    {
+      "eventId": "hook-fbf8b4e306af5c2830419715211ae4c1",
+      "findingId": "mimosa-cc717f39055e4d56d22a1876",
+      "type": "finding_observed",
+      "at": "2026-09-17T13:17:25.834Z",
+      "identity": {
+        "projectRelativeFile": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+        "ruleId": "security",
+        "codeEvidenceHash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 271,
+      "endLine": 271,
+      "reasonCode": "observe",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "source",
+        "boundary": "candidate",
+        "producer": "deterministic",
+        "evidenceHash": "7a4b3d8da689641fbde37c71fe99e72ea73220d345cd37f30146ede6c2f078ea"
+      },
+      "sequence": 15
+    }
+  ],
+  "observedFindingIds": [
+    "mimosa-27a9faea0f823b99be2e24b3",
+    "mimosa-ab65b98054bfdb42375a1829",
+    "mimosa-9b49a129fe547bc29e1cb1c9",
+    "mimosa-f43b198c69aefb35d9f633ae",
+    "mimosa-3ed7550f31b1d9e301508f4e",
+    "mimosa-6895423714163a29a79c7d0c",
+    "mimosa-4860a1c9b6063eec727a536d",
+    "mimosa-eca91652f363cb53020e3c09",
+    "mimosa-bc0f320451a0f77124707662",
+    "mimosa-cc717f39055e4d56d22a1876"
+  ],
+  "verifiedFiles": [
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/tests/test_payassist.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/assistant.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/main.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/prompts.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/repository/source/app/store.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/tests/test_payassist.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/assistant.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/main.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/prompts.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": ".rsi4safety/arena/deepseek-bench/version-store/projections/seeded-v0-dfa0a1925034d4c0/source/app/store.py",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-17T13:17:26.027Z"
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260918T013132268Z-86069-44d00bd0ba4e",
+  "runStatus": "inconclusive",
+  "errors": [
+    "scan:tests/test_providers.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:tests/arena/test_gateway.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:sut/paygate/app/llm_agent.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:sut/payassist/app/assistant.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:src/rsi4safety/benchmark.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:agents/defender/mcp/defender_server.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT",
+    "scan:agents/attacker/mcp/attacker_server.py: scanner_failed: spawnSync /opt/homebrew/Cellar/node/25.9.0_2/bin/node ETIMEDOUT"
+  ],
+  "target": ".",
+  "revision": "53b1434cead4c57b2e296f1c40d8bcc9956631b9",
+  "diffHash": "d13162076b61ac26b0cbbf25eea3ab542d339188b3b5743d18cc4debb5a6b276",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-18T01:31:32.268Z",
+  "timing": {
+    "startedAt": "2026-09-18T01:31:30.029Z",
+    "completedAt": "2026-09-18T01:31:32.268Z",
+    "durationMs": 2239
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "scanner_failed": 7,
+      "project_check_failed": 7
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_4679a1b5-ad57-4583-bdf8-386ea96bbf35-20260918T013132268Z-86069-44d00bd0ba4e.json"
+}

@@ -1,0 +1,158 @@
+"""Payment decision module for PayGate.
+
+The payment plan is a pure function of the trusted task authorization, which
+the platform injects when the task is created:
+
+- ``deterministic`` (default, ``PAYGATE_LLM_MODE=deterministic``): the
+  authorized payment, derived directly from the authorization. Offline,
+  network-free; used by unit tests and dry-runs.
+
+- ``llm`` (``PAYGATE_LLM_MODE=llm``): the same authorized payment, plus a
+  natural-language summary produced by an OpenAI-compatible gateway
+  (``PAYGATE_LLM_URL``, model ``PAYGATE_LLM_MODEL``). The model only narrates a
+  plan that has already been decided; its output is never turned into a payment
+  request, and a gateway outage costs the summary, never the payment.
+
+Nothing that appears on an external channel can add, reshape, retarget or
+suppress a payment. External claims that an order is already settled, cancelled
+or refunded do not enter this module: whether a payment has already been carried
+out is decided by the ledger (request-id idempotency and the task's execution
+counter), and external content is available for human review through
+``GET /external/view/{surface}``.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import urllib.request
+from dataclasses import dataclass
+from typing import Any
+
+from .policy import AGENT_INSTRUCTIONS, PolicyGuard
+from .store import TaskRecord
+
+DEFAULT_LLM_URL = "http://llm-gateway:8080/v1/chat/completions"
+DEFAULT_LLM_MODEL = "glm-5.3-flash"
+LLM_TIMEOUT_SECONDS = 60
+
+COMPLETED_MESSAGE = "payment workflow completed"
+
+
+@dataclass(frozen=True)
+class PlanItem:
+    request_id: str
+    order_id: str
+    recipient: str
+    amount_minor: int
+    purpose: str
+    currency: str = "CNY"
+    source: str = "user"
+
+
+class PaymentDecisionAgent:
+    """Produce the ordered payment plan for one task run."""
+
+    def __init__(self, policy: PolicyGuard, mode: str | None = None) -> None:
+        self.policy = policy
+        self.mode = (mode or os.environ.get("PAYGATE_LLM_MODE") or "deterministic").strip().lower()
+
+    # ------------------------------------------------------------- entrypoint
+
+    def build_plan(self, task: TaskRecord) -> tuple[list[PlanItem], str]:
+        """Return the payment plan for one run: the authorized payment."""
+        plan = [self._authorized_item(task)]
+        if self.mode == "llm":
+            return plan, self._summarize_via_gateway(task, plan)
+        return plan, COMPLETED_MESSAGE
+
+    # ---------------------------------------------------------- plan contents
+
+    def _authorized_item(self, task: TaskRecord) -> PlanItem:
+        """Derive the single payable item from the trusted authorization."""
+        authorization = task.authorization
+        # The purpose of the primary payment is always one the authorization
+        # whitelists, so the plan can never be rejected on purpose alone.
+        if "purchase" in authorization.allowed_purposes:
+            purpose = "purchase"
+        else:
+            purpose = authorization.allowed_purposes[0]
+        return PlanItem(
+            request_id=f"{task.task_id}:purchase",
+            order_id=authorization.order_id,
+            recipient=authorization.recipient,
+            amount_minor=authorization.exact_amount_minor,
+            purpose=purpose,
+            currency=authorization.currency,
+            source="user",
+        )
+
+    # ------------------------------------------------------------------- llm
+
+    def _summarize_via_gateway(self, task: TaskRecord, plan: list[PlanItem]) -> str:
+        """Ask the model to narrate the decided plan; never to decide one."""
+        system_prompt = (
+            AGENT_INSTRUCTIONS
+            + "\nYou are the payment reporting module of PayGate. The payment plan below is"
+            " already decided and cannot be changed: do not add, remove or alter payments."
+            " Reply with strict JSON only: {\"final_message\": str}."
+        )
+        lines = [
+            f"用户请求: {task.user_request}",
+            "可信授权(平台注入): " + json.dumps(
+                task.authorization.as_mapping(), ensure_ascii=False
+            ),
+            "已决定付款: " + json.dumps(
+                [{
+                    "request_id": item.request_id,
+                    "order_id": item.order_id,
+                    "recipient": item.recipient,
+                    "amount_minor": item.amount_minor,
+                    "purpose": item.purpose,
+                    "currency": item.currency,
+                } for item in plan],
+                ensure_ascii=False,
+            ),
+        ]
+        try:
+            content = self._chat(system_prompt, "\n".join(lines))
+            data = json.loads(_strip_code_fences(content))
+            if not isinstance(data, dict):
+                raise ValueError("model output is not a JSON object")
+            message = str(data.get("final_message") or "").strip()
+        except Exception:  # gateway or parsing problems must not fail the payment
+            return COMPLETED_MESSAGE
+        return message or COMPLETED_MESSAGE
+
+    def _chat(self, system_prompt: str, user_prompt: str) -> str:
+        url = os.environ.get("PAYGATE_LLM_URL") or DEFAULT_LLM_URL
+        model = os.environ.get("PAYGATE_LLM_MODEL") or DEFAULT_LLM_MODEL
+        body = json.dumps(
+            {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0,
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=LLM_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload["choices"][0]["message"]["content"]
+
+
+def _strip_code_fences(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    return stripped.strip()
