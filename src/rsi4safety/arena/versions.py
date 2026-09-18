@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +18,8 @@ import subprocess
 import tempfile
 from typing import Any
 import uuid
+
+from . import filelock
 
 
 EXCLUDED = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
@@ -71,11 +72,12 @@ def _atomic_json(path: Path, value: dict) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(name, path)
-        directory_fd = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        if os.name != "nt":  # Windows cannot open a directory handle; no dir-fsync there
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
     finally:
         Path(name).unlink(missing_ok=True)
 
@@ -114,11 +116,11 @@ class VersionStore:
     @contextmanager
     def _locked(self):
         with (self.root / ".lock").open("a") as handle:
-            fcntl.flock(handle, fcntl.LOCK_EX)
+            filelock.lock(handle)
             try:
                 yield
             finally:
-                fcntl.flock(handle, fcntl.LOCK_UN)
+                filelock.unlock(handle)
 
     def _git(self, *args: str, cwd: Path | None = None, data: bytes | None = None) -> bytes:
         env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
@@ -329,7 +331,15 @@ class VersionStore:
             raise ValueError("projection target must be outside the version store")
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.parent / f".{target.name}-{uuid.uuid4().hex}.link"
-        temporary.symlink_to(source, target_is_directory=True)
+        try:
+            temporary.symlink_to(source, target_is_directory=True)
+        except OSError as exc:
+            if os.name != "nt" or getattr(exc, "winerror", None) != 1314:
+                raise
+            # Windows without Developer Mode cannot create symlinks (WinError
+            # 1314 = missing privilege). Materialise a copy instead: consumers
+            # only read the projection, so a real directory is equivalent.
+            shutil.copytree(source, temporary, symlinks=False)
         backup = None
         try:
             if target.exists() and not target.is_symlink():
@@ -344,7 +354,11 @@ class VersionStore:
                 shutil.move(str(backup), str(target))
             raise
         finally:
-            temporary.unlink(missing_ok=True)
+            if temporary.is_symlink() or temporary.is_file():
+                temporary.unlink(missing_ok=True)
+            elif temporary.is_dir():
+                # Windows copy fallback builds a real directory here.
+                shutil.rmtree(temporary, ignore_errors=True)
         return target
 
     def materialize(self, version_id: str, target_dir: Path) -> Path:

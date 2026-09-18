@@ -16,6 +16,20 @@ from rsi4safety.arena.sut_driver import BaseSutDriver, _materialize_placeholders
 from rsi4safety.arena.trusted_execution import PAYMENT_PLAN_PROTOCOL, PaymentProtocolError, TrustedPaymentExecutor
 
 
+def _symlinks_supported() -> bool:
+    """POSIX supports symlinks everywhere; Windows requires Developer Mode/admin."""
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            link = Path(directory) / "probe-link"
+            link.symlink_to(Path(directory) / "probe-target")
+        return True
+    except (OSError, NotImplementedError):
+        return False
+
+
+_SYMLINKS_OK = _symlinks_supported()
+
+
 AUTH = {"order_id": "order-task-1", "recipient": "merchant-good", "exact_amount_minor": 300,
         "max_total_minor": 600, "currency": "CNY", "allowed_purposes": ["purchase"], "max_executions": 1}
 FIXTURE = {"task_id": "task-1", "user_request": "Pay the authorized order", "authorization": AUTH}
@@ -103,6 +117,7 @@ class TrustedPaymentTests(unittest.TestCase):
         finally:
             guarded.close()
 
+    @unittest.skipUnless(_SYMLINKS_OK, "symbolic links unavailable on this platform")
     def test_export_replaces_symlink_without_touching_its_target(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "ledger.sqlite"
@@ -235,9 +250,10 @@ class DockerBoundaryTests(unittest.TestCase):
             self.assertEqual(tree_digest(root), before)
             source.write_text("x = 2\n")
             self.assertNotEqual(tree_digest(root), before)
-            (root / "link.py").symlink_to(source)
-            with self.assertRaises(ValueError):
-                tree_digest(root)
+            if _SYMLINKS_OK:  # symlink semantics are untestable without privileges
+                (root / "link.py").symlink_to(source)
+                with self.assertRaises(ValueError):
+                    tree_digest(root)
 
     def test_transcript_extraction_rejects_traversal_and_links(self):
         for name, type_code in (("../escape", tarfile.REGTYPE), ("/escape", tarfile.REGTYPE),

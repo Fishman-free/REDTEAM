@@ -46,10 +46,19 @@ EXCHANGE_DIR = Path(os.environ.get("EXCHANGE_DIR", "/exchange/defender"))
 WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/agent/workspace"))
 SOURCE_DIR = Path(os.environ.get("SOURCE_DIR", "/agent/source"))
 
-# Path traversal guard: SOURCE_DIR must be a simple absolute path
-import re as _re
-if not _re.match(r"^/[a-zA-Z0-9/_-]+$", SOURCE_DIR):
-    raise RuntimeError(f"blocked: SOURCE_DIR contains unsafe characters: {SOURCE_DIR}")
+# Path traversal guard: SOURCE_DIR must be an absolute path without ".." and
+# without shell-metacharacter noise. (The previous POSIX-only regex was fed a
+# Path object and crashed on import on every platform.)
+_SOURCE_DIR_TEXT = str(os.environ.get("SOURCE_DIR", "/agent/source"))
+# NUL LF CR ESC " $ & ' * < > ? ` | ;  -- as codepoints so this file stays
+# byte-safe under every editor/encoding combination.
+_UNSAFE_SOURCE_DIR_CHARS = frozenset(map(chr, (0, 10, 13, 27, 34, 36, 38, 39,
+                                               42, 60, 62, 63, 96, 124, 59)))
+if (not Path(_SOURCE_DIR_TEXT).is_absolute()
+        or ".." in Path(_SOURCE_DIR_TEXT).parts
+        or any(ch in _UNSAFE_SOURCE_DIR_CHARS for ch in _SOURCE_DIR_TEXT)):
+    raise RuntimeError(f"blocked: SOURCE_DIR is not a safe absolute path: {_SOURCE_DIR_TEXT}")
+SOURCE_DIR = Path(_SOURCE_DIR_TEXT)
 
 RUN_TESTS_OUTER_TIMEOUT_S = 300  # outer kill switch; inner per-test cap is --timeout=120
 GIT_TIMEOUT_S = 60

@@ -7,13 +7,14 @@ attempt without ever becoming the active implementation.
 """
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 from pathlib import Path
 import re
 from typing import Any
 import unicodedata
+
+from . import filelock
 
 
 ZERO_HASH = "0" * 64
@@ -122,7 +123,7 @@ Unverified observations can be archived, but are excluded from retrieval.
         records = []
         previous = ZERO_HASH
         with self.path.open("r", encoding="utf-8") as handle:
-            fcntl.flock(handle, fcntl.LOCK_SH)
+            filelock.lock(handle, shared=True)
             for index, line in enumerate(handle, start=1):
                 try:
                     record = json.loads(line)
@@ -142,7 +143,7 @@ Unverified observations can be archived, but are excluded from retrieval.
             raise ValueError("experience payload exceeds 64000 characters")
         lock_path = self.path.with_name(self.path.name + ".lock")
         with lock_path.open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+            filelock.lock(lock)
             existing = self.all()
             for record in existing:
                 if record["experience_id"] == payload["experience_id"]:
@@ -157,7 +158,7 @@ Unverified observations can be archived, but are excluded from retrieval.
                           previous_digest=existing[-1]["record_digest"] if existing else ZERO_HASH)
             record["record_digest"] = _digest(record)
             with self.path.open("a", encoding="utf-8") as handle:
-                fcntl.flock(handle, fcntl.LOCK_EX)
+                filelock.lock(handle)
                 handle.write(_canonical(record) + "\n")
                 handle.flush()
                 import os

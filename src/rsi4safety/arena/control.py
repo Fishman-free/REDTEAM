@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-import fcntl
 import hashlib
 import json
 from pathlib import Path
 import tarfile
+
+from . import filelock
 
 PROTOCOL_VERSION = "arena-trusted-execution-v2"
 
@@ -40,13 +41,13 @@ def campaign_lock(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+") as handle:
         try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            filelock.lock(handle, blocking=False)
         except BlockingIOError:
             raise RuntimeError("another process is writing this campaign") from None
         try:
             yield
         finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
+            filelock.unlock(handle)
 
 
 def extract_source(archive: Path, target: Path) -> None:

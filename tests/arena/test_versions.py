@@ -11,6 +11,20 @@ from unittest.mock import patch
 from rsi4safety.arena.versions import VersionStore
 
 
+def _symlinks_supported() -> bool:
+    """POSIX supports symlinks everywhere; Windows requires Developer Mode/admin."""
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            link = Path(directory) / "probe-link"
+            link.symlink_to(Path(directory) / "probe-target")
+        return True
+    except (OSError, NotImplementedError):
+        return False
+
+
+_SYMLINKS_OK = _symlinks_supported()
+
+
 def git(directory: Path, *args: str) -> str:
     return subprocess.check_output(
         ["git", "-c", "user.name=test", "-c", "user.email=test@localhost",
@@ -51,7 +65,7 @@ class VersionStoreTests(unittest.TestCase):
         self.assertEqual(git(self.store.worktree_path(revised.version_id), "rev-parse", "HEAD^"), self.seed.commit)
         self.assertFalse((self.store.worktree_path(revised.version_id) / "source" / "old.txt").exists())
         self.assertEqual((self.store.repo / "source" / "app" / "main.py").read_text(), "SAFE = False\n")
-        self.assertIn(str(self.store.worktree_path(rejected.version_id)),
+        self.assertIn(self.store.worktree_path(rejected.version_id).as_posix(),
                       git(self.store.repo, "worktree", "list", "--porcelain"))
         self.assertEqual(self.store.get(rejected.version_id), rejected)
 
@@ -147,7 +161,10 @@ class VersionStoreTests(unittest.TestCase):
         (target / ".git").mkdir(parents=True)
         (target / ".git" / "do-not-delete").write_text("old history")
         self.store.materialize_source(self.seed.version_id, target)
-        self.assertTrue(target.is_symlink())
+        if _SYMLINKS_OK:
+            self.assertTrue(target.is_symlink())
+        else:  # Windows copy fallback: the projection is a real directory
+            self.assertTrue(target.is_dir() and not target.is_symlink())
         self.assertTrue((target / "old.txt").exists())
         candidate = self.candidate("promoted")
         self.store.promote(candidate.version_id, evaluation=self.evaluation(candidate),
@@ -175,6 +192,7 @@ class VersionStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "manifest integrity"):
             self.store.get(candidate.version_id)
 
+    @unittest.skipUnless(_SYMLINKS_OK, "symbolic links unavailable on this platform")
     def test_symlink_payload_is_rejected_without_reading_its_target(self) -> None:
         (self.source / "leak").symlink_to(self.root / "outside")
         with self.assertRaisesRegex(ValueError, "symlinks are forbidden"):

@@ -1,4 +1,3 @@
-import os
 """Security regression tests for docker/llm-gateway/gateway.py.
 
 The gateway lives outside the importable package tree, so it is loaded by
