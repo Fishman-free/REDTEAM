@@ -72,6 +72,9 @@ class ArenaConfig:
     repair_attempts: int = 2
     max_submissions: int = 12
     max_sut_executions: int = 1000
+    # Hard wall-clock bound for one fresh SUT execution, independent of the
+    # request timeout and action count.
+    sut_execution_timeout_seconds: int = 180
     sut_llm_mode: str = "deterministic"          # deterministic | llm
     sut_app: str = "paygate"                      # SUT application under sut/: paygate | payassist
     defender_scope: str = "full_agent"            # full_agent | prompt_only (repair route)
@@ -90,7 +93,8 @@ class ArenaConfig:
         object.__setattr__(self, "repo_root", self.repo_root.resolve())
         for name in ("rounds", "repetitions", "attacker_max_turns", "defender_max_turns",
                      "judge_max_turns", "session_deadline_seconds", "seed", "final_seed",
-                     "max_candidates", "repair_attempts", "max_submissions", "max_sut_executions"):
+                     "max_candidates", "repair_attempts", "max_submissions", "max_sut_executions",
+                     "sut_execution_timeout_seconds"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise ValueError(f"{name} must be a positive integer")
         if self.rounds > 20:
@@ -202,6 +206,7 @@ class ArenaConfig:
             "session_deadline_seconds": self.session_deadline_seconds,
             "max_candidates": self.max_candidates, "repair_attempts": self.repair_attempts,
             "max_submissions": self.max_submissions, "max_sut_executions": self.max_sut_executions,
+            "sut_execution_timeout_seconds": self.sut_execution_timeout_seconds,
             "glm_base_url": self.glm_base_url, "glm_openai_base_url": self.glm_openai_base_url,
             "claude_code_version": self.claude_code_version, "docker_memory": self.docker_memory,
         }

@@ -2,6 +2,10 @@
 
 Arena 是支付智能体攻防改进平台。在线路线的攻击者、改进者运行在独立 Docker 容器中的无头 Claude Code 会话；**评判默认由宿主程序执行**，只有显式选择 `--judge-mode claude` 才启用模型评判。支持 PayGate 与 PayAssist 两个本地研究 SUT，宿主可信执行器提供付款事实，授权检查与晋级门禁位于候选代码之外。它们仍不能抵御恶意宿主用户。当前实现以 [ARENA_EVOLUTION_SPEC.md](ARENA_EVOLUTION_SPEC.md) 为准。
 
+Windows 本地 dry-run 与 CI 均使用有界生命周期：每次新鲜 SUT 执行有独立硬超时（默认 180 秒，可用 `--sut-execution-timeout` 调整），每个 HTTP 动作最多等待 30 秒且计入该预算。超时、`taskkill` 失败或 SQLite 文件锁无法释放会保留阶段和耗时诊断，并在清理路径中继续关闭日志句柄；不会无限等待或只终止 Python 启动器而留下子进程。dry-run 只使用确定性 SUT，不需要 Docker、模型调用或网络外发。
+
+版本投影在 POSIX 上用原子 symlink 替换；Windows 优先使用 symlink，遇到 WinError 1314（无创建链接权限）时复制不可变 package source。Windows 不能可靠地 `os.replace` 已存在的目录 symlink，故先在版本锁内移入 `legacy-projections/` 再安装；若 WinError 5 仍阻止目录替换，则仅在目标已移开且临时项为普通目录时复制安装。任何失败都会移除部分目标并恢复旧投影，避免把候选工作树或半成品暴露给 SUT。
+
 内部契约（数据格式、API、MCP 工具面）见 [ARENA_SPEC.md](ARENA_SPEC.md)；预置漏洞清单（仅人工审计用）见 [arena/SEEDED_VULNS.md](arena/SEEDED_VULNS.md)。
 
 ## 快速开始

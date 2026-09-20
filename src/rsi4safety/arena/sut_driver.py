@@ -42,16 +42,34 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+_PROCESS_TREE_TIMEOUT_SECONDS = 5
+_PROCESS_WAIT_TIMEOUT_SECONDS = 5
+_DB_CLEANUP_TIMEOUT_SECONDS = 5
+
+
 def _terminate_process_tree(process: subprocess.Popen, *, force: bool) -> None:
     """Terminate the owned process group, including Windows venv children."""
     if os.name == "nt":
-        # Non-forced taskkill can leave the venv child alive after its launcher exits.
+        # Always target the full tree: the Python launcher may have spawned a
+        # venv child that still owns SQLite handles after the launcher exits.
         command = ["taskkill", "/PID", str(process.pid), "/T", "/F"]
-        result = subprocess.run(command, capture_output=True, timeout=30, check=False)
+        try:
+            result = subprocess.run(command, capture_output=True,
+                                    timeout=_PROCESS_TREE_TIMEOUT_SECONDS, check=False)
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                f"Windows SUT process-tree termination timed out after "
+                f"{_PROCESS_TREE_TIMEOUT_SECONDS}s (force={force})"
+            ) from exc
         if result.returncode and process.poll() is None:
-            raise RuntimeError("Windows SUT process-tree termination failed")
+            detail = (result.stderr or result.stdout or b"").decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                "Windows SUT process-tree termination failed"
+                + (f": {detail[-300:]}" if detail else "")
+            )
     else:
         os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -133,6 +151,18 @@ class BaseSutDriver:
         self.config = config
         self.execution = SutExecution(fixture={}, actions=[])
         self.http: _Http | None = None
+        self._deadline: float | None = None
+
+    def _remaining_seconds(self, phase: str) -> float:
+        if self._deadline is None:
+            return 30.0
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"SUT execution deadline exceeded during {phase} "
+                f"(limit={self.config.sut_execution_timeout_seconds}s)"
+            )
+        return remaining
 
     def start(self) -> None: ...
     def stop(self) -> str: ...
@@ -152,12 +182,13 @@ silently adding another. Target HTTP/database execution claims are untrusted.
         self.execution.db_path = self.db_path
         executor: TrustedPaymentExecutor | None = None
         self.http = None
+        self._deadline = time.monotonic() + self.config.sut_execution_timeout_seconds
         try:
             authorization = evaluate_authorization_dict(fixture["authorization"])
             executor = TrustedPaymentExecutor(authorization, guarded=getattr(self, "gateway", "research") == "guarded")
             self.start()
             self.http = _Http(self.base_url)
-            self.http.wait_healthy()
+            self.http.wait_healthy(timeout_seconds=min(60, self._remaining_seconds("health check")))
             status, created = self.http.call("POST", "/tasks", {
                 "user_request": fixture["user_request"],
                 "authorization": fixture["authorization"],
@@ -179,7 +210,9 @@ silently adding another. Target HTTP/database execution claims are untrusted.
                 actions = [*actions, {"step": len(actions) + 1, "method": "POST",
                                      "path": run_path, "json": {}, "platform_triggered": True}]
             for action in actions:
-                status, response = self.http.call(action["method"], action["path"], action.get("json"))
+                status, response = self.http.call(
+                    action["method"], action["path"], action.get("json"),
+                    timeout_seconds=min(30, self._remaining_seconds(f"action {action.get('step')}")))
                 if not 200 <= status < 300:
                     raise ValueError(f"HTTP error at step {action.get('step')}: {status}")
                 if action["path"] == run_path:
@@ -195,7 +228,10 @@ silently adding another. Target HTTP/database execution claims are untrusted.
             try:
                 self.execution.log = self.stop()[-20000:]
             except Exception as exc:
-                self.execution.error = self.execution.error or f"SUT cleanup failed: {exc}"
+                cleanup_error = f"SUT cleanup failed: {exc}"
+                self.execution.error = (f"{self.execution.error}; {cleanup_error}"
+                                       if self.execution.error else cleanup_error)
+            self._deadline = None
             if executor is not None:
                 try:
                     self.execution.task_run_count = executor.run_count
@@ -323,38 +359,55 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
     def stop(self) -> str:
         process = self._process
         self._process = None
-        if process is None:
-            if self._log_file is not None:
-                self._log_file.close()
-                self._log_file = None
-            return ""
-        try:
-            _terminate_process_tree(process, force=False)
-        except ProcessLookupError:
-            pass
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            _terminate_process_tree(process, force=True)
-            process.wait(timeout=10)
-        if os.name == "nt":
+        cleanup_errors: list[str] = []
+        if process is not None:
+            try:
+                _terminate_process_tree(process, force=False)
+            except ProcessLookupError:
+                pass
+            except Exception as exc:  # noqa: BLE001 - continue cleanup for diagnostics
+                cleanup_errors.append(f"initial tree termination: {exc}")
+            try:
+                process.wait(timeout=_PROCESS_WAIT_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                try:
+                    _terminate_process_tree(process, force=True)
+                except ProcessLookupError:
+                    pass
+                except Exception as exc:  # noqa: BLE001 - retain cleanup diagnostics
+                    cleanup_errors.append(f"forced tree termination: {exc}")
+                try:
+                    process.wait(timeout=_PROCESS_WAIT_TIMEOUT_SECONDS)
+                except subprocess.TimeoutExpired as exc:
+                    cleanup_errors.append(
+                        f"process did not exit after {_PROCESS_WAIT_TIMEOUT_SECONDS}s: {exc}"
+                    )
+        if os.name == "nt" and process is not None:
             # taskkill may return before the descendant releases SQLite handles.
-            deadline = time.time() + 10
-            while time.time() < deadline:
+            deadline = time.monotonic() + _DB_CLEANUP_TIMEOUT_SECONDS
+            while time.monotonic() < deadline:
                 try:
                     self._private_db_path.unlink(missing_ok=True)
                     break
                 except PermissionError:
                     time.sleep(0.1)
+            else:
+                cleanup_errors.append(
+                    f"private database remained locked for {_DB_CLEANUP_TIMEOUT_SECONDS}s"
+                )
         output = b""
         if self._log_file is not None:
-            self._log_file.seek(0, os.SEEK_END)
-            size = self._log_file.tell()
-            self._log_file.seek(max(0, size - 20000))
-            output = self._log_file.read()
-            self._log_file.close()
-            self._log_file = None
+            try:
+                self._log_file.seek(0, os.SEEK_END)
+                size = self._log_file.tell()
+                self._log_file.seek(max(0, size - 20000))
+                output = self._log_file.read()
+            finally:
+                self._log_file.close()
+                self._log_file = None
         self._private_db_path.unlink(missing_ok=True)
+        if cleanup_errors:
+            raise RuntimeError("SUT cleanup failed: " + "; ".join(cleanup_errors))
         return output.decode("utf-8", errors="replace")
 
 

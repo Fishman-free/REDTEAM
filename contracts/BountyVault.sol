@@ -17,10 +17,10 @@ import "./RTMToken.sol";
 /// vault can choose winners, but it cannot mint outside the published schedule.
 ///
 /// Why there is no `ReentrancyGuard`: `settleClaim` makes exactly one external
-/// call, `rtm.mint(...)`, on an address fixed at construction. `rtm` is an
-/// immutable, host-controlled `RTMToken` whose `mint` performs a plain ERC-20
-/// balance update and makes no callback into the beneficiary or any other
-/// untrusted contract, so no reentrant path into this vault exists. The
+/// call, `rtm.mint(...)`, on the RTMToken bound once during initialization. `rtm`
+/// cannot be rebound after initialization, and its `mint` performs a plain ERC-20
+/// balance update with no callback into the beneficiary or any other untrusted
+/// contract, so no reentrant path into this vault exists. The
 /// reasoning is safe independently of that assumption too: the claim is marked
 /// settled *before* the mint (checks-effects-interactions), and a re-entrant
 /// `settleClaim` would revert with `ClaimAlreadySettled` -- so even a
@@ -28,7 +28,9 @@ import "./RTMToken.sol";
 /// version starts calling an arbitrary or upgradeable token.
 contract BountyVault is Ownable, Pausable {
     /// @notice Bounty asset minted on settlement; also this vault's only minter role.
-    RTMToken public immutable rtm;
+    /// @dev Bound exactly once by `initializeRtm`; the token immutably points
+    /// to this vault as its sole minter.
+    RTMToken public rtm;
 
     /// @notice Account allowed to configure and settle claims.
     address public evaluator;
@@ -86,6 +88,10 @@ contract BountyVault is Ownable, Pausable {
     error ZeroAmount();
     /// @notice A claim with this id already exists.
     error ClaimAlreadyConfigured();
+    /// @notice The vault is already bound to an RTM token.
+    error RtmAlreadyInitialized();
+    /// @notice The vault has not yet been bound to an RTM token.
+    error RtmNotInitialized();
     /// @notice No claim has been configured under this id.
     error ClaimNotConfigured();
     /// @notice This claim has already been paid.
@@ -99,15 +105,18 @@ contract BountyVault is Ownable, Pausable {
         _;
     }
 
-    /// @notice Deploys the vault and makes the deployer the RTM minter.
-    /// @dev The vault takes the minter role on `rtm_`, so this constructor must
-    /// be followed by `rtm_.setMinter(vault)` from the token owner before any
-    /// claim can settle. Claims mint lazily at settlement time rather than being
-    /// pre-funded, which is what lets an exhausted year defer a payout to the
-    /// next one instead of failing forever.
-    /// @param rtm_ Bounty token this vault mints; must be a real `RTMToken`.
+    /// @notice Deploys the vault before its RTM token is bound.
+    /// @dev Deployment is intentionally two-step: deploy the vault first, then
+    /// deploy RTMToken with the vault address as `minter_`, and finally call
+    /// `initializeRtm` once. There is no post-deploy role handoff.
     /// @param initialOwner Owner allowed to rotate the evaluator and the cap.
-    constructor(RTMToken rtm_, address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
+    /// @notice Binds the vault to its RTM token exactly once.
+    /// @dev The token must already have this vault as its immutable minter.
+    function initializeRtm(RTMToken rtm_) external onlyOwner {
+        if (address(rtm) != address(0)) revert RtmAlreadyInitialized();
+        if (address(rtm_) == address(0) || rtm_.minter() != address(this)) revert ZeroAddress();
         rtm = rtm_;
     }
 
@@ -145,6 +154,7 @@ contract BountyVault is Ownable, Pausable {
         onlyEvaluator
         whenNotPaused
     {
+        if (address(rtm) == address(0)) revert RtmNotInitialized();
         if (id == bytes32(0)) revert ZeroAddress();
         if (beneficiary == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
@@ -168,6 +178,7 @@ contract BountyVault is Ownable, Pausable {
     /// halving schedule: the vault cannot pay out faster than the token emits.
     /// @param id Claim id; must be configured and unsettled.
     function settleClaim(bytes32 id) external onlyEvaluator whenNotPaused {
+        if (address(rtm) == address(0)) revert RtmNotInitialized();
         Claim storage c = claims[id];
         if (!c.configured) revert ClaimNotConfigured();
         if (c.settled) revert ClaimAlreadySettled();

@@ -11,7 +11,8 @@ RTM 的总量固定为 **21,000,000 RTM**（`MAX_SUPPLY`），且**永不增发*
 
 - 部署时**不预挖**，`totalSupply()` 从 0 开始，部署者不获得任何代币；
 - 除 `mint` 之外没有任何增发路径，`mint` 只能由单一 `minter` 角色调用；
-- 铸造权与发行规则分离：合约所有者只能轮换 `minter`，不能铸造、不能修改年度预算表、不能移动 `emissionStart`（后者为 `immutable`）。
+- 铸造权在部署时绑定到指定的 `BountyVault`，且 `RTMToken.minter` 为 `immutable`；没有 `setMinter`，所以 owner、evaluator 和任何旧权限都不能把 minter 改成直接铸币地址；
+- 部署顺序是：先部署 `BountyVault(owner)`，再以 vault 地址部署 `RTMToken(owner, vault, emissionStart)`，最后由 vault owner 仅调用一次 `initializeRtm(token)` 完成反向绑定。初始化前 vault 不可配置或结算 claim。
 
 因此代币供应量的上限是部署前就公开确定的，不随治理动作变化。
 

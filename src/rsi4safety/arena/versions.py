@@ -35,6 +35,24 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _is_windows() -> bool:
+    """Keep platform branching patchable without changing pathlib's Path class."""
+    return os.name == "nt"
+
+
+def _path_present(path: Path) -> bool:
+    """Also count broken symlinks, which Path.exists() intentionally excludes."""
+    return path.exists() or path.is_symlink()
+
+
+def _remove_projection(path: Path) -> None:
+    """Remove a projection without following a directory symlink."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
 def tree_digest(directory: Path) -> str:
     """Hash relative names, executable bits and bytes; reject links and devices."""
     directory = Path(directory)
@@ -334,7 +352,7 @@ class VersionStore:
         try:
             temporary.symlink_to(source, target_is_directory=True)
         except OSError as exc:
-            if os.name != "nt" or getattr(exc, "winerror", None) != 1314:
+            if not _is_windows() or getattr(exc, "winerror", None) != 1314:
                 raise
             # Windows without Developer Mode cannot create symlinks (WinError
             # 1314 = missing privilege). Materialise a copy instead: consumers
@@ -348,10 +366,43 @@ class VersionStore:
                 backups.mkdir(exist_ok=True)
                 backup = backups / uuid.uuid4().hex
                 shutil.move(str(target), str(backup))
-            os.replace(temporary, target)
+            elif _is_windows() and target.is_symlink():
+                # Windows cannot atomically replace an existing directory
+                # symlink (WinError 5), even when the caller owns both links.
+                backups = self.root / "legacy-projections"
+                backups.mkdir(exist_ok=True)
+                backup = backups / uuid.uuid4().hex
+                shutil.move(str(target), str(backup))
+            try:
+                os.replace(temporary, target)
+            except PermissionError as exc:
+                if not _is_windows() or getattr(exc, "winerror", None) != 5:
+                    raise
+                # A Windows directory copy cannot be atomically replaced either
+                # when a consumer still has a handle open. Install by rename only
+                # after the old target is moved aside; the lock serializes readers
+                # in this process and the source is always an immutable package.
+                if _path_present(target):
+                    raise RuntimeError("Windows projection target remained occupied after move-aside") from exc
+                try:
+                    os.replace(temporary, target)
+                except PermissionError as retry_exc:
+                    if getattr(retry_exc, "winerror", None) != 5:
+                        raise
+                    if temporary.is_symlink():
+                        raise RuntimeError(
+                            "Windows cannot install a directory symlink without replacement privilege"
+                        ) from retry_exc
+                    shutil.copytree(temporary, target, symlinks=False)
         except BaseException:
-            if backup is not None and not target.exists():
-                shutil.move(str(backup), str(target))
+            if backup is not None:
+                # Restore the previous projection even if a failed replacement
+                # recreated a target path. Never leave a partially installed
+                # candidate tree at the consumer-visible location.
+                if _path_present(target):
+                    _remove_projection(target)
+                if _path_present(backup):
+                    shutil.move(str(backup), str(target))
             raise
         finally:
             if temporary.is_symlink() or temporary.is_file():

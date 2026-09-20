@@ -30,6 +30,8 @@ def _arena_parser(subparsers) -> None:
         parser.add_argument("--attacker-max-turns", type=int, default=None)
         parser.add_argument("--defender-max-turns", type=int, default=None)
         parser.add_argument("--judge-max-turns", type=int, default=None)
+        parser.add_argument("--sut-execution-timeout", type=int, default=180,
+                            help="hard wall-clock limit per fresh SUT execution (seconds)")
         parser.add_argument("--seed", type=int, default=17)
         return parser
     run = add_common("run")
@@ -115,6 +117,7 @@ def _run_arena(args) -> None:
         seed=getattr(args, "seed", 17), dry_run=getattr(args, "dry_run", False),
         judge_mode=getattr(args, "judge_mode", "programmatic"),
         sut_llm_mode=getattr(args, "sut_llm_mode", "deterministic"),
+        sut_execution_timeout_seconds=getattr(args, "sut_execution_timeout", 180),
         sut_app=getattr(args, "sut_app", "paygate"),
         defender_scope=getattr(args, "defender_scope", "full_agent"),
         resume_sessions=not getattr(args, "no_resume", False),
