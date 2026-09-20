@@ -20,9 +20,9 @@ describe('RTM halving token and bounty vault', function () {
   beforeEach(async () => {
     [owner, evaluator, attacker, outsider] = await ethers.getSigners();
     const emissionStart = await time.latest();
-    rtm = await (await ethers.getContractFactory('RTMToken')).deploy(owner.address, emissionStart);
-    vault = await (await ethers.getContractFactory('BountyVault')).deploy(rtm.target, owner.address);
-    await rtm.setMinter(vault.target);
+    vault = await (await ethers.getContractFactory('BountyVault')).deploy(owner.address);
+    rtm = await (await ethers.getContractFactory('RTMToken')).deploy(owner.address, vault.target, emissionStart);
+    await vault.initializeRtm(rtm.target);
     await vault.setEvaluator(evaluator.address);
   });
 
@@ -65,7 +65,15 @@ describe('RTM halving token and bounty vault', function () {
 
     it('rejects a zero emission start', async () => {
       const factory = await ethers.getContractFactory('RTMToken');
-      await expect(factory.deploy(owner.address, 0)).to.be.revertedWithCustomError(rtm, 'ZeroAmount');
+      await expect(factory.deploy(owner.address, vault.target, 0)).to.be.revertedWithCustomError(rtm, 'ZeroAmount');
+    });
+
+    it('requires a deployed BountyVault-bound minter', async () => {
+      const factory = await ethers.getContractFactory('RTMToken');
+      await expect(factory.deploy(owner.address, ethers.ZeroAddress, await time.latest()))
+        .to.be.revertedWithCustomError(rtm, 'ZeroAddress');
+      await expect(factory.deploy(owner.address, outsider.address, await time.latest()))
+        .to.be.revertedWithCustomError(rtm, 'InvalidMinter');
     });
   });
 
@@ -78,30 +86,27 @@ describe('RTM halving token and bounty vault', function () {
         .to.be.revertedWithCustomError(rtm, 'NotMinter');
     });
 
-    it('rotates the minter and rejects the zero address', async () => {
-      const tx = await rtm.setMinter(evaluator.address);
-      await expect(tx).to.emit(rtm, 'MinterUpdated').withArgs(vault.target, evaluator.address);
-      expect(await rtm.minter()).to.equal(evaluator.address);
-      await expect(rtm.connect(outsider).setMinter(outsider.address))
-        .to.be.revertedWithCustomError(rtm, 'OwnableUnauthorizedAccount');
-      await expect(rtm.setMinter(ethers.ZeroAddress))
-        .to.be.revertedWithCustomError(rtm, 'ZeroAddress');
+    it('keeps the BountyVault as an immutable minter', async () => {
+      expect(await rtm.minter()).to.equal(vault.target);
+      expect(rtm.setMinter).to.equal(undefined);
+      await expect(rtm.connect(outsider).mint(attacker.address, 1n))
+        .to.be.revertedWithCustomError(rtm, 'NotMinter');
+      await expect(rtm.connect(owner).mint(attacker.address, 1n))
+        .to.be.revertedWithCustomError(rtm, 'NotMinter');
     });
 
     it('rejects zero recipients and zero amounts', async () => {
       await expect(rtm.connect(evaluator).mint(ethers.ZeroAddress, 1n))
         .to.be.revertedWithCustomError(rtm, 'NotMinter');
-      await rtm.setMinter(evaluator.address);
-      await expect(rtm.connect(evaluator).mint(ethers.ZeroAddress, 1n))
-        .to.be.revertedWithCustomError(rtm, 'ZeroAddress');
       await expect(rtm.connect(evaluator).mint(attacker.address, 0n))
-        .to.be.revertedWithCustomError(rtm, 'ZeroAmount');
+        .to.be.revertedWithCustomError(rtm, 'NotMinter');
     });
 
-    it('mints within budget and reports remaining emission', async () => {
-      await rtm.setMinter(evaluator.address);
+    it('mints within budget only through a settled vault claim', async () => {
       const amount = 1_000n * 10n ** 18n;
-      await expect(rtm.connect(evaluator).mint(attacker.address, amount))
+      await vault.setMaxPerClaim(amount);
+      await vault.connect(evaluator).configureClaim(ethers.id('direct-vault-mint'), attacker.address, amount);
+      await expect(vault.connect(evaluator).settleClaim(ethers.id('direct-vault-mint')))
         .to.emit(rtm, 'EmissionMinted').withArgs(attacker.address, amount, 0n);
       expect(await rtm.totalSupply()).to.equal(amount);
       expect(await rtm.mintedByYear(0)).to.equal(amount);
@@ -110,6 +115,22 @@ describe('RTM halving token and bounty vault', function () {
   });
 
   describe('bounty vault settlement against the emission schedule', function () {
+    it('requires owner initialization and rejects rebinding', async () => {
+      const uninitialized = await (await ethers.getContractFactory('BountyVault')).deploy(owner.address);
+      const uninitializedRtm = await (await ethers.getContractFactory('RTMToken'))
+        .deploy(owner.address, uninitialized.target, await time.latest());
+      const id = ethers.id('before-init');
+      await uninitialized.setEvaluator(evaluator.address);
+      await uninitialized.setMaxPerClaim(1n);
+      await expect(uninitialized.connect(evaluator).configureClaim(id, attacker.address, 1n))
+        .to.be.revertedWithCustomError(uninitialized, 'RtmNotInitialized');
+      await expect(uninitialized.connect(outsider).initializeRtm(uninitializedRtm.target))
+        .to.be.revertedWithCustomError(uninitialized, 'OwnableUnauthorizedAccount');
+      await uninitialized.initializeRtm(uninitializedRtm.target);
+      await expect(uninitialized.initializeRtm(uninitializedRtm.target))
+        .to.be.revertedWithCustomError(uninitialized, 'RtmAlreadyInitialized');
+    });
+
     it('pays the configured claim to the beneficiary', async () => {
       const id = ethers.id('bounty-1');
       const amount = 1_000n * 10n ** 18n;

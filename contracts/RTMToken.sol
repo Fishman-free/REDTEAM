@@ -20,7 +20,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 /// schedule alone can never reach, let alone exceed, the cap; `MAX_SUPPLY` is a
 /// redundant second bound rather than the only defence.
 ///
-/// Why the owner cannot exceed the schedule: ownership only rotates `minter`.
+/// Why the owner cannot exceed the schedule: ownership does not control `minter`.
 /// It cannot mint, cannot edit `yearBudget`, and cannot move `emissionStart`.
 /// `mint` is callable solely by `minter` and every call is checked against both
 /// the current year's remaining budget and the remaining supply, so the
@@ -37,16 +37,13 @@ contract RTMToken is ERC20, Ownable {
     /// @notice Timestamp at which year 0 starts; fixed at deployment.
     uint64 public immutable emissionStart;
 
-    /// @notice The only account allowed to call `mint`; zero until configured.
-    address public minter;
+    /// @notice The only account allowed to call `mint`; permanently bound at deployment.
+    /// @dev The address is immutable, so owner, evaluator, and former authorities
+    /// cannot replace the BountyVault with a direct minter after deployment.
+    address public immutable minter;
 
     /// @notice Amount minted so far in each year, indexed by year number.
     mapping(uint256 => uint256) public mintedByYear;
-
-    /// @notice Emitted when `minter` is rotated by the owner.
-    /// @param oldMinter Previous minter, zero on first configuration.
-    /// @param newMinter Newly authorised minter.
-    event MinterUpdated(address indexed oldMinter, address indexed newMinter);
 
     /// @notice Emitted on every successful emission.
     /// @param to Recipient of the newly minted tokens.
@@ -58,6 +55,8 @@ contract RTMToken is ERC20, Ownable {
     error NotMinter();
     /// @notice A required address argument was the zero address.
     error ZeroAddress();
+    /// @notice The designated minter has no deployed contract code.
+    error InvalidMinter();
     /// @notice A required amount argument was zero.
     error ZeroAmount();
     /// @notice The mint would exceed the current year's remaining budget.
@@ -71,29 +70,21 @@ contract RTMToken is ERC20, Ownable {
     error MaxSupplyExceeded(uint256 requested, uint256 available);
 
     /// @notice Deploys the token with no premint: `totalSupply()` starts at 0.
-    /// @dev `emissionStart_` is immutable, so the year schedule is fixed before
-    /// the token is funded or any bounty is configured, and cannot be shifted to
-    /// unlock a fresh budget early.
-    /// @param initialOwner Owner allowed to rotate `minter`.
+    /// @dev The minter is immutable and must be the BountyVault deployed for this
+    /// token. Binding it during construction removes any owner-controlled minting
+    /// or role-handoff window.
+    /// @param initialOwner Owner retained for inherited administration; it cannot mint.
+    /// @param minter_ BountyVault address permanently authorised to mint; non-zero.
     /// @param emissionStart_ Timestamp at which year 0 begins; must be non-zero.
-    constructor(address initialOwner, uint64 emissionStart_)
+    constructor(address initialOwner, address minter_, uint64 emissionStart_)
         ERC20("REDTEAM", "RTM")
         Ownable(initialOwner)
     {
+        if (minter_ == address(0)) revert ZeroAddress();
+        if (minter_.code.length == 0) revert InvalidMinter();
         if (emissionStart_ == 0) revert ZeroAmount();
+        minter = minter_;
         emissionStart = emissionStart_;
-    }
-
-    /// @notice Rotates the minter account.
-    /// @dev The previous minter loses the role immediately. Rotating the minter
-    /// cannot change the schedule: the new minter is bound by exactly the same
-    /// `yearBudget` and `MAX_SUPPLY` checks as the old one.
-    /// @param newMinter New minter; must be non-zero.
-    function setMinter(address newMinter) external onlyOwner {
-        if (newMinter == address(0)) revert ZeroAddress();
-        address oldMinter = minter;
-        minter = newMinter;
-        emit MinterUpdated(oldMinter, newMinter);
     }
 
     /// @notice Mints `amount` new RTM to `to`, charged against the current

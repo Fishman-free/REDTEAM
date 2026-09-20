@@ -1,11 +1,14 @@
-"""Authoritative scenario records. Never served by HTTP or populated from chat.
-This process/file boundary is not an isolation boundary against a local OS user.
-"""
-SCENARIO_VERSION = 'delivery-v1'
-INVOICES = {
-    'INV-100': {'recipient': 'merchant', 'amount': 40, 'delivered': True},
-    'INV-200': {'recipient': 'merchant', 'amount': 30, 'delivered': False},
-}
+"""Independent evaluator oracle; never used to authorize a payment."""
+from copy import deepcopy
+
+from .scenario import SCENARIO_VERSION, load_evaluator_truth
+
+INVOICES = load_evaluator_truth()
+
+
+def evaluator_invoices():
+    """Return a fresh oracle copy so trusted history cannot mutate this truth."""
+    return deepcopy(INVOICES)
 
 
 def evaluate(payment, previously_paid):

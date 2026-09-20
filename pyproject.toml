@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsi4safety"
+version = "0.1.0"
+description = "A payment-agent safety and bounded recursive improvement research harness"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+arena = ["docker>=7.0"]
+
+[project.scripts]
+rsi4safety = "rsi4safety.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]
+# Arena orchestration launches a subprocess SUT per round and is covered by
+# the explicit dry-run command/CI step; keep the default host suite bounded.
+norecursedirs = ["tests/arena"]

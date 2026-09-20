@@ -1,0 +1,4 @@
+{
+  "INV-100": {"recipient": "merchant", "amount": 40, "delivered": true},
+  "INV-200": {"recipient": "merchant", "amount": 30, "delivered": false}
+}

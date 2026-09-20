@@ -1,0 +1,246 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+from .runner import ContinuousSafetyRunner
+from .campaign import ExperimentRunner
+from .config import ExperimentConfig, load_env
+
+
+def _arena_parser(subparsers) -> None:
+    arena = subparsers.add_parser(
+        "arena", help="three-agent (attacker/defender/judge) campaign with Docker and audit chain")
+    arena_sub = arena.add_subparsers(dest="arena_command", required=True)
+    def add_common(command):
+        parser = arena_sub.add_parser(command)
+        parser.add_argument("--campaign", default="arena-001")
+        parser.add_argument("--state-dir", type=Path, default=None)
+        parser.add_argument("--env-file", type=Path, default=Path(".env"))
+        parser.add_argument("--rounds", type=int, default=3)
+        parser.add_argument("--repetitions", type=int, default=2)
+        parser.add_argument("--attacker-model", default=None)
+        parser.add_argument("--defender-model", default=None)
+        parser.add_argument("--judge-model", default=None)
+        parser.add_argument("--sut-model", default=None,
+                            help="Override the SUT planning model")
+        parser.add_argument("--attacker-max-turns", type=int, default=None)
+        parser.add_argument("--defender-max-turns", type=int, default=None)
+        parser.add_argument("--judge-max-turns", type=int, default=None)
+        parser.add_argument("--sut-execution-timeout", type=int, default=180,
+                            help="hard wall-clock limit per fresh SUT execution (seconds)")
+        parser.add_argument("--seed", type=int, default=17)
+        return parser
+    run = add_common("run")
+    run.add_argument("--dry-run", action="store_true",
+                     help="scripted agents + in-process SUT; no Docker, no API calls")
+    run.add_argument("--judge-mode", default="programmatic", choices=("programmatic", "claude"),
+                     help="programmatic verdicts by default; claude = opt-in LLM adjudication")
+    run.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
+    run.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist"),
+                     help="SUT application: paygate (deterministic policy SUT) or payassist "
+                          "(DeepSeek conversational payment assistant)")
+    run.add_argument("--defender-scope", default="full_agent",
+                     choices=("full_agent", "prompt_only"),
+                     help="Repair route: full_agent (any source change) or "
+                          "prompt_only (only prompts.py and tests/)")
+    run.add_argument("--no-resume", action="store_true", help="start a fresh session per round")
+    verify = arena_sub.add_parser("verify")
+    verify.add_argument("--campaign", default="arena-001")
+    verify.add_argument("--state-dir", type=Path, default=None)
+    down = arena_sub.add_parser("down")
+    down.add_argument("--campaign", default="arena-001")
+    down.add_argument("--state-dir", type=Path, default=None)
+    down.add_argument("--volumes", action="store_true", help="also remove persistent workspaces")
+    smoke = add_common("smoke")
+    smoke.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
+    smoke.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist"))
+    smoke.set_defaults(rounds=1)
+
+    bench = arena_sub.add_parser(
+        "bench", help="run benchmark seeds against a target (no agent sessions)")
+    bench.add_argument("--campaign", default="bench")
+    bench.add_argument("--state-dir", type=Path, default=None)
+    bench.add_argument("--system", default=None,
+                       help="filter by system ID (e.g. A01); omit for all priority seeds")
+    bench.add_argument("--track", default="full_agent", choices=("full_agent", "prompt_only"))
+    bench.add_argument("--sut-app", default="payassist", choices=("paygate", "payassist"))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Payment safety RSI research harness")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    _arena_parser(subparsers)
+    demo = subparsers.add_parser("demo", help="run offline attack, test, score, improve and retest rounds")
+    demo.add_argument("--state-dir", type=Path, default=Path(".rsi4safety/demo"))
+    demo.add_argument("--json", action="store_true", help="print machine-readable output")
+    demo.add_argument("--rounds", type=int, default=1, help="bounded number of rounds (1-100)")
+    for name, help_text in (
+        ("probe", "verify GLM credentials, model identity and JSON protocol"),
+        ("experiment", "run parallel adaptive model attacks, evaluation and evolution"),
+        ("repair-check", "test the repair protocol using explicitly synthetic evidence"),
+    ):
+        command = subparsers.add_parser(name, help=help_text)
+        command.add_argument("--state-dir", type=Path, default=Path(f".rsi4safety/{name}"))
+        command.add_argument("--env-file", type=Path, default=Path(".env"))
+        command.add_argument("--model", default=None)
+        command.add_argument("--base-url", default=None)
+        command.add_argument("--rounds", type=int, default=3)
+        command.add_argument("--attacks-per-round", type=int, default=3)
+        command.add_argument("--max-candidates", type=int, default=2)
+        command.add_argument("--repetitions", type=int, default=2)
+        command.add_argument("--concurrency", type=int, default=3)
+        command.add_argument("--max-calls", type=int, default=400)
+        command.add_argument("--max-tokens", type=int, default=2_000_000)
+        command.add_argument("--max-output-tokens", type=int, default=1200)
+        command.add_argument("--seed", type=int, default=17)
+    return parser
+
+
+def _run_arena(args) -> None:
+    from .arena.config import ArenaConfig, glm_api_key
+    from .arena.audit import HashChain
+    state_dir = args.state_dir or Path(".rsi4safety/arena") / args.campaign
+    config = ArenaConfig(
+        campaign_id=args.campaign, state_dir=state_dir,
+        rounds=getattr(args, "rounds", 1),
+        repetitions=getattr(args, "repetitions", 1),
+        attacker_model=getattr(args, "attacker_model", None) or "glm-5.3-flash",
+        defender_model=getattr(args, "defender_model", None) or "glm-5.3-flash",
+        judge_model=getattr(args, "judge_model", None) or "glm-5.3-flash",
+        attacker_max_turns=getattr(args, "attacker_max_turns", None) or 40,
+        defender_max_turns=getattr(args, "defender_max_turns", None) or 96,
+        judge_max_turns=getattr(args, "judge_max_turns", None) or 24,
+        seed=getattr(args, "seed", 17), dry_run=getattr(args, "dry_run", False),
+        judge_mode=getattr(args, "judge_mode", "programmatic"),
+        sut_llm_mode=getattr(args, "sut_llm_mode", "deterministic"),
+        sut_execution_timeout_seconds=getattr(args, "sut_execution_timeout", 180),
+        sut_app=getattr(args, "sut_app", "paygate"),
+        defender_scope=getattr(args, "defender_scope", "full_agent"),
+        resume_sessions=not getattr(args, "no_resume", False),
+        repo_root=Path.cwd(),
+    )
+    if args.arena_command == "verify":
+        result = HashChain.verify(config.audit_dir / "chain.jsonl")
+        print(json.dumps({"ok": result.ok, "checked": result.checked,
+                          "first_bad_seq": result.first_bad_seq, "reason": result.reason},
+                         ensure_ascii=False))
+        raise SystemExit(0 if result.ok else 1)
+    if args.arena_command == "down":
+        from .arena.docker_host import DockerHost
+        removed = DockerHost(config).down(remove_volumes=getattr(args, "volumes", False))
+        print(json.dumps({"removed": removed}, ensure_ascii=False))
+        return
+    if args.arena_command == "bench":
+        from .arena.benchmark_seeds import PRIORITY_SEEDS, seeds_for_system, seed_summary
+        from .arena.benchmark_runner import run_benchmark, save_report
+        from .arena.sut_driver import InProcessSutDriver
+        from .arena.versions import VersionStore
+        system_filter = getattr(args, "system", None)
+        seeds = seeds_for_system(system_filter) if system_filter else PRIORITY_SEEDS
+        track = getattr(args, "track", "full_agent")
+        sut_app = getattr(args, "sut_app", "payassist")
+        print(f"Running {len(seeds)} seeds (track={track}, target={sut_app})")
+        print(f"Registry: {seed_summary()}")
+
+        # Materialize SUT source (same as campaign seeding)
+        store = VersionStore(config.state_dir / "version-store")
+        initial = store.initialize(config.repo_root / "sut" / sut_app)
+        store.materialize_source(store.active().version_id, config.sut_dir)
+        print(f"SUT source materialized: {config.sut_dir}")
+
+        def factory():
+            return InProcessSutDriver(config, gateway="research")
+
+        report = run_benchmark(config, factory, seeds, track=track)
+        out = config.state_dir / "benchmark-report.json"
+        save_report(report, out)
+        print(json.dumps(report.summary, ensure_ascii=False, indent=2))
+        print(f"Full report: {out}")
+        return
+    # run / smoke
+    from .arena.docker_host import DockerHost
+    from .arena.orchestrator import ArenaOrchestrator
+    from .arena.runtime import StubAgentRuntime
+    if args.sut_model:
+        import os
+        os.environ["PAYASSIST_MODEL"] = args.sut_model
+    docker_host = None
+    runtime = StubAgentRuntime()
+    if not config.dry_run:
+        load_env(args.env_file)
+        docker_host = DockerHost(config)
+        docker_host.ping()
+        if not glm_api_key():
+            raise SystemExit("GLM_API_KEY missing: put it in .env before a real campaign")
+        runtime = None  # the orchestrator wires ClaudeCodeRuntime once containers are up
+    def progress(phase: str, data: dict) -> None:
+        print(json.dumps({"phase": phase, **data}, ensure_ascii=False), file=sys.stderr, flush=True)
+    orchestrator = ArenaOrchestrator(config, runtime=runtime, docker_host=docker_host,
+                                     progress=progress)
+    report = orchestrator.run()
+    summary = {
+        "status": report["status"], "stop_reason": report.get("stop_reason"),
+        "chain_head": report.get("chain_head"),
+        "report": str(config.state_dir / "report.md"),
+    }
+    if args.arena_command == "smoke":
+        summary["preflight_note"] = "smoke run completed; teardown with: rsi4safety arena down"
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    if report["status"] != "completed":
+        raise SystemExit(1)
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    if args.command == "arena":
+        _run_arena(args)
+        return
+    if args.command in {"probe", "experiment", "repair-check"}:
+        load_env(args.env_file)
+        config = ExperimentConfig(
+            model=args.model or os.getenv("GLM_MODEL", "glm-5.3-flash"),
+            base_url=args.base_url or os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/coding/paas/v4"),
+            rounds=args.rounds, attacks_per_round=args.attacks_per_round,
+            max_candidates=args.max_candidates, repetitions=args.repetitions,
+            concurrency=args.concurrency, max_calls=args.max_calls, max_tokens=args.max_tokens,
+            max_output_tokens=args.max_output_tokens, seed=args.seed,
+        )
+        runner = ExperimentRunner(args.state_dir, config, progress=lambda event: print(json.dumps(event, ensure_ascii=False), file=sys.stderr, flush=True))
+        if args.command == "probe":
+            result = runner.preflight()
+        elif args.command == "repair-check":
+            runner.preflight()
+            full = runner.repair_protocol_check()
+            result = {"passed": full["passed"], "evidence_source": full["evidence_source"], "usage": full["usage"],
+                      "report": str(args.state_dir / "repair-protocol-check.json")}
+        else:
+            full = runner.run()
+            result = {key: full.get(key) for key in ("status", "stop_reason", "final_gate", "active_version", "usage")}
+            result["verified_findings"] = sum(item.get("verified_findings", 0) for item in full["rounds"])
+            result["final_scores"] = {key: value["scores"] for key, value in full.get("final_evaluation", {}).items()}
+            result["report"] = str(args.state_dir / "report.json")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result.get("status") == "stopped" or result.get("passed") is False:
+            raise SystemExit(1)
+        return
+    if args.command == "demo":
+        if not 1 <= args.rounds <= 100:
+            raise SystemExit("--rounds must be between 1 and 100")
+        runner = ContinuousSafetyRunner(args.state_dir)
+        summaries = [runner.summary(runner.run_round()) for _ in range(args.rounds)]
+        if args.json:
+            print(json.dumps(summaries[0] if args.rounds == 1 else summaries, indent=2, ensure_ascii=False))
+            return
+        for summary in summaries:
+            print(f"Payment safety round: {summary['round_id']}")
+            print(f"- unauthorized commit: {summary['attack']['actual_unauthorized']} -> {summary['retest']['actual_unauthorized']}")
+            print(f"- scores before: {summary['before_scores']}")
+            print(f"- scores after: {summary['after_scores']}")
+            for candidate in summary["candidates"]:
+                state = "PASSED" if candidate["passed"] else "REJECTED"
+                print(f"- {state}: {candidate['version']} ({', '.join(candidate['reasons']) or 'all gates passed'})")
+            print(f"- active version: {summary['active_version']}")

@@ -11,7 +11,8 @@ RTM 的总量固定为 **21,000,000 RTM**（`MAX_SUPPLY`），且**永不增发*
 
 - 部署时**不预挖**，`totalSupply()` 从 0 开始，部署者不获得任何代币；
 - 除 `mint` 之外没有任何增发路径，`mint` 只能由单一 `minter` 角色调用；
-- 铸造权与发行规则分离：合约所有者只能轮换 `minter`，不能铸造、不能修改年度预算表、不能移动 `emissionStart`（后者为 `immutable`）。
+- 铸造权在部署时绑定到指定的 `BountyVault`，且 `RTMToken.minter` 为 `immutable`；没有 `setMinter`，所以 owner、evaluator 和任何旧权限都不能把 minter 改成直接铸币地址；
+- 部署顺序是：先部署 `BountyVault(owner)`，再以 vault 地址部署 `RTMToken(owner, vault, emissionStart)`，最后由 vault owner 仅调用一次 `initializeRtm(token)` 完成反向绑定。初始化前 vault 不可配置或结算 claim。
 
 因此代币供应量的上限是部署前就公开确定的，不随治理动作变化。
 
@@ -56,7 +57,9 @@ sum(n>=0) yearBudget(n) = 2 * YEAR0_BUDGET - popcount(YEAR0_BUDGET)
 
 由此得到的性质是：一次成功攻击最多拿到一笔 `<= maxPerClaim` 的奖励，且必然消耗当年预算；想拿到全年预算，就必须在该年内提交足够多的独立有效认领，而每一条都需要通过独立验证。
 
-**预算耗尽时的行为（有意设计）**：若当年预算已花完，`rtm.mint` 会以 `YearBudgetExceeded` 回滚整个结算调用。认领保持"已配置、未结算"状态，评估者可在年份翻篇后直接重试。奖励是**被推迟，而不是被没收或重新计价**。代价是结算速度被发行速度限制——这正是减半机制想要的效果。
+**预算耗尽时的行为**：若当年预算已花完，`rtm.mint` 会以 `YearBudgetExceeded` 回滚整个结算调用。认领保持“已配置、未结算”，但当前没有预算预留、取消或部分支付机制；若其金额大于后续年度减半后的预算，将可能一直无法整笔支付。不能保证所有奖励仅被延期，也不能向外承诺兑付。预算预留与认领生命周期属于后续独立改进。
+
+**部署信任边界**：token 拒绝将零地址或 EOA 作为 minter，并在部署后锁定该地址；“有合约代码”不等于验证了 BountyVault 身份。部署者必须核对 vault 字节码和相互绑定，不能使用任意外部或可升级 minter。此实现尚未接入 Arena 判奖或真实资产。
 
 ## 4. BountyVault 在原研究构想中的位置
 
