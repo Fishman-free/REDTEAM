@@ -55,6 +55,8 @@ contract RTMToken is ERC20, Ownable {
     error NotMinter();
     /// @notice A required address argument was the zero address.
     error ZeroAddress();
+    /// @notice The designated minter has no deployed contract code.
+    error InvalidMinter();
     /// @notice A required amount argument was zero.
     error ZeroAmount();
     /// @notice The mint would exceed the current year's remaining budget.
@@ -79,6 +81,7 @@ contract RTMToken is ERC20, Ownable {
         Ownable(initialOwner)
     {
         if (minter_ == address(0)) revert ZeroAddress();
+        if (minter_.code.length == 0) revert InvalidMinter();
         if (emissionStart_ == 0) revert ZeroAmount();
         minter = minter_;
         emissionStart = emissionStart_;

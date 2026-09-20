@@ -172,10 +172,9 @@ contract BountyVault is Ownable, Pausable {
     ///
     /// Exhausted-budget behaviour: if the current year's emission budget is
     /// already spent, `rtm.mint` reverts with `YearBudgetExceeded` and the whole
-    /// call reverts -- the claim stays configured and unsettled, and the
-    /// evaluator simply retries after the year rolls over. Rewards are therefore
-    /// deferred, never lost or re-based. This is a deliberate consequence of the
-    /// halving schedule: the vault cannot pay out faster than the token emits.
+    /// call reverts -- the claim stays configured and unsettled. There is no
+    /// budget reservation or automatic cross-year guarantee; an operator must
+    /// handle this outstanding claim explicitly under the active research policy.
     /// @param id Claim id; must be configured and unsettled.
     function settleClaim(bytes32 id) external onlyEvaluator whenNotPaused {
         if (address(rtm) == address(0)) revert RtmNotInitialized();

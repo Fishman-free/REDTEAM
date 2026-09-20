@@ -96,7 +96,7 @@ python -m rsi4safety arena verify --campaign drycheck-local
 
 `ExperimentalToken`、`PaymentAgent`、`RewardSettlement` 是现有本地支付 demo 的合约；SafeERC20 与配置事件加固已保留。`RTMToken`、`BountyVault` 的年度减半发行和奖励结算实现及测试也保留，但**尚未接入 Arena 或当前 payment-agent demo**。
 
-[攻击接口设计](ATTACK_INTERFACE_DESIGN.md) 中的对外 A2A 会话、配额、commit-reveal、独立证明和公开领奖仍是设计，不是上线能力。RTM owner 可轮换 minter；单次 claim 限额不等于总预算不可耗尽；跨年减半可能让未预留预算的大额 claim 无法整笔支付。不得承诺已具备生产资金安全或保证兑付。
+[攻击接口设计](ATTACK_INTERFACE_DESIGN.md) 中的对外 A2A 会话、配额、commit-reveal、独立证明和公开领奖仍是设计，不是上线能力。RTM minter 在部署时固定为一个已有合约，不能再由 owner 轮换；部署者仍须核验指定合约确实是预期的 BountyVault，非零代码检查不验证合约身份。单次 claim 限额不等于总预算不可耗尽；跨年减半可能让未预留预算的大额 claim 无法整笔支付。不得承诺已具备生产资金安全或保证兑付。
 
 ## CI 与项目站
 

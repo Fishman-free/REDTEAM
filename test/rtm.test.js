@@ -68,10 +68,12 @@ describe('RTM halving token and bounty vault', function () {
       await expect(factory.deploy(owner.address, vault.target, 0)).to.be.revertedWithCustomError(rtm, 'ZeroAmount');
     });
 
-    it('requires a non-zero BountyVault-bound minter', async () => {
+    it('requires a deployed BountyVault-bound minter', async () => {
       const factory = await ethers.getContractFactory('RTMToken');
       await expect(factory.deploy(owner.address, ethers.ZeroAddress, await time.latest()))
         .to.be.revertedWithCustomError(rtm, 'ZeroAddress');
+      await expect(factory.deploy(owner.address, outsider.address, await time.latest()))
+        .to.be.revertedWithCustomError(rtm, 'InvalidMinter');
     });
   });
 
