@@ -86,7 +86,7 @@ python -m rsi4safety arena verify --campaign drycheck-local
 
 - 基础 RSI demo 使用模拟资金与确定性策略候选，保留版本父子关系、拒绝原因、经验和回归结果。全部拒付不能晋级。
 - Arena 已有 PayGate/PayAssist、宿主可信支付执行器、配对对照、程序裁决、冻结验收、版本晋级/回滚、审计与 Windows 兼容处理。
-- Arena dry-run 使用 stub，不会自动产生真实修复。拒绝晋级或终局回滚可能是**正确结果**；协议完成与审计链有效，不等于修复成功。
+- Arena dry-run 使用 stub，不会自动产生真实修复；它仍会在本机启动受控的 uvicorn SUT 子进程，只是不使用 Docker 或模型 API。拒绝晋级或终局回滚可能是**正确结果**；协议完成与审计链有效，不等于修复成功。
 - 开发回归可使用执行缓存；冻结验收强制新执行。公开任务与开发数据即使按实例分开，也可能共享攻击机制，不能据此证明泛化。
 - Docker/Claude Code/GLM 在线路线需要显式安装 `.[arena]`、配置 Docker 和模型凭据。`probe`、`experiment`、`repair-check`、非 dry-run Arena 会调用模型，本次不运行。
 

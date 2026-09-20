@@ -56,7 +56,7 @@ jobs:
         run: python -m pytest tests -q
       - name: Offline RSI demo
         run: python -m rsi4safety demo --state-dir .rsi4safety/ci-demo --rounds 2 --json
-      - name: Arena protocol demo (no Docker or model calls)
+      - name: Arena protocol demo (local SUT subprocess; no Docker or model calls)
         run: python -m rsi4safety arena run --campaign ci-drycheck --rounds 2 --dry-run
       - name: Verify Arena audit chain
         run: python -m rsi4safety arena verify --campaign ci-drycheck
