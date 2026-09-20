@@ -135,17 +135,20 @@ class TrustedPaymentTests(unittest.TestCase):
 class _FakeHttp:
     run_response = response(decision())
     failure = None
+    health_timeouts = []
 
     def __init__(self, url):
         self.trace = []
 
-    def wait_healthy(self):
+    def wait_healthy(self, *, timeout_seconds=60):
+        self.health_timeouts.append(timeout_seconds)
         if self.failure:
             raise self.failure
 
-    def call(self, method, path, body=None):
+    def call(self, method, path, body=None, *, timeout_seconds=30):
         result = {"task_id": "task-new"} if path == "/tasks" else self.run_response if path.endswith("/run") else {"ok": True}
-        self.trace.append({"method": method, "path": path, "body": body, "status": 200, "response": result})
+        self.trace.append({"method": method, "path": path, "body": body, "status": 200,
+                           "response": result, "timeout_seconds": timeout_seconds})
         return 200, result
 
 
@@ -177,6 +180,7 @@ class DriverBoundaryTests(unittest.TestCase):
         self.http_patch.start()
         _FakeHttp.run_response = response(decision())
         _FakeHttp.failure = None
+        _FakeHttp.health_timeouts = []
 
     def tearDown(self):
         self.http_patch.stop()
@@ -191,6 +195,7 @@ class DriverBoundaryTests(unittest.TestCase):
         self.assertTrue(execution.ledger_ok)
         self.assertTrue(execution.http_trace[-1]["platform_triggered"])
         self.assertEqual(execution.ledger_rows[0]["status"], "executed")
+        self.assertTrue(all(item["timeout_seconds"] <= 30 for item in execution.http_trace))
         self.assertEqual(ledger_rows_from_file(driver.db_path), execution.ledger_rows)
 
     def test_explicit_run_does_not_add_extra_payment(self):

@@ -349,67 +349,59 @@ class VersionStore:
             raise ValueError("projection target must be outside the version store")
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.parent / f".{target.name}-{uuid.uuid4().hex}.link"
-        try:
-            temporary.symlink_to(source, target_is_directory=True)
-        except OSError as exc:
-            if not _is_windows() or getattr(exc, "winerror", None) != 1314:
-                raise
-            # Windows without Developer Mode cannot create symlinks (WinError
-            # 1314 = missing privilege). Materialise a copy instead: consumers
-            # only read the projection, so a real directory is equivalent.
-            shutil.copytree(source, temporary, symlinks=False)
+        copy = temporary.with_suffix(".copy")
         backup = None
         try:
-            if target.exists() and not target.is_symlink():
-                # One-time migration preserves any legacy .git directory intact.
+            try:
+                temporary.symlink_to(source, target_is_directory=True)
+            except OSError as exc:
+                if not _is_windows() or getattr(exc, "winerror", None) != 1314:
+                    raise
+                # No Developer Mode/admin privilege: stage a complete ordinary
+                # directory, never copy directly into the consumer-visible view.
+                shutil.copytree(source, temporary, symlinks=False)
+            if _path_present(target) and (not target.is_symlink() or _is_windows()):
+                # POSIX can replace a symlink atomically. Windows directory links
+                # and ordinary directories need a move-aside, under the store's
+                # mutation lock. Retain legacy .git and old view bytes intact.
                 backups = self.root / "legacy-projections"
                 backups.mkdir(exist_ok=True)
-                backup = backups / uuid.uuid4().hex
-                shutil.move(str(target), str(backup))
-            elif _is_windows() and target.is_symlink():
-                # Windows cannot atomically replace an existing directory
-                # symlink (WinError 5), even when the caller owns both links.
-                backups = self.root / "legacy-projections"
-                backups.mkdir(exist_ok=True)
-                backup = backups / uuid.uuid4().hex
-                shutil.move(str(target), str(backup))
+                moved = backups / uuid.uuid4().hex
+                # Do NOT use shutil.move's copy/delete fallback. A failed rename
+                # must leave the old view alone; publish backup only on success.
+                os.rename(target, moved)
+                backup = moved
             try:
                 os.replace(temporary, target)
             except PermissionError as exc:
                 if not _is_windows() or getattr(exc, "winerror", None) != 5:
                     raise
-                # A Windows directory copy cannot be atomically replaced either
-                # when a consumer still has a handle open. Install by rename only
-                # after the old target is moved aside; the lock serializes readers
-                # in this process and the source is always an immutable package.
                 if _path_present(target):
+                    # Another writer is outside our advisory lock. Do not merge
+                    # into it, follow it, or delete it during rollback.
                     raise RuntimeError("Windows projection target remained occupied after move-aside") from exc
-                try:
-                    os.replace(temporary, target)
-                except PermissionError as retry_exc:
-                    if getattr(retry_exc, "winerror", None) != 5:
-                        raise
-                    if temporary.is_symlink():
-                        raise RuntimeError(
-                            "Windows cannot install a directory symlink without replacement privilege"
-                        ) from retry_exc
-                    shutil.copytree(temporary, target, symlinks=False)
-        except BaseException:
-            if backup is not None:
-                # Restore the previous projection even if a failed replacement
-                # recreated a target path. Never leave a partially installed
-                # candidate tree at the consumer-visible location.
+                # Some Windows filesystems/ACLs reject directory-link replacement.
+                # Copy only verified committed projection bytes (not the mutable
+                # candidate worktree), then rename a complete ordinary directory.
+                shutil.copytree(source, copy, symlinks=False)
                 if _path_present(target):
-                    _remove_projection(target)
-                if _path_present(backup):
-                    shutil.move(str(backup), str(target))
+                    raise FileExistsError("projection target appeared during copy staging")
+                os.rename(copy, target)
+        except BaseException as exc:
+            if backup is not None and not _path_present(target):
+                try:
+                    os.rename(backup, target)
+                except OSError as restore_error:
+                    raise RuntimeError(
+                        f"projection install failed ({exc}); previous view retained at {backup}; "
+                        f"restore failed: {restore_error}"
+                    ) from exc
             raise
         finally:
-            if temporary.is_symlink() or temporary.is_file():
-                temporary.unlink(missing_ok=True)
-            elif temporary.is_dir():
-                # Windows copy fallback builds a real directory here.
-                shutil.rmtree(temporary, ignore_errors=True)
+            # Only our staging entries: never remove target or follow a link into
+            # the immutable store. A partial copy cannot survive as a live view.
+            _remove_projection(temporary)
+            _remove_projection(copy)
         return target
 
     def materialize(self, version_id: str, target_dir: Path) -> Path:

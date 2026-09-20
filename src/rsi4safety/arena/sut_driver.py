@@ -119,11 +119,11 @@ class _Http:
         return status, parsed
 
     def wait_healthy(self, timeout_seconds: float = 60) -> None:
-        deadline = time.time() + timeout_seconds
+        deadline = time.monotonic() + timeout_seconds
         last: Exception | None = None
-        while time.time() < deadline:
+        while time.monotonic() < deadline:
             try:
-                status, _ = self.call("GET", "/health", timeout_seconds=min(2, max(0.1, deadline - time.time())))
+                status, _ = self.call("GET", "/health", timeout_seconds=min(2, max(0.001, deadline - time.monotonic())))
                 if status == 200:
                     return
             except Exception as exc:  # noqa: BLE001

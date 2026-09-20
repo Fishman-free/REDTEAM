@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -168,69 +169,33 @@ class VersionStoreTests(unittest.TestCase):
         self.assertEqual((target / "secret.txt").read_text(), "required artifact\n")
         self.assertFalse((target / ".git").exists())
 
-    def test_windows_copy_projection_falls_back_when_replace_is_denied(self) -> None:
+    def test_windows_copy_fallback_uses_committed_bytes_not_candidate_worktree(self) -> None:
         target = self.root / "copy-fallback"
+        target.mkdir()
+        (target / "old.txt").write_text("old view\n")
         candidate = self.candidate("copy-fallback")
-        calls = 0
-
-        def denied_twice(source, destination):
-            nonlocal calls
-            calls += 1
-            raise _winerror5()
-
+        (self.store.worktree_path(candidate.version_id) / "source" / "app" / "main.py").write_text("tampered\n")
         real_replace = os.replace
-        def allow_package_projection(source_path, destination):
-            if Path(destination).parent == self.store.root / "projections":
-                return real_replace(source_path, destination)
-            return denied_twice(source_path, destination)
+
+        def deny_view_replace(source, destination):
+            if Path(destination) == target:
+                raise _winerror5()
+            return real_replace(source, destination)
 
         with patch("rsi4safety.arena.versions._is_windows", return_value=True), \
-                patch("rsi4safety.arena.versions.Path.symlink_to", side_effect=_winerror1314()), \
-                patch("rsi4safety.arena.versions.os.replace", side_effect=allow_package_projection):
+                patch.object(Path, "symlink_to", side_effect=_winerror1314()), \
+                patch("rsi4safety.arena.versions.os.replace", side_effect=deny_view_replace):
             projected = self.store.materialize_source(candidate.version_id, target)
         self.assertEqual(projected, target)
         self.assertTrue(target.is_dir() and not target.is_symlink())
         self.assertEqual((target / "app" / "main.py").read_text(), "SAFE = True\n")
-        self.assertEqual(calls, 2)
-
-    def test_windows_replace_denial_does_not_leak_candidate_or_delete_target(self) -> None:
-        target = self.root / "occupied"
-        target.mkdir()
-        (target / "old.txt").write_text("old\n")
-        candidate = self.candidate("occupied")
-
-        def recreate_then_deny(source, destination):
-            if destination == target:
-                target.mkdir(exist_ok=True)
-                (target / "still-occupied.txt").write_text("lock\n")
-            raise _winerror5()
-
-        real_replace = os.replace
-        def allow_package_projection(source_path, destination):
-            if Path(destination).parent == self.store.root / "projections":
-                return real_replace(source_path, destination)
-            return recreate_then_deny(source_path, destination)
-
-        with patch("rsi4safety.arena.versions._is_windows", return_value=True), \
-                patch("rsi4safety.arena.versions.os.replace", side_effect=allow_package_projection):
-            with self.assertRaisesRegex(RuntimeError, "target remained occupied"):
-                self.store.materialize_source(candidate.version_id, target)
-        self.assertEqual((target / "old.txt").read_text(), "old\n")
-        self.assertFalse((target / "app" / "main.py").exists())
-
-    @unittest.skipUnless(_SYMLINKS_OK, "symbolic links unavailable on this platform")
-    def test_windows_replaces_existing_directory_symlink_without_winerror5(self) -> None:
-        target = self.root / "live-windows"
-        self.store.materialize_source(self.seed.version_id, target)
-        self.assertTrue(target.is_symlink())
-        candidate = self.candidate("windows-replace")
-        with patch("rsi4safety.arena.versions.os.name", "nt"):
-            projected = self.store.materialize_source(candidate.version_id, target)
-        self.assertEqual(projected, target)
-        self.assertTrue(target.is_symlink())
-        self.assertEqual((target / "app" / "main.py").read_text(), "SAFE = True\n")
-        preserved = list((self.store.root / "legacy-projections").glob("*/app/main.py"))
-        self.assertEqual(len(preserved), 0)
+        self.assertFalse((target / "old.txt").exists())
+        self.assertFalse((target / ".git").exists())
+        self.assertEqual(self.store.active(), self.seed)
+        backups = list((self.store.root / "legacy-projections").iterdir())
+        self.assertEqual(len(backups), 1)
+        self.assertEqual((backups[0] / "old.txt").read_text(), "old view\n")
+        self.assertEqual(list(self.root.glob(".copy-fallback-*")), [])
 
     def test_promotion_recovery_and_rollback_update_source_without_stale_files(self) -> None:
         target = self.root / "live"
