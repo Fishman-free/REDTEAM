@@ -142,7 +142,9 @@
 
 ---
 
-## 四、改进分支（本地已提交，待你推送）
+## 四、改进分支（2026-09-18 历史记录）
+
+> 2026-09-21 整合注记：下表是原审查时的状态。最新远端中合约分支已进入 `main`，Windows 修复已进入 `codex/agent-evolution`；当前整合状态与本次实测另见 [docs/INTEGRATION.md](docs/INTEGRATION.md)。以下历史测试不代替本次验证。机器专属路径已改为占位符。
 
 | 分支 | 基于 | 内容 | 提交 |
 |---|---|---|---|
@@ -152,8 +154,8 @@
 推送命令（确认无误后执行）：
 
 ```powershell
-cd C:\Users\21560\Desktop\REDTEAM-codex;  git push origin safety/windows-portability
-cd C:\Users\21560\Desktop\REDTEAM;         git push origin safety/contracts-and-rtm
+git -C <codex-checkout> push origin safety/windows-portability
+git -C <main-checkout> push origin safety/contracts-and-rtm
 ```
 
 推送后在 GitHub 上开 PR 给对应队友 review。**未做**：未 push、未 merge、未碰任何队友分支的提交历史。

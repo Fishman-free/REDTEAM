@@ -3,14 +3,24 @@ artifacts/
 cache/
 coverage/
 __pycache__/
-.pytest_cache/
 *.py[cod]
+.pytest_cache/
 *.sqlite3
 *.sqlite3-*
 *.log
+.rsi4safety/
+.venv/
+dist/
+build/
+*.egg-info/
 .env
 .env.*
 !.env.example
 
 # Claude Code spec-workflow plugin state
 .spec-workflow/
+
+# Machine-local agent-tool state (scanner ledgers, plugin caches) -- never commit
+.mimosa/
+.v2c/
+.video_agent/

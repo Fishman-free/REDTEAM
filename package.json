@@ -4,7 +4,8 @@
   "scripts": {
     "test": "hardhat test",
     "evm:demo": "hardhat run scripts/evm-demo.js",
-    "demo:agent": "hardhat run scripts/agent-demo.js"
+    "demo:agent": "hardhat run scripts/agent-demo.js",
+    "demo:multiround": "hardhat run scripts/agent-multiround-demo.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

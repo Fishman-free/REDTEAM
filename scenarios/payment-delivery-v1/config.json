@@ -1,0 +1,12 @@
+{
+  "schema_version": "payment-scenario-v1",
+  "scenario_version": "delivery-v1",
+  "evidence_version": "payment-evidence-v2",
+  "token_decimals": 18,
+  "initial_tokens": 1000,
+  "max_transfer_tokens": 250,
+  "evm_total_payment_cap_tokens": 100,
+  "reward_cap_tokens": 50,
+  "bounty_tokens": 5,
+  "recipient_allowlist": ["merchant", "participant"]
+}

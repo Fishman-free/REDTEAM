@@ -1,0 +1,64 @@
+name: offline-tests
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  REDTEAM_LLM_ENABLED: "0"
+  PYTHONUTF8: "1"
+jobs:
+  python:
+    name: Python and SUTs (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test and SUT dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Host suites (SQLite, RSI and Arena)
+        run: python -m pytest -q
+      - name: Unittest entrypoint parity
+        run: python -m unittest discover -s tests
+      - name: PayGate suite (isolated app import)
+        working-directory: sut/paygate
+        run: python -m pytest tests -q
+      - name: PayAssist suite (isolated app import)
+        working-directory: sut/payassist
+        run: python -m pytest tests -q
+      - name: Offline RSI demo
+        run: python -m rsi4safety demo --state-dir .rsi4safety/ci-demo --rounds 2 --json
+      - name: Arena protocol demo (no Docker or model calls)
+        run: python -m rsi4safety arena run --campaign ci-drycheck --rounds 2 --dry-run
+      - name: Verify Arena audit chain
+        run: python -m rsi4safety arena verify --campaign ci-drycheck
+  evm:
+    name: Local EVM contracts and payment agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked EVM toolchain
+        run: npm ci --no-audit --no-fund
+      - name: Contract and payment-agent suites
+        run: npm test
+      - name: Single-turn payment demo (offline)
+        run: npm run demo:agent
+      - name: Multi-turn payment demo (offline)
+        run: npm run demo:multiround
