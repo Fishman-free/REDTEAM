@@ -27,8 +27,27 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Host suites (SQLite, RSI and Arena)
         run: python -m pytest -q
-      - name: Unittest entrypoint parity
-        run: python -m unittest discover -s tests
+      - name: Unittest entrypoint parity (bounded host suites)
+        run: |
+          python -m unittest discover -s tests -p "test_core.py"
+          python -m unittest discover -s tests -p "test_llm.py"
+          python -m unittest discover -s tests -p "test_http_flow.py"
+          python -m unittest discover -s tests -p "test_payment_scenario.py"
+          python -m unittest discover -s tests -p "test_model_agents.py"
+          python -m unittest discover -s tests -p "test_providers.py"
+          python -m unittest discover -s tests -p "test_runner.py"
+          python -m unittest discover -s tests -p "test_campaign.py"
+          python -m unittest discover -s tests -p "test_security_regressions.py"
+          python -m unittest discover -s tests -p "test_rsi4safety_core.py"
+          python -m unittest discover -s tests -p "test_arena_cli.py"
+          python -m unittest discover -s tests/arena -p "test_audit.py"
+          python -m unittest discover -s tests/arena -p "test_constitution.py"
+          python -m unittest discover -s tests/arena -p "test_exchange.py"
+          python -m unittest discover -s tests/arena -p "test_experience.py"
+          python -m unittest discover -s tests/arena -p "test_scoring.py"
+          python -m unittest discover -s tests/arena -p "test_trusted_execution.py"
+          python -m unittest discover -s tests/arena -p "test_versions.py"
+          python -m unittest discover -s tests/arena -p "test_sut_cleanup.py"
       - name: PayGate suite (isolated app import)
         working-directory: sut/paygate
         run: python -m pytest tests -q
