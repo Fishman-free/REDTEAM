@@ -38,6 +38,13 @@ def _winerror1314() -> OSError:
     return error
 
 
+def _same_path(left: Path, right: Path) -> bool:
+    """Compare Windows link targets after resolving short/extended path forms."""
+    if os.name == "nt":
+        return os.path.normcase(os.path.realpath(left)) == os.path.normcase(os.path.realpath(right))
+    return left.resolve() == right.resolve()
+
+
 def git(directory: Path, *args: str) -> str:
     return subprocess.check_output(
         ["git", "-c", "user.name=test", "-c", "user.email=test@localhost",
@@ -424,7 +431,7 @@ class ProjectionRollbackTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 self.switch()
         self.assertTrue(self.target.is_symlink())
-        self.assertEqual(self.target.resolve(), original)
+        self.assertTrue(_same_path(self.target.resolve(), original))
         self.assert_old_view()
         self.assert_no_staging()
 
@@ -443,7 +450,7 @@ class ProjectionRollbackTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 self.switch()
         self.assertTrue(self.target.is_symlink())
-        self.assertEqual(self.target.resolve(), original)
+        self.assertTrue(_same_path(self.target.resolve(), original))
         self.assert_old_view()
         self.assert_no_staging()
 
@@ -462,7 +469,7 @@ class ProjectionRollbackTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "copy interrupted"):
                 self.switch()
         self.assertTrue(self.target.is_symlink())
-        self.assertEqual(self.target.resolve(), original)
+        self.assertTrue(_same_path(self.target.resolve(), original))
         self.assert_old_view()
         self.assert_no_staging()
 
@@ -484,7 +491,7 @@ class ProjectionRollbackTests(unittest.TestCase):
                 self.switch()
         self.assertTrue(self.target.is_symlink())
         self.assertFalse(self.target.exists())
-        self.assertEqual(Path(os.readlink(self.target)), original)
+        self.assertTrue(_same_path(Path(os.readlink(self.target)), original))
         self.assert_no_staging()
 
 
