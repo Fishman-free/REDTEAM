@@ -25,29 +25,18 @@ jobs:
           python-version: "3.12"
       - name: Install test and SUT dependencies
         run: python -m pip install -r requirements-dev.txt
-      - name: Host suites (SQLite, RSI and Arena)
-        run: python -m pytest -q
-      - name: Unittest entrypoint parity (bounded host suites)
+      - name: Root host suites (SQLite and RSI)
+        run: python -m pytest tests --ignore=tests/arena -q
+      - name: Root unittest parity (fail on any group)
+        shell: bash
         run: |
-          python -m unittest discover -s tests -p "test_core.py"
-          python -m unittest discover -s tests -p "test_llm.py"
-          python -m unittest discover -s tests -p "test_http_flow.py"
-          python -m unittest discover -s tests -p "test_payment_scenario.py"
-          python -m unittest discover -s tests -p "test_model_agents.py"
-          python -m unittest discover -s tests -p "test_providers.py"
-          python -m unittest discover -s tests -p "test_runner.py"
-          python -m unittest discover -s tests -p "test_campaign.py"
-          python -m unittest discover -s tests -p "test_security_regressions.py"
-          python -m unittest discover -s tests -p "test_rsi4safety_core.py"
-          python -m unittest discover -s tests -p "test_arena_cli.py"
-          python -m unittest discover -s tests/arena -p "test_audit.py"
-          python -m unittest discover -s tests/arena -p "test_constitution.py"
-          python -m unittest discover -s tests/arena -p "test_exchange.py"
-          python -m unittest discover -s tests/arena -p "test_experience.py"
-          python -m unittest discover -s tests/arena -p "test_scoring.py"
-          python -m unittest discover -s tests/arena -p "test_trusted_execution.py"
-          python -m unittest discover -s tests/arena -p "test_versions.py"
-          python -m unittest discover -s tests/arena -p "test_sut_cleanup.py"
+          set -euo pipefail
+          for file in tests/test_*.py; do
+            python -m unittest discover -s tests -p "$(basename "$file")"
+          done
+      - name: Complete Arena suite (including promotion, resume and rollback)
+        timeout-minutes: 20
+        run: python -m pytest tests/arena -vv --durations=15 -o faulthandler_timeout=120
       - name: PayGate suite (isolated app import)
         working-directory: sut/paygate
         run: python -m pytest tests -q
@@ -57,6 +46,7 @@ jobs:
       - name: Offline RSI demo
         run: python -m rsi4safety demo --state-dir .rsi4safety/ci-demo --rounds 2 --json
       - name: Arena protocol demo (local SUT subprocess; no Docker or model calls)
+        timeout-minutes: 10
         run: python -m rsi4safety arena run --campaign ci-drycheck --rounds 2 --dry-run
       - name: Verify Arena audit chain
         run: python -m rsi4safety arena verify --campaign ci-drycheck

@@ -241,5 +241,252 @@ class VersionStoreTests(unittest.TestCase):
                 parent_version_id=self.seed.version_id, parent_package_digest=self.seed.package_digest)
 
 
+class ProjectionRollbackTests(unittest.TestCase):
+    """Fault injection needs neither Git worktrees nor Windows link privileges."""
+
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.store = VersionStore(self.root / "store")
+        self.source = self.store.root / "projections" / "verified" / "source"
+        (self.source / "app").mkdir(parents=True)
+        (self.source / "app" / "main.py").write_text("new committed bytes\n")
+        self.target = self.root / "live"
+        (self.target / "app").mkdir(parents=True)
+        (self.target / "app" / "main.py").write_text("old view\n")
+        (self.target / "old.txt").write_text("preserve\n")
+        windows = patch("rsi4safety.arena.versions._is_windows", return_value=True)
+        windows.start()
+        self.addCleanup(windows.stop)
+
+    def copy_mode(self):
+        return patch.object(Path, "symlink_to", side_effect=_winerror1314())
+
+    def switch(self):
+        with self.store._locked():
+            return self.store._switch_projection(self.source, self.target)
+
+    def assert_old_view(self):
+        self.assertEqual((self.target / "app" / "main.py").read_text(), "old view\n")
+        self.assertEqual((self.target / "old.txt").read_text(), "preserve\n")
+        self.assertEqual((self.source / "app" / "main.py").read_text(), "new committed bytes\n")
+
+    def assert_no_staging(self):
+        self.assertEqual(list(self.root.glob(".live-*")), [])
+
+    def make_old_link(self, *, dangling=False):
+        original = self.root / "old-source"
+        os.rename(self.target, original)
+        if dangling:
+            original = self.root / "missing-source"
+        self.target.symlink_to(original, target_is_directory=True)
+        return original
+
+    def test_move_aside_failure_never_removes_old_view(self):
+        real_rename = os.rename
+
+        def deny_move(source, destination):
+            if Path(source) == self.target:
+                raise _winerror5()
+            return real_rename(source, destination)
+
+        with self.copy_mode(), patch("rsi4safety.arena.versions.os.rename", side_effect=deny_move):
+            with self.assertRaises(PermissionError):
+                self.switch()
+        self.assert_old_view()
+        self.assert_no_staging()
+        self.assertEqual(list((self.store.root / "legacy-projections").iterdir()), [])
+
+    def test_install_rename_failure_restores_old_view(self):
+        real_rename = os.rename
+
+        def deny_install(source, destination):
+            if Path(source).suffix == ".copy" and Path(destination) == self.target:
+                raise _winerror5()
+            return real_rename(source, destination)
+
+        with self.copy_mode(), \
+                patch("rsi4safety.arena.versions.os.replace", side_effect=_winerror5()), \
+                patch("rsi4safety.arena.versions.os.rename", side_effect=deny_install):
+            with self.assertRaises(PermissionError):
+                self.switch()
+        self.assert_old_view()
+        self.assert_no_staging()
+        self.assertEqual(list((self.store.root / "legacy-projections").iterdir()), [])
+
+    def test_partial_fallback_copy_never_exposes_half_tree_and_restores_old_view(self):
+        real_copytree = shutil.copytree
+
+        def fail_copy(source, destination, *args, **kwargs):
+            if Path(destination).suffix == ".copy":
+                self.assertFalse(self.target.exists())
+                Path(destination).mkdir()
+                (Path(destination) / "partial.txt").write_text("incomplete\n")
+                raise OSError("copy interrupted")
+            return real_copytree(source, destination, *args, **kwargs)
+
+        with self.copy_mode(), \
+                patch("rsi4safety.arena.versions.os.replace", side_effect=_winerror5()), \
+                patch("rsi4safety.arena.versions.shutil.copytree", side_effect=fail_copy):
+            with self.assertRaisesRegex(OSError, "copy interrupted"):
+                self.switch()
+        self.assert_old_view()
+        self.assert_no_staging()
+        self.assertFalse((self.target / "partial.txt").exists())
+
+    def test_1314_partial_staging_failure_preserves_existing_view(self):
+        def fail_copy(source, destination, **kwargs):
+            Path(destination).mkdir()
+            (Path(destination) / "partial.txt").write_text("incomplete\n")
+            raise OSError("staging interrupted")
+
+        with self.copy_mode(), patch("rsi4safety.arena.versions.shutil.copytree", side_effect=fail_copy):
+            with self.assertRaisesRegex(OSError, "staging interrupted"):
+                self.switch()
+        self.assert_old_view()
+        self.assert_no_staging()
+        self.assertFalse((self.store.root / "legacy-projections").exists())
+
+    def test_failed_initial_copy_does_not_leave_a_new_view(self):
+        shutil.rmtree(self.target)
+
+        def fail_copy(source, destination, **kwargs):
+            Path(destination).mkdir()
+            raise OSError("staging interrupted")
+
+        with self.copy_mode(), patch("rsi4safety.arena.versions.shutil.copytree", side_effect=fail_copy):
+            with self.assertRaisesRegex(OSError, "staging interrupted"):
+                self.switch()
+        self.assertFalse(self.target.exists())
+        self.assert_no_staging()
+
+    def test_restore_failure_retains_backup_and_reports_its_path(self):
+        real_rename = os.rename
+
+        def deny_restore(source, destination):
+            if Path(source).parent.name == "legacy-projections":
+                raise _winerror5()
+            return real_rename(source, destination)
+
+        with self.copy_mode(), \
+                patch("rsi4safety.arena.versions.os.replace", side_effect=OSError("install denied")), \
+                patch("rsi4safety.arena.versions.os.rename", side_effect=deny_restore):
+            with self.assertRaisesRegex(RuntimeError, "restore failed") as caught:
+                self.switch()
+        backups = list((self.store.root / "legacy-projections").iterdir())
+        self.assertEqual(len(backups), 1)
+        self.assertIn(str(backups[0]), str(caught.exception))
+        self.assertEqual((backups[0] / "app" / "main.py").read_text(), "old view\n")
+        self.assertFalse(self.target.exists())
+        self.assert_no_staging()
+
+    def test_unexpected_live_target_is_not_removed_or_merged_on_rollback(self):
+        def occupy_then_deny(source, destination):
+            self.target.mkdir()
+            (self.target / "other-writer.txt").write_text("not ours\n")
+            raise _winerror5()
+
+        with self.copy_mode(), patch("rsi4safety.arena.versions.os.replace", side_effect=occupy_then_deny):
+            with self.assertRaisesRegex(RuntimeError, "target remained occupied"):
+                self.switch()
+        self.assertEqual((self.target / "other-writer.txt").read_text(), "not ours\n")
+        self.assertFalse((self.target / "app").exists())
+        backups = list((self.store.root / "legacy-projections").iterdir())
+        self.assertEqual((backups[0] / "app" / "main.py").read_text(), "old view\n")
+        self.assert_no_staging()
+
+    def test_non_windows_permission_failure_is_not_treated_as_windows_fallback(self):
+        def stage_ordinary_copy(link, source, **kwargs):
+            shutil.copytree(source, link)
+
+        with patch("rsi4safety.arena.versions._is_windows", return_value=False), \
+                patch.object(Path, "symlink_to", autospec=True, side_effect=stage_ordinary_copy), \
+                patch("rsi4safety.arena.versions.os.replace", side_effect=_winerror5()):
+            with self.assertRaises(PermissionError):
+                self.switch()
+        self.assert_old_view()
+        self.assert_no_staging()
+
+    @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
+    def test_actual_directory_symlink_replacement_does_not_follow_old_link(self):
+        original = self.make_old_link()
+        self.switch()
+        self.assertTrue(self.target.is_symlink())
+        self.assertEqual(self.target.resolve(), self.source)
+        self.assertEqual((original / "app" / "main.py").read_text(), "old view\n")
+        self.assert_no_staging()
+
+    @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
+    def test_actual_directory_symlink_move_failure_keeps_old_link(self):
+        original = self.make_old_link()
+        with patch("rsi4safety.arena.versions.os.rename", side_effect=_winerror5()):
+            with self.assertRaises(PermissionError):
+                self.switch()
+        self.assertTrue(self.target.is_symlink())
+        self.assertEqual(self.target.resolve(), original)
+        self.assert_old_view()
+        self.assert_no_staging()
+
+    @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
+    def test_actual_directory_symlink_install_failure_restores_old_link(self):
+        original = self.make_old_link()
+        real_rename = os.rename
+
+        def deny_install(source, destination):
+            if Path(source).suffix == ".copy" and Path(destination) == self.target:
+                raise _winerror5()
+            return real_rename(source, destination)
+
+        with patch("rsi4safety.arena.versions.os.replace", side_effect=_winerror5()), \
+                patch("rsi4safety.arena.versions.os.rename", side_effect=deny_install):
+            with self.assertRaises(PermissionError):
+                self.switch()
+        self.assertTrue(self.target.is_symlink())
+        self.assertEqual(self.target.resolve(), original)
+        self.assert_old_view()
+        self.assert_no_staging()
+
+    @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
+    def test_actual_directory_symlink_partial_copy_failure_restores_old_link(self):
+        original = self.make_old_link()
+
+        def fail_copy(source, destination, **kwargs):
+            self.assertFalse(self.target.exists())
+            Path(destination).mkdir()
+            (Path(destination) / "partial.txt").write_text("incomplete\n")
+            raise OSError("copy interrupted")
+
+        with patch("rsi4safety.arena.versions.os.replace", side_effect=_winerror5()), \
+                patch("rsi4safety.arena.versions.shutil.copytree", side_effect=fail_copy):
+            with self.assertRaisesRegex(OSError, "copy interrupted"):
+                self.switch()
+        self.assertTrue(self.target.is_symlink())
+        self.assertEqual(self.target.resolve(), original)
+        self.assert_old_view()
+        self.assert_no_staging()
+
+    @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
+    def test_actual_directory_symlink_winerror5_installs_complete_copy(self):
+        original = self.make_old_link()
+        with patch("rsi4safety.arena.versions.os.replace", side_effect=_winerror5()):
+            self.switch()
+        self.assertFalse(self.target.is_symlink())
+        self.assertEqual((self.target / "app" / "main.py").read_text(), "new committed bytes\n")
+        self.assertEqual((original / "app" / "main.py").read_text(), "old view\n")
+        self.assert_no_staging()
+
+    @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
+    def test_dangling_directory_symlink_is_restored_after_install_failure(self):
+        original = self.make_old_link(dangling=True)
+        with patch("rsi4safety.arena.versions.os.replace", side_effect=OSError("install denied")):
+            with self.assertRaisesRegex(OSError, "install denied"):
+                self.switch()
+        self.assertTrue(self.target.is_symlink())
+        self.assertFalse(self.target.exists())
+        self.assertEqual(Path(os.readlink(self.target)), original)
+        self.assert_no_staging()
+
+
 if __name__ == "__main__":
     unittest.main()

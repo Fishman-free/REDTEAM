@@ -350,7 +350,8 @@ class VersionStore:
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.parent / f".{target.name}-{uuid.uuid4().hex}.link"
         copy = temporary.with_suffix(".copy")
-        backup = None
+        backup = None  # Set only after the old view has actually moved.
+        install_committed = False
         try:
             try:
                 temporary.symlink_to(source, target_is_directory=True)
@@ -387,8 +388,14 @@ class VersionStore:
                 if _path_present(target):
                     raise FileExistsError("projection target appeared during copy staging")
                 os.rename(copy, target)
+            install_committed = True
         except BaseException as exc:
-            if backup is not None and not _path_present(target):
+            if backup is not None and not install_committed:
+                if _path_present(target):
+                    raise RuntimeError(
+                        f"projection install failed ({exc}); target occupied; "
+                        f"previous view retained at {backup}"
+                    ) from exc
                 try:
                     os.rename(backup, target)
                 except OSError as restore_error:
@@ -405,12 +412,12 @@ class VersionStore:
         return target
 
     def materialize(self, version_id: str, target_dir: Path) -> Path:
-        """Atomically point target_dir at a clean complete package projection."""
+        """Install a complete projection; Windows move-aside is not atomic."""
         with self._locked():
             return self._switch_projection(self._projection(self.get(version_id)), Path(target_dir))
 
     def materialize_source(self, version_id: str, target_dir: Path) -> Path:
-        """Project source only, without .git; subsequent switches are atomic."""
+        """Project committed source without .git, with rollback on install errors."""
         with self._locked():
             return self._switch_projection(self._projection(self.get(version_id)) / "source", Path(target_dir))
 

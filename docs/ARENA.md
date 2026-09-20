@@ -4,7 +4,9 @@ Arena 是支付智能体攻防改进平台。在线路线的攻击者、改进�
 
 Windows 本地 dry-run 与 CI 均使用有界生命周期：每次新鲜 SUT 执行有独立硬超时（默认 180 秒，可用 `--sut-execution-timeout` 调整），每个 HTTP 动作最多等待 30 秒且计入该预算。超时、`taskkill` 失败或 SQLite 文件锁无法释放会保留阶段和耗时诊断，并在清理路径中继续关闭日志句柄；不会无限等待或只终止 Python 启动器而留下子进程。dry-run 只使用确定性 SUT，不需要 Docker、模型调用或网络外发。
 
-版本投影在 POSIX 上用原子 symlink 替换；Windows 优先使用 symlink，遇到 WinError 1314（无创建链接权限）时复制不可变 package source。Windows 不能可靠地 `os.replace` 已存在的目录 symlink，故先在版本锁内移入 `legacy-projections/` 再安装；若 WinError 5 仍阻止目录替换，则仅在目标已移开且临时项为普通目录时复制安装。任何失败都会移除部分目标并恢复旧投影，避免把候选工作树或半成品暴露给 SUT。
+版本投影在 POSIX 上替换已有 symlink 时为原子操作；Windows 优先使用 symlink，遇到 WinError 1314（无创建链接权限）时，将已校验的提交投影复制到临时目录。Windows 目录链接和已有普通目录先在版本存储的写锁内重命名到 `legacy-projections/`，只有重命名成功才登记备份；移动失败不删除旧视图。安装遇到 WinError 5 时，从已校验的提交投影（不是可变候选工作树）另建完整临时副本，再重命名到空目标，绝不直接往 live 目录复制。安装失败且目标仍为空时恢复旧视图；恢复受阻或有其它写者占据目标时保留备份并报告其路径，不删除非本次事务所有的目标。临时复制失败会清理暂存目录。
+
+Windows 移开旧视图再安装存在短暂空档，不保证掉电事务原子性；写锁只约束遵守锁协议的写者，不覆盖外部读者。切换期间应停止 SUT/其它投影读者。跨文件系统或权限阻止备份重命名时失败退出并保留旧视图，不以递归复制/删除强行移动。
 
 内部契约（数据格式、API、MCP 工具面）见 [ARENA_SPEC.md](ARENA_SPEC.md)；预置漏洞清单（仅人工审计用）见 [arena/SEEDED_VULNS.md](arena/SEEDED_VULNS.md)。
 
