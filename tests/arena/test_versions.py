@@ -485,13 +485,14 @@ class ProjectionRollbackTests(unittest.TestCase):
 
     @unittest.skipUnless(_SYMLINKS_OK, "directory symlink privilege unavailable")
     def test_dangling_directory_symlink_is_restored_after_install_failure(self):
-        original = self.make_old_link(dangling=True)
+        self.make_old_link(dangling=True)
+        original_link = os.readlink(self.target)
         with patch("rsi4safety.arena.versions.os.replace", side_effect=OSError("install denied")):
             with self.assertRaisesRegex(OSError, "install denied"):
                 self.switch()
         self.assertTrue(self.target.is_symlink())
         self.assertFalse(self.target.exists())
-        self.assertTrue(_same_path(Path(os.readlink(self.target)), original))
+        self.assertEqual(os.readlink(self.target), original_link)
         self.assert_no_staging()
 
 
