@@ -48,4 +48,4 @@
 
 ## 6. 奖励与公开服务
 
-`RTMToken/BountyVault` 是保留的独立合约实现，未接入 Arena。单笔额度、年度发行预算和一次性 claim 不等于无重复漏洞奖励或保证兑付。管理员 minter/evaluator 权限、跨年预算预留、去重与 commit-reveal 需另行设计和验证；当前不得向外承诺奖励债务，也不得部署真实资金服务。
+`RTMToken/BountyVault` 是保留的独立合约实现，未接入 Arena。当前 BountyVault 在登记时预留绑定发行年度的完整额度；只能同年结算，跨年须由当前 evaluator 显式取消并释放原年度预留；没有自动跨年、部分支付或奖励真实性保证。管理员 evaluator 治理、claim/evidence 去重与 commit-reveal 仍需另行设计和验证；当前不得向外承诺奖励债务，也不得部署真实资金服务。
