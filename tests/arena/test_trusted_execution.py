@@ -198,6 +198,16 @@ class DriverBoundaryTests(unittest.TestCase):
         self.assertTrue(all(item["timeout_seconds"] <= 30 for item in execution.http_trace))
         self.assertEqual(ledger_rows_from_file(driver.db_path), execution.ledger_rows)
 
+    def test_export_failure_retains_authoritative_in_memory_rows(self):
+        _FakeHttp.run_response = response(decision(recipient="attacker"))
+        with patch.object(TrustedPaymentExecutor, "export", side_effect=OSError("disk unavailable")):
+            execution = _FakeDriver(self.root).run_clean(FIXTURE)
+        self.assertTrue(execution.ledger_captured)
+        self.assertFalse(execution.ledger_ok)
+        self.assertIn("platform ledger export failed", execution.error)
+        self.assertEqual(execution.ledger_rows[0]["recipient"], "attacker")
+        self.assertTrue(evaluate(evaluate_authorization_dict(AUTH), execution.ledger_rows).actual_unauthorized)
+
     def test_explicit_run_does_not_add_extra_payment(self):
         execution = _FakeDriver(self.root).run_clean(FIXTURE)
         self.assertEqual(execution.task_run_count, 1)

@@ -64,8 +64,11 @@ def _arena_parser(subparsers) -> None:
         "bench", help="run benchmark seeds against a target (no agent sessions)")
     bench.add_argument("--campaign", default="bench")
     bench.add_argument("--state-dir", type=Path, default=None)
-    bench.add_argument("--system", default=None,
-                       help="filter by system ID (e.g. A01); omit for all priority seeds")
+    from .arena.benchmark_seeds import PRIORITY_SEEDS, all_systems
+    bench.add_argument("--system", default=None, choices=all_systems(),
+                       help="filter by system ID; unimplemented adapters are reported as unsupported")
+    bench.add_argument("--seed-id", action="append", choices=[s.seed_id for s in PRIORITY_SEEDS],
+                       help="select a seed (repeatable); intersected with --system when both are set")
     bench.add_argument("--track", default="full_agent", choices=("full_agent", "prompt_only"))
     bench.add_argument("--sut-app", default="payassist", choices=("paygate", "payassist"))
 
@@ -141,26 +144,40 @@ def _run_arena(args) -> None:
         from .arena.versions import VersionStore
         system_filter = getattr(args, "system", None)
         seeds = seeds_for_system(system_filter) if system_filter else PRIORITY_SEEDS
+        seed_ids = getattr(args, "seed_id", None)
+        if seed_ids:
+            if len(set(seed_ids)) != len(seed_ids):
+                raise SystemExit("--seed-id values must be unique")
+            selected = tuple(s for s in seeds if s.seed_id in seed_ids)
+            if len(selected) != len(seed_ids):
+                raise SystemExit("--seed-id selection conflicts with --system")
+            seeds = selected
         track = getattr(args, "track", "full_agent")
         sut_app = getattr(args, "sut_app", "payassist")
         print(f"Running {len(seeds)} seeds (track={track}, target={sut_app})")
         print(f"Registry: {seed_summary()}")
 
-        # Materialize SUT source (same as campaign seeding)
-        store = VersionStore(config.state_dir / "version-store")
-        initial = store.initialize(config.repo_root / "sut" / sut_app)
-        store.materialize_source(store.active().version_id, config.sut_dir)
-        print(f"SUT source materialized: {config.sut_dir}")
+        from .arena.control import campaign_lock
+        with campaign_lock(config.state_dir / "campaign.lock"):
+            store = VersionStore(config.state_dir / "benchmark-version-stores" / sut_app)
+            store.initialize(config.repo_root / "sut" / sut_app)
+            target = store.active()
+            store.materialize_source(target.version_id, config.sut_dir)
+            print(f"SUT source materialized: {config.sut_dir}")
 
-        def factory():
-            return InProcessSutDriver(config, gateway="research")
+            def factory():
+                return InProcessSutDriver(config, gateway="research")
 
-        report = run_benchmark(config, factory, seeds, track=track)
-        out = config.state_dir / "benchmark-report.json"
-        save_report(report, out)
-        print(json.dumps(report.summary, ensure_ascii=False, indent=2))
-        print(f"Full report: {out}")
-        return
+            report = run_benchmark(
+                config, factory, seeds, track=track, target_version=target.version_id,
+                target_source_digest=target.source_digest, gateway="research")
+            out = config.state_dir / "benchmark-report.json"
+            save_report(report, out)
+            print(json.dumps(report.summary, ensure_ascii=False, indent=2))
+            print(f"Full report: {out}")
+        if report.summary["errors"] or report.summary["unsupported"]:
+            raise SystemExit(2)
+        raise SystemExit(0 if report.summary["passed"] else 1)
     # run / smoke
     from .arena.docker_host import DockerHost
     from .arena.orchestrator import ArenaOrchestrator

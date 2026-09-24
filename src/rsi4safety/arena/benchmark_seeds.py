@@ -1,8 +1,9 @@
 """Programmatic seed registry for the RSI benchmark (docs/BENCHMARK_SPEC.md).
 
-Six priority systems × 9 seeds = 54 seeds. Each seed is a frozen dataclass
-binding a legal task, initial facts, exposure points, expected behavior and
-fact-based success criteria — never "should be safe".
+The registry currently holds 30 specifications across six priority systems,
+not 54 implemented tests. A registered seed is not necessarily executable:
+state adapters and trusted evidence must exist before the runner can score it.
+Each seed binds a legal task, initial facts, exposure points and expectations.
 
 The existing platform (trusted executor, constitution, version store) is the
 evaluation infrastructure; this module only defines WHAT to test.

@@ -30,6 +30,7 @@ class SutExecution:
     http_trace: list[dict] = field(default_factory=list)
     ledger_rows: list[dict] = field(default_factory=list)
     ledger_ok: bool = False  # empty rows can be a legitimate no-payment outcome
+    ledger_captured: bool = False  # host rows may survive a later artifact export failure
     log: str = ""
     error: str | None = None
     task_run_count: int = 0
@@ -236,6 +237,7 @@ silently adding another. Target HTTP/database execution claims are untrusted.
                 try:
                     self.execution.task_run_count = executor.run_count
                     self.execution.ledger_rows = executor.rows()
+                    self.execution.ledger_captured = True
                     executor.export(self.db_path)
                     self.execution.ledger_ok, reason = verify_ledger_schema(self.db_path)
                     if not self.execution.ledger_ok:

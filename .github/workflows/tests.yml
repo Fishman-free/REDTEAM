@@ -43,6 +43,8 @@ jobs:
       - name: PayAssist suite (isolated app import)
         working-directory: sut/payassist
         run: python -m pytest tests -q
+      - name: Offline benchmark smoke (host-ledger evidence and strict exit status)
+        run: python -m rsi4safety arena bench --campaign ci-benchmark --system A01 --seed-id A01-B01 --sut-app payassist
       - name: Offline RSI demo
         run: python -m rsi4safety demo --state-dir .rsi4safety/ci-demo --rounds 2 --json
       - name: Arena protocol demo (local SUT subprocess; no Docker or model calls)
