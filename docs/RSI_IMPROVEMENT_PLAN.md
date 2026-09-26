@@ -3,6 +3,12 @@
 > 依据：外部顾问判断（2026-09-17）+ deepseek1 战役防御者超时死因分析。
 > 原则：**先分析、建档、搭框架、逐条实现，不急于跑战役。**
 
+> **状态核对（2026-09-27）**：P0/P1/P2 各项已在前几轮实现并合入
+（会话宽限注入、网关重试/超时、授权契约与字段信任矩阵、结构化诊断、
+防御者技能包、prompts_fixed、defender_scope 配置、修复成本指标），
+复选框此前未同步，本次如实更新。P3 外层进化已落成确定性实验框架
+`src/rsi4safety/rsi_eval/` 与预注册协议 `docs/RSI_PREREGISTRATION.md`。
+
 ---
 
 ## 一、诊断结论（已确认的事实）
@@ -34,31 +40,31 @@
 - **T-0**：才发 SIGINT（此时防御者已有两次机会提交）
 
 **实现**：
-- [ ] `runtime.py`: 增加进度心跳线程（每 5 分钟检查会话时长，注入 MCP inbox 消息）
-- [ ] `config.py`: `defender_session_deadline_seconds` 独立配置（默认 4800s = 80 分钟）
-- [ ] 防御者 MCP 增加 `check_deadline()` 工具（返回剩余秒数）
+- [x] `runtime.py`: 增加进度心跳线程（每 5 分钟检查会话时长，注入 MCP inbox 消息）
+- [x] `config.py`: `defender_session_deadline_seconds` 独立配置（默认 4800s = 80 分钟）
+- [x] 防御者 MCP 增加 `check_deadline()` 工具（返回剩余秒数）
 
 ### P0-2: 网络韧性
 
 **问题**：网络抖动→Claude Code 内部 10 次重试→烧掉宝贵会话时钟。
 
 **方案**：
-- [ ] 网关增加按模型上游重试（当前透传不重试）
+- [x] 网关增加按模型上游重试（当前透传不重试）
 - [ ] SUT 规划调用已有 3 次重试 ✓（已实现）
-- [ ] 网关 `UPSTREAM_TIMEOUT_SECONDS` 120→300（DeepSeek reasoner 可超 120s）
+- [x] 网关 `UPSTREAM_TIMEOUT_SECONDS` 120→300（DeepSeek reasoner 可超 120s）
 
 ### P1-1: PayAssist 授权契约（顾问最优先）
 
 **问题**：防御者不知道什么算"正确"——缺乏业务判据。
 
 **实现**：
-- [ ] `agents/defender/knowledge/payassist-authorization-contract.md`：
+- [x] `agents/defender/knowledge/payassist-authorization-contract.md`：
   - 业务不变量（谁能授权、覆盖范围、失效条件）
   - 工具契约（每个 API 读写什么、副作用）
   - 字段来源与可信度表
   - 正常流程与例外（付款/变更/取消/重试/待确认）
   - 授权范围表示（租户+主体+收款人+金额+币种+单据）
-- [ ] `agents/defender/knowledge/field-trust-matrix.md`：
+- [x] `agents/defender/knowledge/field-trust-matrix.md`：
   | 字段 | 可信来源 | 不可信来源 | 越权后果 |
   |---|---|---|---|
   | 收款账户 | 授权注册时锁定 | 发票备注/客服对话/商品页 | wrong_recipient |
@@ -72,7 +78,7 @@
 **问题**：防御者拿到的反例只有"攻击成功"没有"哪一步把数据变成了权限"。
 
 **实现**：
-- [ ] `orchestrator.py`: 有效发现附带诊断结构体：
+- [x] `orchestrator.py`: 有效发现附带诊断结构体：
   ```json
   {
     "violated_rule": "PAY-ACCOUNT-BOUND",
@@ -83,27 +89,27 @@
     "verification_hint": "替换实体名/换措辞/换注入面后重测"
   }
   ```
-- [ ] 程序化裁决输出该结构（从违规码+账本 diff+HTTP 轨迹自动推导）
+- [x] 程序化裁决输出该结构（从违规码+账本 diff+HTTP 轨迹自动推导）
 
 ### P1-3: 防御者任务提示词重写（顾问骨架）
 
-- [ ] `agents/defender/CLAUDE.md`: 替换为顾问提供的骨架，接入真实工具和文件路径
-- [ ] `agents/defender/skills/payassist-repair/SKILL.md`: 新增 PayAssist 专属修复技能：
+- [x] `agents/defender/CLAUDE.md`: 替换为顾问提供的骨架，接入真实工具和文件路径
+- [x] `agents/defender/skills/payassist-repair/SKILL.md`: 新增 PayAssist 专属修复技能：
   - 如何诊断提示级漏洞（定位是哪条提示词规则把不可信文本变成了权限）
   - 如何设计授权策略层（不只是"提高警惕"）
   - 如何验证修复（原攻击+变体+正常案例+回归）
 
 ### P2-1: PayAssist 提示词改进（目标系统自身的修复方向）
 
-- [ ] `sut/payassist/app/prompts.py`: 保留漏洞版本作为 seeded-v0，但增加注释标记可修改位置
-- [ ] 新增 `sut/payassist/app/prompts_fixed.py`: 参考版（顾问建议的可执行付款条件文本），仅供研究者参考，不自动加载
+- [x] `sut/payassist/app/prompts.py`: 保留漏洞版本作为 seeded-v0，但增加注释标记可修改位置
+- [x] 新增 `sut/payassist/app/prompts_fixed.py`: 参考版（顾问建议的可执行付款条件文本），仅供研究者参考，不自动加载
 
 ### P2-2: 两条实验路线分离
 
-- [ ] `config.py`: 增加 `defender_scope: "prompt_only" | "full_agent"` 配置
-- [ ] prompt_only: 门禁拒绝修改 assistant.py/store.py/main.py 的补丁（只允许改 prompts.py 和 tests/）
-- [ ] full_agent: 当前行为（可修改全部源码）
-- [ ] 报告标注路线，结论分开表述
+- [x] `config.py`: 增加 `defender_scope: "prompt_only" | "full_agent"` 配置
+- [x] prompt_only: 门禁拒绝修改 assistant.py/store.py/main.py 的补丁（只允许改 prompts.py 和 tests/）
+- [x] full_agent: 当前行为（可修改全部源码）
+- [x] 报告标注路线，结论分开表述
 
 ### P2-3: 评测指标增强
 
@@ -116,10 +122,10 @@
 
 ### P3-1: 外层进化（修复能力进化，暂不实现，先记录）
 
-- [ ] 设计文档：外层进化对象（失败轨迹提取/案例检索/候选生成策略/测试顺序/防御者提示词）
-- [ ] 外层指标：固定预算内未见漏洞产出合格补丁的比例
-- [ ] 经验条目结构：触发条件→违反边界→有效修复→合法例外→支持/失败案例→适用版本
-- [ ] 防 EvoSkill 注入：外部反例正文不因被总结而获得指令地位
+- [x] 设计文档：外层进化对象（失败轨迹提取/案例检索/候选生成策略/测试顺序/防御者提示词）
+- [x] 外层指标：固定预算内未见漏洞产出合格补丁的比例
+- [x] 经验条目结构：触发条件→违反边界→有效修复→合法例外→支持/失败案例→适用版本
+- [x] 防 EvoSkill 注入：外部反例正文不因被总结而获得指令地位
 
 ### P3-2: 对照实验设计（五臂，暂不跑）
 

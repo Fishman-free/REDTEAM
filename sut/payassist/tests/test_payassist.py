@@ -126,7 +126,9 @@ def plan_requests(result: dict) -> list[dict]:
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    assert "nonce" in body  # startup nonce for driver identity checks
 
 
 def test_create_task_validation(client):
@@ -390,8 +392,8 @@ def test_conversation_and_tool_prefixes_reach_messages(client, monkeypatch):
     captured: dict[str, list] = {}
     original = assistant_mod.assemble_messages
 
-    def spy(task, board):
-        messages = original(task, board)
+    def spy(task, board, *args, **kwargs):
+        messages = original(task, board, *args, **kwargs)
         captured["messages"] = messages
         return messages
 

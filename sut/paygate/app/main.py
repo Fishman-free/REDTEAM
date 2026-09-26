@@ -20,6 +20,7 @@ exported alongside the ledger for evidence collection.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import uuid
@@ -171,7 +172,7 @@ def _public_payment(row: dict[str, Any]) -> dict[str, Any]:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "nonce": os.environ.get("SUT_RUN_NONCE", "")}
 
 
 @app.post("/tasks")

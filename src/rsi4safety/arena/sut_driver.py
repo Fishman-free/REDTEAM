@@ -14,7 +14,9 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import uuid
 
+from .authorization import build_user_channel_plan
 from .config import ArenaConfig
 from .constitution import evaluate_authorization_dict, verify_ledger_schema
 from .trusted_execution import TrustedPaymentExecutor
@@ -119,14 +121,22 @@ class _Http:
         })
         return status, parsed
 
-    def wait_healthy(self, timeout_seconds: float = 60) -> None:
+    def wait_healthy(self, timeout_seconds: float = 60, expected_nonce: str | None = None) -> None:
         deadline = time.monotonic() + timeout_seconds
         last: Exception | None = None
         while time.monotonic() < deadline:
             try:
-                status, _ = self.call("GET", "/health", timeout_seconds=min(2, max(0.001, deadline - time.monotonic())))
+                status, body = self.call("GET", "/health", timeout_seconds=min(2, max(0.001, deadline - time.monotonic())))
                 if status == 200:
-                    return
+                    if expected_nonce is None:
+                        return
+                    # Identity check: a stale SUT that survived a previous
+                    # run's cleanup can still answer /health on this port;
+                    # only THIS run's nonce proves the responder is ours.
+                    if isinstance(body, dict) and body.get("nonce") == expected_nonce:
+                        return
+                    last = RuntimeError("health nonce mismatch (stale SUT process?)")
+                    continue
             except Exception as exc:  # noqa: BLE001
                 last = exc
             time.sleep(0.3)
@@ -186,10 +196,21 @@ silently adding another. Target HTTP/database execution claims are untrusted.
         self._deadline = time.monotonic() + self.config.sut_execution_timeout_seconds
         try:
             authorization = evaluate_authorization_dict(fixture["authorization"])
-            executor = TrustedPaymentExecutor(authorization, guarded=getattr(self, "gateway", "research") == "guarded")
+            # 图 1b：任务与确认变更经平台核验的用户通道形成可执行授权记录；
+            # 外部攻击动作只走 /external/*，永远触碰不到 /user/confirm。
+            channel_plan = build_user_channel_plan(fixture)
+            executor = TrustedPaymentExecutor(
+                authorization,
+                guarded=getattr(self, "gateway", "research") == "guarded",
+                auth_record=channel_plan.record if channel_plan is not None else None,
+                prior_payments=fixture.get("prior_payments"),
+            )
             self.start()
             self.http = _Http(self.base_url)
-            self.http.wait_healthy(timeout_seconds=min(60, self._remaining_seconds("health check")))
+            self.http.wait_healthy(
+                timeout_seconds=min(60, self._remaining_seconds("health check")),
+                expected_nonce=getattr(self, "run_nonce", None),
+            )
             status, created = self.http.call("POST", "/tasks", {
                 "user_request": fixture["user_request"],
                 "authorization": fixture["authorization"],
@@ -201,6 +222,20 @@ silently adding another. Target HTTP/database execution claims are untrusted.
             new_task_id = created["task_id"]
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", new_task_id):
                 raise ValueError("SUT returned an invalid task_id")
+            if channel_plan is not None:
+                for message in channel_plan.messages[1:]:
+                    status, _ = self.http.call(
+                        "POST", "/user/confirm",
+                        {"task_id": new_task_id, "subject": channel_plan.subject,
+                         "content": message.content, "message_id": message.message_id},
+                        timeout_seconds=min(30, self._remaining_seconds("user confirmation")),
+                    )
+                    self.http.trace[-1]["platform_triggered"] = True
+                    if status not in {200, 201}:
+                        raise ValueError(
+                            f"user confirmation delivery failed: HTTP {status} "
+                            "(the SUT must expose the verified user-dialogue entry)"
+                        )
             actions = _materialize_placeholders(self.execution.actions, fixture)
             actions = _retarget_task_ids(actions, "{task_id}", new_task_id)
             if fixture.get("task_id") and fixture["task_id"] != new_task_id:
@@ -334,6 +369,7 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
         self.base_url = f"http://127.0.0.1:{self.port}"
         self._process: subprocess.Popen | None = None
         self._log_file = None
+        self.run_nonce = uuid.uuid4().hex
 
     def start(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -347,6 +383,7 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
             "PAYGATE_LLM_MODE": self.config.sut_llm_mode,
             # PayAssist reads its own mode env; deterministic enables offline bench.
             **({"PAYASSIST_MODE": "deterministic"} if self.config.sut_app == "payassist" else {}),
+            "SUT_RUN_NONCE": self.run_nonce,
             "PYTHONDONTWRITEBYTECODE": "1",
         })
         self._log_file = tempfile.TemporaryFile()

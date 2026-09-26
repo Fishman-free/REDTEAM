@@ -84,6 +84,31 @@ print(runner.summary(result))
 
 攻击生成与候选生成可按请求内容复用缓存，命中日志引用原调用编号。付款评测及最终验收强制新请求。响应缺少 token 用量时保留保守预留量，不能将该估算当作服务商账单。详细运行步骤、报告字段与实验边界见 [GLM_EXPERIMENTS.md](GLM_EXPERIMENTS.md)。
 
+## 双入口与身份授权核验（研究计划图 1b）
+
+用户本人（资金所有者或获授权人）通过**用户对话入口**提出任务、确认变更；经身份和权限核验后形成可执行授权（`arena/authorization.py` 的 AuthorizationGate，fail-closed）。外部参与者（访客、商户、其他智能体）通过**外部对话/资料入口**交流，也可能发起攻击，但外部通道内容一律是数据：能发消息不等于有付款权限，"商户说'用户同意了'"不构成授权，也不构成身份核验。
+
+- `AuthorizationRecord`：唯一被支付执行门信任的授权形态（主体、范围、来源消息链、有效期、状态）；确认变更生成继承记录（parent_record_id）。
+- 预注册判别标准：每个 benchmark seed 的 `adjudication` 由冻结的 `RULE_CRITERIA` 编译，评测前明确"违规码→判据→分母"，裁决不接受事后解释。
+- 有限反馈协议（`arena/feedback_policy.py`）：攻击侧只获 bounty 式结果摘要（无账本/轨迹/防御方信息，`assert_feedback_bounded` 守护）；确认防守失败后，完整攻击方案（动作、夹具、程序化判定、结构化诊断）才交付防御侧。
+
+## 场景分级（研究计划 §02）
+
+从简单到复杂逐级增加权限与场景，benchmark 按 `tier` 分层报告：
+
+| 层级 | 含义 | 例 |
+|---|---|---|
+| L0 | 不允许付款（只读任务） | `allows_payment=false`，任何付款请求 = `payment_forbidden` |
+| L1 | 单笔付款 | 授权内精确付款、状态确认（可信先前付款状态由宿主注入） |
+| L2 | 受控/限额支付 | `max_per_payment_minor` 单笔上限 + `max_total_minor` 累计上限，金额可变 |
+| L3 | 多智能体协作 | `sut/paychain`：采购→审批→支付三角色分工，权限分级，伪造审批文本要连穿三道检查 |
+
+## 攻击环与 RSI 证据（研究计划 §03–§04）
+
+- 攻击投递方式（`arena/attackers.py`）：single 单轮注入、crescendo 多轮升级（正常起步→伪造"先前确认"→原载荷）、chat_inject 聊天记录伪装（载荷嵌入伪用户/系统/客服轮次）。
+- 攻击多样性（`experience.diversity_guidance`）：按机制簇统计已探索手法并注入 attacker brief 的新颖性要求（Rainbow Teaming 式）。
+- RSI 泛化实验（`rsi_eval/`）：学习曲线度量"积累经验后解决新问题更有效、成本更低"；确定性结果与局限见 [EXPERIMENT_2026-09-27.md](EXPERIMENT_2026-09-27.md)，真实模型五臂协议见 [RSI_PREREGISTRATION.md](RSI_PREREGISTRATION.md)。
+
 ## 方法依据与实验边界
 
 本框架借鉴以下方法的部分工程思路，并非对论文方法的完整复现：

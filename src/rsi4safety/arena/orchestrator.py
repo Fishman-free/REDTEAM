@@ -27,7 +27,9 @@ from .sut_driver import BaseSutDriver, DockerSutDriver, InProcessSutDriver, _Htt
 from .runtime import StubAgentRuntime
 from .control import PROTOCOL_VERSION, campaign_lock, digest, extract_source, runtime_fingerprint, tree_hash
 from .versions import VersionStore
-from .experience import ExperienceStore
+from .experience import ExperienceStore, diversity_guidance
+from .feedback_policy import attacker_feedback as _attacker_feedback_view
+from .feedback_policy import defender_package as _defender_finding_package
 from uuid import uuid4
 
 WAKEUP_ROLES = ("attacker", "judge", "defender")
@@ -314,32 +316,9 @@ class ArenaOrchestrator:
             verdicts = self._programmatic_verdicts(findings)
             round_report["judge_session"] = {"mode": "programmatic", "ok": True}
         valid = self._apply_verdicts(round_index, findings, verdicts)
-        self._last_attacker_feedback = [
-            {
-                "submission_id": finding["manifest"]["attack_submission"]["submission_id"],
-                "title": finding["manifest"]["attack_submission"]["title"],
-                "hypothesis": finding["manifest"]["attack_submission"]["hypothesis"][:300],
-                "programmatic_outcome": finding["summary"]["programmatic_verdict"],
-                # Execution errors must reach the attacker: a util=False result
-                # without them reads as "attack disrupted the task" when the
-                # attack in fact never ran (e.g. action outside the allowlist).
-                "repetition_errors": [
-                    str(rep.get("error"))[:240]
-                    for rep in finding["manifest"]["programmatic_verdict"].get("per_repetition", [])
-                    if rep.get("error")
-                ][:4],
-                "adjudication": {
-                    "valid_finding": finding["verdict"].valid_finding,
-                    "severity": finding["verdict"].severity,
-                    "category": ("adjudication_unavailable" if finding.get("adjudication_missing")
-                                 else finding["verdict"].category),
-                    "rationale": finding["verdict"].rationale[:400],
-                } if "verdict" in finding else {"valid_finding": False, "severity": "none",
-                                                "category": "not_reproduced",
-                                                "rationale": ""},
-            }
-            for finding in findings
-        ]
+        # 有限反馈协议（研究计划 §03）：攻击侧只拿 bounty 式结果摘要，
+        # 永不包含账本/轨迹/防御方信息（feedback_policy 显式化并可测试）。
+        self._last_attacker_feedback = _attacker_feedback_view(findings)
         round_report["verdicts"] = [
             {"evidence_id": item.evidence_id, "valid_finding": item.valid_finding,
              "severity": item.severity} for item in verdicts]
@@ -419,6 +398,11 @@ class ArenaOrchestrator:
         if role == "attacker" and self.config.attacker_hints:
             payload["intel_hints"] = list(self.config.attacker_hints)
         if role == "attacker":
+            # Rainbow-Teaming 式多样性管理：报告已探索的机制簇并要求新簇。
+            try:
+                payload["attack_diversity"] = diversity_guidance(self.experiences)
+            except (ValueError, OSError):
+                pass
             priors = self._attacker_prior_findings()
             if priors:
                 payload["own_prior_findings"] = priors
@@ -858,19 +842,10 @@ class ArenaOrchestrator:
     def _write_findings(self, round_index: int, valid: list[dict], findings: list[dict]) -> None:
         digest = []
         for finding in valid:
-            submission = finding["manifest"]["attack_submission"]
-            digest.append({
-                "evidence_id": finding["evidence_id"],
-                "severity": finding["verdict"].severity,
-                "category": finding["verdict"].category,
-                "rationale": finding["verdict"].rationale,
-                "affects_authorized_utility": finding["verdict"].affects_authorized_utility,
-                "programmatic_verdict": finding["summary"]["programmatic_verdict"],
-                "attack_actions": submission["actions"],
-                "attack_title": submission["title"],
-                "task_fixture": finding["manifest"]["task_fixture"],
-                "diagnosis": self._build_diagnosis(finding),
-            })
+            package = _defender_finding_package(finding)
+            # 确认防守失败后才交付完整攻击方案（方式、手段、执行记录）。
+            package["diagnosis"] = self._build_diagnosis(finding)
+            digest.append(package)
         self._write_brief("defender", round_index, [], extra={
             "type": "round_brief", "findings": digest,
             "base_sut_version": self._current_version_label()})
