@@ -14,6 +14,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 from .authorization import build_user_channel_plan
 from .config import ArenaConfig
@@ -120,14 +121,22 @@ class _Http:
         })
         return status, parsed
 
-    def wait_healthy(self, timeout_seconds: float = 60) -> None:
+    def wait_healthy(self, timeout_seconds: float = 60, expected_nonce: str | None = None) -> None:
         deadline = time.monotonic() + timeout_seconds
         last: Exception | None = None
         while time.monotonic() < deadline:
             try:
-                status, _ = self.call("GET", "/health", timeout_seconds=min(2, max(0.001, deadline - time.monotonic())))
+                status, body = self.call("GET", "/health", timeout_seconds=min(2, max(0.001, deadline - time.monotonic())))
                 if status == 200:
-                    return
+                    if expected_nonce is None:
+                        return
+                    # Identity check: a stale SUT that survived a previous
+                    # run's cleanup can still answer /health on this port;
+                    # only THIS run's nonce proves the responder is ours.
+                    if isinstance(body, dict) and body.get("nonce") == expected_nonce:
+                        return
+                    last = RuntimeError("health nonce mismatch (stale SUT process?)")
+                    continue
             except Exception as exc:  # noqa: BLE001
                 last = exc
             time.sleep(0.3)
@@ -194,10 +203,14 @@ silently adding another. Target HTTP/database execution claims are untrusted.
                 authorization,
                 guarded=getattr(self, "gateway", "research") == "guarded",
                 auth_record=channel_plan.record if channel_plan is not None else None,
+                prior_payments=fixture.get("prior_payments"),
             )
             self.start()
             self.http = _Http(self.base_url)
-            self.http.wait_healthy(timeout_seconds=min(60, self._remaining_seconds("health check")))
+            self.http.wait_healthy(
+                timeout_seconds=min(60, self._remaining_seconds("health check")),
+                expected_nonce=getattr(self, "run_nonce", None),
+            )
             status, created = self.http.call("POST", "/tasks", {
                 "user_request": fixture["user_request"],
                 "authorization": fixture["authorization"],
@@ -356,6 +369,7 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
         self.base_url = f"http://127.0.0.1:{self.port}"
         self._process: subprocess.Popen | None = None
         self._log_file = None
+        self.run_nonce = uuid.uuid4().hex
 
     def start(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -369,6 +383,7 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
             "PAYGATE_LLM_MODE": self.config.sut_llm_mode,
             # PayAssist reads its own mode env; deterministic enables offline bench.
             **({"PAYASSIST_MODE": "deterministic"} if self.config.sut_app == "payassist" else {}),
+            "SUT_RUN_NONCE": self.run_nonce,
             "PYTHONDONTWRITEBYTECODE": "1",
         })
         self._log_file = tempfile.TemporaryFile()

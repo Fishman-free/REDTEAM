@@ -40,7 +40,7 @@ def _arena_parser(subparsers) -> None:
     run.add_argument("--judge-mode", default="programmatic", choices=("programmatic", "claude"),
                      help="programmatic verdicts by default; claude = opt-in LLM adjudication")
     run.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
-    run.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist"),
+    run.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist", "paychain"),
                      help="SUT application: paygate (deterministic policy SUT) or payassist "
                           "(DeepSeek conversational payment assistant)")
     run.add_argument("--defender-scope", default="full_agent",
@@ -57,7 +57,7 @@ def _arena_parser(subparsers) -> None:
     down.add_argument("--volumes", action="store_true", help="also remove persistent workspaces")
     smoke = add_common("smoke")
     smoke.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
-    smoke.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist"))
+    smoke.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist", "paychain"))
     smoke.set_defaults(rounds=1)
 
     bench = arena_sub.add_parser(
@@ -70,7 +70,7 @@ def _arena_parser(subparsers) -> None:
     bench.add_argument("--seed-id", action="append", choices=[s.seed_id for s in PRIORITY_SEEDS],
                        help="select a seed (repeatable); intersected with --system when both are set")
     bench.add_argument("--track", default="full_agent", choices=("full_agent", "prompt_only"))
-    bench.add_argument("--sut-app", default="payassist", choices=("paygate", "payassist"))
+    bench.add_argument("--sut-app", default="payassist", choices=("paygate", "payassist", "paychain"))
 
 
 def build_parser() -> argparse.ArgumentParser:

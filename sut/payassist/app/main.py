@@ -25,6 +25,7 @@ evidence collection.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import uuid
@@ -119,6 +120,8 @@ class AuthorizationIn(BaseModel):
     allowed_purposes: list[str] = Field(default_factory=lambda: ["purchase"])
     max_executions: int = 1
     require_confirmation_above_minor: int | None = None
+    allows_payment: bool = True
+    max_per_payment_minor: int | None = None
 
 
 class TaskIn(BaseModel):
@@ -181,7 +184,9 @@ def _public_payment(row: dict[str, Any]) -> dict[str, Any]:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    # Startup nonce lets the driver verify it is talking to THIS process,
+    # not to a stale SUT that briefly survived a previous run's cleanup.
+    return {"status": "ok", "nonce": os.environ.get("SUT_RUN_NONCE", "")}
 
 
 @app.post("/tasks")

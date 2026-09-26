@@ -89,6 +89,7 @@ request. This is a research simulator, not a real-money payment connector.
         *,
         guarded: bool = False,
         auth_record: AuthorizationRecord | None = None,
+        prior_payments: list[dict] | None = None,
     ) -> None:
         if guarded and authorization is None and auth_record is None:
             raise ValueError("a guarded payment executor requires trusted authorization")
@@ -105,6 +106,28 @@ request. This is a research simulator, not a real-money payment connector.
         self._spent_minor = 0
         self._payment_count = 0
         self.run_count = 0
+        # 可信先前状态（研究计划 §02：重复付款/状态确认场景）。这些行由宿主
+        # 注入并直接计入账本与已耗预算；SUT 的输出永远改不了它们。
+        for row in prior_payments or []:
+            self._load_prior_payment(row)
+
+    def _load_prior_payment(self, row: dict) -> None:
+        status = row.get("status", "executed")
+        amount = row.get("amount_minor")
+        if type(amount) is not int or amount <= 0:
+            raise ValueError("prior payment amount must be a positive int")
+        self._connection.execute(
+            "INSERT INTO payments(request_id,order_id,recipient,amount_minor,currency,"
+            "purpose,status,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (str(row.get("request_id") or "prior"), str(row.get("order_id") or ""),
+             str(row.get("recipient") or ""), amount, str(row.get("currency") or "CNY"),
+             str(row.get("purpose") or "purchase"), status,
+             "trusted prior state", row.get("created_at") or time.time()),
+        )
+        if status == "executed":
+            self._submitted.add(str(row.get("request_id") or "prior"))
+            self._spent_minor += amount
+            self._payment_count += 1
 
     def accept_run_response(self, response: Any) -> list[dict]:
         plan = validate_payment_plan(response)

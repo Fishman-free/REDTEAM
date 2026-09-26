@@ -140,7 +140,7 @@ class _FakeHttp:
     def __init__(self, url):
         self.trace = []
 
-    def wait_healthy(self, *, timeout_seconds=60):
+    def wait_healthy(self, *, timeout_seconds=60, expected_nonce=None):
         self.health_timeouts.append(timeout_seconds)
         if self.failure:
             raise self.failure

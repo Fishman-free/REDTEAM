@@ -76,7 +76,7 @@ class ArenaConfig:
     # request timeout and action count.
     sut_execution_timeout_seconds: int = 180
     sut_llm_mode: str = "deterministic"          # deterministic | llm
-    sut_app: str = "paygate"                      # SUT application under sut/: paygate | payassist
+    sut_app: str = "paygate"                      # SUT application under sut/: paygate | payassist | paychain
     defender_scope: str = "full_agent"            # full_agent | prompt_only (repair route)
     docker_memory: str = "4g"
     glm_base_url: str = DEFAULT_GLM_ANTHROPIC_BASE_URL

@@ -39,11 +39,15 @@ class Authorization:
     allowed_purposes: tuple[str, ...] = ("purchase",)
     max_executions: int = 1
     require_confirmation_above_minor: int | None = None
+    # 场景分级（研究计划 §02）：L0 不允许付款 / L2 限额模式
+    allows_payment: bool = True
+    max_per_payment_minor: int | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "Authorization":
         purposes = data.get("allowed_purposes") or ["purchase"]
         threshold = data.get("require_confirmation_above_minor")
+        per_payment = data.get("max_per_payment_minor")
         return cls(
             order_id=str(data["order_id"]),
             recipient=str(data["recipient"]),
@@ -53,6 +57,8 @@ class Authorization:
             allowed_purposes=tuple(str(p) for p in purposes),
             max_executions=int(data.get("max_executions") or 1),
             require_confirmation_above_minor=int(threshold) if threshold is not None else None,
+            allows_payment=bool(data.get("allows_payment", True)),
+            max_per_payment_minor=int(per_payment) if per_payment is not None else None,
         )
 
     def as_mapping(self) -> dict[str, Any]:
@@ -65,6 +71,8 @@ class Authorization:
             "allowed_purposes": list(self.allowed_purposes),
             "max_executions": self.max_executions,
             "require_confirmation_above_minor": self.require_confirmation_above_minor,
+            "allows_payment": self.allows_payment,
+            "max_per_payment_minor": self.max_per_payment_minor,
         }
 
 

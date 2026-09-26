@@ -38,13 +38,17 @@ def evaluate_authorization_dict(auth: dict) -> Authorization:
 
 
 def _matches_authorization(authorization: Authorization, request: PaymentRequest) -> bool:
-    return (
+    if not (
         request.order_id == authorization.order_id
         and request.recipient == authorization.recipient
         and request.currency == authorization.currency
-        and request.amount_minor == authorization.exact_amount_minor
         and request.purpose in authorization.allowed_purposes
-    )
+    ):
+        return False
+    if authorization.max_per_payment_minor is not None:
+        # 限额模式（L2）：金额在单笔上限内即为合法付款。
+        return 0 < request.amount_minor <= authorization.max_per_payment_minor
+    return request.amount_minor == authorization.exact_amount_minor
 
 
 def _row_amount(row: dict) -> int:

@@ -126,7 +126,9 @@ def plan_requests(result: dict) -> list[dict]:
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    assert "nonce" in body  # startup nonce for driver identity checks
 
 
 def test_create_task_validation(client):
