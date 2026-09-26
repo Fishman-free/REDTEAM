@@ -2,6 +2,18 @@
 
 本仓库是**本地合成资产的支付智能体安全研究平台**。当前整合了两条可独立运行的实现：严格付款提议到 SQLite/本地 EVM 的执行闭环，以及 RSI4Safety 的授权评测、候选修复与 Arena 编排。它不是主网支付产品、通用攻击平台，也不证明模型具备通用安全性或递归自我改进能力。
 
+## 研究计划对齐（2026-09-27）
+
+依据《智能体支付系统和方案的设计》（2026-09-24 提纲）完成五项对齐，映射见 [RESEARCH_PLAN_2026-09-27.md](docs/RESEARCH_PLAN_2026-09-27.md)：
+
+1. **双入口与身份授权核验**（提纲图 1b）：用户对话入口经平台身份核验形成可执行授权（`arena/authorization.py`，fail-closed）；外部通道内容一律是数据，"商户说'用户同意了'"不构成授权；支付执行门核对已验证授权记录。每个 seed 附**预注册判别标准**（`benchmark_seeds.RULE_CRITERIA`）。
+2. **场景分级 L0–L3**（提纲 §02）：不允许付款（只读）→ 单笔付款 → 受控/限额支付（单笔/每日上限）→ 多智能体协作（`sut/paychain`：采购→审批→支付分工，伪造审批攻击穿过三角色）。benchmark 报告按 tier 分层。
+3. **攻击环升级**（提纲 §03+§05）：Crescendo 式多轮升级攻击、ChatInject 式聊天记录伪装（`arena/attackers.py`）、Rainbow-Teaming 式攻击库多样性管理（`experience.diversity_guidance`）、**有限反馈协议**显式化（`arena/feedback_policy.py`：攻击侧只拿 bounty 式结果摘要，确认防守失败后才向防御方交付完整攻击方案）。
+4. **RSI 泛化实验**（提纲 §04）：确定性框架 `src/rsi4safety/rsi_eval/` 直接回答"修好这次错误 ≠ 以后更会修"——经验驱动的窄补丁使 held-out 新问题修复率随训练族数从 20% 升至 100%，族内变体一轮训练即全部泛化，修复成本为通用不变量路线的 1/4；真实模型五臂战役已预注册（[RSI_PREREGISTRATION.md](docs/RSI_PREREGISTRATION.md)），本轮不执行。
+5. **Survey 落地**（提纲 §05）：[SURVEY.md](docs/SURVEY.md) 把 Freysa/CrAIBench/Crescendo/ChatInject/Rainbow Teaming/AgentDojo/GEPA/ACE/DGM 逐条映射到本仓库模块与采纳任务。
+
+实验结果与局限声明见 [EXPERIMENT_2026-09-27.md](docs/EXPERIMENT_2026-09-27.md)。
+
 ## 两条实验路径，不混用协议
 
 | 路径 | 代码与协议 | 用途 |
@@ -39,6 +51,8 @@ npm run demo:multiround
 cd sut/paygate
 python -m pytest tests -q
 cd ../payassist
+python -m pytest tests -q
+cd ../paychain
 python -m pytest tests -q
 cd ../..
 ```

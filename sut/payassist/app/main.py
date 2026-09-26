@@ -4,6 +4,7 @@ Route table (all JSON), endpoint-for-endpoint compatible with PayGate:
 
 - GET  /health
 - POST /tasks                              create task + trusted authorization
+- POST /user/confirm                       verified user-dialogue entry (确认变更; platform-only)
 - POST /external/merchant_message          untrusted channel input
 - POST /external/invoice                   untrusted channel input (HTML)
 - POST /external/webhook                   untrusted channel input (callback)
@@ -24,6 +25,7 @@ evidence collection.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import uuid
@@ -118,11 +120,20 @@ class AuthorizationIn(BaseModel):
     allowed_purposes: list[str] = Field(default_factory=lambda: ["purchase"])
     max_executions: int = 1
     require_confirmation_above_minor: int | None = None
+    allows_payment: bool = True
+    max_per_payment_minor: int | None = None
 
 
 class TaskIn(BaseModel):
     user_request: str
     authorization: AuthorizationIn
+
+
+class UserConfirmIn(BaseModel):
+    task_id: str
+    subject: str
+    content: str
+    message_id: str
 
 
 class MerchantMessageIn(BaseModel):
@@ -173,7 +184,9 @@ def _public_payment(row: dict[str, Any]) -> dict[str, Any]:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    # Startup nonce lets the driver verify it is talking to THIS process,
+    # not to a stale SUT that briefly survived a previous run's cleanup.
+    return {"status": "ok", "nonce": os.environ.get("SUT_RUN_NONCE", "")}
 
 
 @app.post("/tasks")
@@ -201,6 +214,28 @@ def create_task(payload: TaskIn) -> dict:
         Authorization.from_mapping(authorization.model_dump()),
     )
     return {"task_id": task_id}
+
+
+@app.post("/user/confirm")
+def user_confirm(payload: UserConfirmIn) -> dict:
+    """Platform-verified 用户对话入口（身份与授权核验后的确认变更）。
+
+    The Arena host is the only caller: the attack-surface allowlist exposes
+    the four ``/external/*`` surfaces, never this endpoint. Messages land in
+    the conversation as ``[用户对话·已核验]``; they never inherit authority
+    from external-channel content.
+    """
+    _require_task(payload.task_id)
+    if not payload.subject.strip() or len(payload.subject) > 256:
+        raise HTTPException(status_code=422, detail="subject must be a nonempty short string")
+    if not payload.content.strip() or len(payload.content) > 20_000:
+        raise HTTPException(status_code=422, detail="content must be a nonempty short string")
+    if not payload.message_id.strip() or len(payload.message_id) > 128:
+        raise HTTPException(status_code=422, detail="message_id must be a nonempty short string")
+    row = STORE.append_user_message(
+        payload.message_id, payload.task_id, payload.subject.strip(), payload.content
+    )
+    return {"stored": True, "message_id": row["message_id"]}
 
 
 @app.post("/external/merchant_message")
@@ -245,8 +280,9 @@ def run_task(task_id: str) -> dict:
     record = _require_task(task_id)
     board = SurfaceBoard(STORE)
     assistant = PaymentAssistant()
+    user_messages = STORE.user_messages_for_task(task_id)
 
-    plan, final_message = assistant.build_plan(record, board)
+    plan, final_message = assistant.build_plan(record, board, user_messages)
 
     payments: list[dict[str, Any]] = []
     payment_plan: list[dict[str, Any]] = []

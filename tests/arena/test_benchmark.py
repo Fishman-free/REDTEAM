@@ -207,7 +207,11 @@ class BenchmarkRegressionTests(unittest.TestCase):
         self.assertIn("cannot prove", escalation["evidence"])
 
     def test_non_payment_and_stateful_seeds_never_launch_payment_driver(self):
-        supported = {"A01-B01", "A01-B02", "A01-B03", "A01-B05", "A01-X01", "A01-X02"}
+        supported = {"A01-B01", "A01-B02", "A01-B03", "A01-B04", "A01-B05",
+                     "A01-B06", "A01-B07", "A01-B08", "A01-B09",
+                     "A01-X01", "A01-X02", "A01-X03", "A01-X04", "A01-X05",
+                     "A01-X06", "A01-X07", "A01-X08", "A01-X09", "A01-X10",
+                     "A03-B01", "A03-X01", "A03-X02"}
         for seed in PRIORITY_SEEDS:
             if seed.seed_id in supported:
                 continue
@@ -332,7 +336,7 @@ class BenchmarkReportTests(unittest.TestCase):
 
     def test_summary_uses_selected_denominators_and_real_version(self):
         seed = seed_by_id("A01-X01")
-        report = self.run_report((seed, seed_by_id("A01-X03")), factory_for([payment(seed)]))
+        report = self.run_report((seed, seed_by_id("A02-B01")), factory_for([payment(seed)]))
         self.assertEqual(report.target_version, "version-known")
         self.assertEqual(report.summary["target_version"], "version-known")
         self.assertEqual(report.summary["target_source_digest"], "a" * 64)
@@ -341,13 +345,13 @@ class BenchmarkReportTests(unittest.TestCase):
         self.assertEqual(len(report.summary["runtime_fingerprint"]), 64)
         self.assertEqual(len(report.summary["seed_set_digest"]), 64)
         self.assertEqual(report.summary["total_seeds"], 2)
-        self.assertEqual(report.summary["systems"], {"A01": 2})
-        self.assertEqual(report.summary["by_kind"], {"basic": 0, "auth": 0, "attack": 2})
-        self.assertEqual(report.summary["registry"]["total_seeds"], 30)
+        self.assertEqual(report.summary["systems"], {"A01": 1, "A02": 1})
+        self.assertEqual(report.summary["by_kind"], {"basic": 1, "auth": 0, "attack": 1})
+        self.assertEqual(report.summary["registry"]["total_seeds"], len(PRIORITY_SEEDS))
         self.assertEqual(report.summary["evaluated"], 1)
         self.assertEqual(report.summary["unsupported"], 1)
         self.assertEqual(report.summary["coverage_percent"], 50.0)
-        self.assertEqual(report.attack_defense_rate, 50.0)
+        self.assertEqual(report.attack_defense_rate, 100.0)
         self.assertEqual(report.summary["binary_pass_rate"], 50.0)
         self.assertFalse(report.summary["passed"])
         self.assertEqual(report.attack_score, 1.0)
@@ -355,7 +359,7 @@ class BenchmarkReportTests(unittest.TestCase):
 
     def test_report_serializes_explicit_unknowns_and_string_codes(self):
         seed = seed_by_id("A01-B01")
-        report = self.run_report((seed, seed_by_id("A01-B04")),
+        report = self.run_report((seed, seed_by_id("A02-B01")),
                                  factory_for([payment(seed, order_id="wrong")]))
         path = Path(self.temp.name) / "report.json"
         save_report(report, path)

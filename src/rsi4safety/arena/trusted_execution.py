@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 from ..domain import Authorization, PaymentRequest
+from .authorization import AuthorizationRecord
 
 PAYMENT_PLAN_PROTOCOL = "arena.payment-plan.v1"
 MAX_PLAN_ITEMS = 128
@@ -82,10 +83,21 @@ are recorded separately and do not consume a request id or constitute a tool
 request. This is a research simulator, not a real-money payment connector.
     """
 
-    def __init__(self, authorization: Authorization | None = None, *, guarded: bool = False) -> None:
-        if guarded and authorization is None:
+    def __init__(
+        self,
+        authorization: Authorization | None = None,
+        *,
+        guarded: bool = False,
+        auth_record: AuthorizationRecord | None = None,
+        prior_payments: list[dict] | None = None,
+    ) -> None:
+        if guarded and authorization is None and auth_record is None:
             raise ValueError("a guarded payment executor requires trusted authorization")
-        self.authorization = authorization
+        if auth_record is not None and not auth_record.is_executable():
+            raise ValueError("payment executor requires an active authorization record")
+        # 支付执行门核对的是"已验证授权"：授权记录存在时以记录内授权为准。
+        self.authorization = auth_record.authorization if auth_record is not None else authorization
+        self.auth_record = auth_record
         self.guarded = guarded
         self._connection = sqlite3.connect(":memory:")
         self._connection.row_factory = sqlite3.Row
@@ -94,6 +106,28 @@ request. This is a research simulator, not a real-money payment connector.
         self._spent_minor = 0
         self._payment_count = 0
         self.run_count = 0
+        # 可信先前状态（研究计划 §02：重复付款/状态确认场景）。这些行由宿主
+        # 注入并直接计入账本与已耗预算；SUT 的输出永远改不了它们。
+        for row in prior_payments or []:
+            self._load_prior_payment(row)
+
+    def _load_prior_payment(self, row: dict) -> None:
+        status = row.get("status", "executed")
+        amount = row.get("amount_minor")
+        if type(amount) is not int or amount <= 0:
+            raise ValueError("prior payment amount must be a positive int")
+        self._connection.execute(
+            "INSERT INTO payments(request_id,order_id,recipient,amount_minor,currency,"
+            "purpose,status,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (str(row.get("request_id") or "prior"), str(row.get("order_id") or ""),
+             str(row.get("recipient") or ""), amount, str(row.get("currency") or "CNY"),
+             str(row.get("purpose") or "purchase"), status,
+             "trusted prior state", row.get("created_at") or time.time()),
+        )
+        if status == "executed":
+            self._submitted.add(str(row.get("request_id") or "prior"))
+            self._spent_minor += amount
+            self._payment_count += 1
 
     def accept_run_response(self, response: Any) -> list[dict]:
         plan = validate_payment_plan(response)
@@ -112,7 +146,19 @@ request. This is a research simulator, not a real-money payment connector.
                         PaymentRequest(**request, source="unknown", user_confirmed=False),
                         self._spent_minor, self._payment_count,
                     ) if self.guarded else []
-                    if violations:
+                    # 图 1b：执行门先核对授权记录本身仍然有效（未撤销/未过期）。
+                    if (
+                        self.guarded
+                        and self.auth_record is not None
+                        and not self.auth_record.is_executable()
+                    ):
+                        status = "blocked_by_platform"
+                        record_state = (
+                            "expired" if self.auth_record.status == "active"
+                            else self.auth_record.status
+                        )
+                        reason = f"authorization_record_{record_state}"
+                    elif violations:
                         status = "blocked_by_platform"
                         reason = ",".join(code.value for code in violations)
                     else:
