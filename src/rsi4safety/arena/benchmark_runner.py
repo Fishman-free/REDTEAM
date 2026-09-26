@@ -7,14 +7,17 @@ transitions remain visible as unsupported rather than simulated as payments.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 import json
 from pathlib import Path
 import time
 from typing import Callable
 
 from . import constitution
-from .benchmark_seeds import BenchmarkSeed, SeedKind, PRIORITY_SEEDS, seed_summary
+from .authorization import build_user_channel_plan
+from .benchmark_seeds import (
+    BenchmarkSeed, SeedKind, PRIORITY_SEEDS, pre_registered_adjudication, seed_summary,
+)
 from .config import ArenaConfig
 from .control import digest, runtime_fingerprint
 from .continuous_scoring import (
@@ -33,7 +36,7 @@ _SUPPORTED_FACTS = {
     "order_id", "recipient", "recipient_account", "exact_amount_minor",
     "max_total_minor", "currency", "allowed_purposes", "max_executions",
     "require_confirmation_above_minor", "requested_amount_minor", "exposures",
-    "authorization_valid",
+    "authorization_valid", "user_channel",
 }
 _EXPECTED_FIELDS = {
     "recipient", "order_id", "amount_minor", "currency", "purpose", "executions",
@@ -62,6 +65,7 @@ class SeedResult:
     expected_passed: bool | None
     attempted_unauthorized: bool | None
     actual_unauthorized: bool | None
+    adjudication: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -172,6 +176,16 @@ def run_seed(seed: BenchmarkSeed, driver_factory: Callable[[], BaseSutDriver]) -
         unsupported = _unsupported_reason(seed)
         if unsupported is None:
             auth = _build_authorization(seed)
+            fixture = {"task_id": seed.seed_id.replace("-", "_").lower(),
+                       "user_request": seed.legal_task, "authorization": auth}
+            user_channel = seed.initial_facts.get("user_channel")
+            if user_channel is not None:
+                # 图 1b：用户对话入口（平台核验）任务与确认变更；裁决按最终
+                # 已验证授权记录评估，外部通道内容永远改变不了记录。
+                fixture["user_channel"] = user_channel
+                channel_plan = build_user_channel_plan(fixture)
+                if channel_plan.changed:
+                    auth = _record_to_authorization_dict(channel_plan.record)
             authorization = constitution.evaluate_authorization_dict(auth)
             _validate_expected(seed)
             actions = []
@@ -188,8 +202,6 @@ def run_seed(seed: BenchmarkSeed, driver_factory: Callable[[], BaseSutDriver]) -
                                 "path": path, "json": body})
             actions.append({"step": len(actions) + 1, "method": "POST",
                             "path": "/tasks/{task_id}/run", "json": {}})
-            fixture = {"task_id": seed.seed_id.replace("-", "_").lower(),
-                       "user_request": seed.legal_task, "authorization": auth}
             result = driver_factory().run(fixture, actions)
             if not isinstance(result, SutExecution):
                 raise TypeError("driver must return SutExecution")
@@ -243,6 +255,7 @@ def run_seed(seed: BenchmarkSeed, driver_factory: Callable[[], BaseSutDriver]) -
                                 if verdict and (verdict.attempted_unauthorized or error is None) else None),
         actual_unauthorized=(verdict.actual_unauthorized
                              if verdict and (verdict.actual_unauthorized or error is None) else None),
+        adjudication=pre_registered_adjudication(seed),
     )
 
 
@@ -257,6 +270,21 @@ def _build_authorization(seed: BenchmarkSeed) -> dict:
         "allowed_purposes": list(facts.get("allowed_purposes", ("purchase",))),
         "max_executions": facts.get("max_executions", 1),
         "require_confirmation_above_minor": facts.get("require_confirmation_above_minor"),
+    }
+
+
+def _record_to_authorization_dict(record) -> dict:
+    """Project a verified AuthorizationRecord back into fixture-authorization shape."""
+    authorization = record.authorization
+    return {
+        "order_id": authorization.order_id,
+        "recipient": authorization.recipient,
+        "exact_amount_minor": authorization.exact_amount_minor,
+        "max_total_minor": authorization.max_total_minor,
+        "currency": authorization.currency,
+        "allowed_purposes": list(authorization.allowed_purposes),
+        "max_executions": authorization.max_executions,
+        "require_confirmation_above_minor": authorization.require_confirmation_above_minor,
     }
 
 
@@ -360,6 +388,13 @@ def run_benchmark(config: ArenaConfig, driver_factory: Callable[[], BaseSutDrive
         "binary_fail_count": sum(r.passed is False for r in results),
         "binary_pass_rate": round(100 * passed / len(results), 2),
         "passed": passed == len(results),
+        "adjudication_pre_registered": all(
+            bool(pre_registered_adjudication(seed).get("rules")) for seed in seeds
+        ),
+        "identity_confusion_seeds": sorted(
+            seed.seed_id for seed in seeds
+            if "DUAL-ENTRY-AUTH" in pre_registered_adjudication(seed).get("rules", {})
+        ),
     }
     report = BenchmarkReport(target_version, track, started, time.time(), results, summary)
     summary["attack_defense_rate"] = report.attack_defense_rate

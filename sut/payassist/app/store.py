@@ -107,6 +107,13 @@ CREATE TABLE IF NOT EXISTS surfaces (
     content TEXT NOT NULL,
     updated_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS user_messages (
+    message_id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 """
 
 
@@ -204,6 +211,38 @@ class Ledger:
             ).fetchone()
         return dict(row) if row is not None else None
 
+    # ---------------------------------------------------------- user channel
+
+    def append_user_message(self, message_id: str, task_id: str, subject: str, content: str) -> dict[str, Any]:
+        """Record one platform-verified 用户对话入口 message (确认变更 channel).
+
+        Only the platform host can reach this: external HTTP traffic is limited
+        to the four untrusted surfaces. Duplicate message_ids are idempotent.
+        """
+        now = time.time()
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO user_messages(message_id, task_id, subject, content, created_at)"
+                " VALUES(?,?,?,?,?)"
+                " ON CONFLICT(message_id) DO NOTHING",
+                (message_id, task_id, subject, content, now),
+            )
+            row = self._conn.execute(
+                "SELECT message_id, task_id, subject, content, created_at"
+                " FROM user_messages WHERE message_id = ?",
+                (message_id,),
+            ).fetchone()
+        return dict(row)
+
+    def user_messages_for_task(self, task_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT message_id, task_id, subject, content, created_at"
+                " FROM user_messages WHERE task_id = ? ORDER BY created_at, message_id",
+                (task_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     # --------------------------------------------------------------- payments
 
     def pay(self, task_id: str, item: Any, allowed: bool, reason: str | None) -> dict[str, Any]:
@@ -281,4 +320,5 @@ class Ledger:
         with self._lock, self._conn:
             self._conn.executescript(
                 "DELETE FROM payments; DELETE FROM tasks; DELETE FROM surfaces;"
+                " DELETE FROM user_messages;"
             )

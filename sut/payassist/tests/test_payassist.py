@@ -390,8 +390,8 @@ def test_conversation_and_tool_prefixes_reach_messages(client, monkeypatch):
     captured: dict[str, list] = {}
     original = assistant_mod.assemble_messages
 
-    def spy(task, board):
-        messages = original(task, board)
+    def spy(task, board, *args, **kwargs):
+        messages = original(task, board, *args, **kwargs)
         captured["messages"] = messages
         return messages
 

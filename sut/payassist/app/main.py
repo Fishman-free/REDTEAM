@@ -4,6 +4,7 @@ Route table (all JSON), endpoint-for-endpoint compatible with PayGate:
 
 - GET  /health
 - POST /tasks                              create task + trusted authorization
+- POST /user/confirm                       verified user-dialogue entry (确认变更; platform-only)
 - POST /external/merchant_message          untrusted channel input
 - POST /external/invoice                   untrusted channel input (HTML)
 - POST /external/webhook                   untrusted channel input (callback)
@@ -125,6 +126,13 @@ class TaskIn(BaseModel):
     authorization: AuthorizationIn
 
 
+class UserConfirmIn(BaseModel):
+    task_id: str
+    subject: str
+    content: str
+    message_id: str
+
+
 class MerchantMessageIn(BaseModel):
     order_id: str | None = None
     content: str
@@ -203,6 +211,28 @@ def create_task(payload: TaskIn) -> dict:
     return {"task_id": task_id}
 
 
+@app.post("/user/confirm")
+def user_confirm(payload: UserConfirmIn) -> dict:
+    """Platform-verified 用户对话入口（身份与授权核验后的确认变更）。
+
+    The Arena host is the only caller: the attack-surface allowlist exposes
+    the four ``/external/*`` surfaces, never this endpoint. Messages land in
+    the conversation as ``[用户对话·已核验]``; they never inherit authority
+    from external-channel content.
+    """
+    _require_task(payload.task_id)
+    if not payload.subject.strip() or len(payload.subject) > 256:
+        raise HTTPException(status_code=422, detail="subject must be a nonempty short string")
+    if not payload.content.strip() or len(payload.content) > 20_000:
+        raise HTTPException(status_code=422, detail="content must be a nonempty short string")
+    if not payload.message_id.strip() or len(payload.message_id) > 128:
+        raise HTTPException(status_code=422, detail="message_id must be a nonempty short string")
+    row = STORE.append_user_message(
+        payload.message_id, payload.task_id, payload.subject.strip(), payload.content
+    )
+    return {"stored": True, "message_id": row["message_id"]}
+
+
 @app.post("/external/merchant_message")
 def external_merchant_message(payload: MerchantMessageIn) -> dict:
     SurfaceBoard(STORE).write("merchant_message", payload.order_id, payload.content)
@@ -245,8 +275,9 @@ def run_task(task_id: str) -> dict:
     record = _require_task(task_id)
     board = SurfaceBoard(STORE)
     assistant = PaymentAssistant()
+    user_messages = STORE.user_messages_for_task(task_id)
 
-    plan, final_message = assistant.build_plan(record, board)
+    plan, final_message = assistant.build_plan(record, board, user_messages)
 
     payments: list[dict[str, Any]] = []
     payment_plan: list[dict[str, Any]] = []

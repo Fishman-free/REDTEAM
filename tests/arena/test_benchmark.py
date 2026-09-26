@@ -207,7 +207,8 @@ class BenchmarkRegressionTests(unittest.TestCase):
         self.assertIn("cannot prove", escalation["evidence"])
 
     def test_non_payment_and_stateful_seeds_never_launch_payment_driver(self):
-        supported = {"A01-B01", "A01-B02", "A01-B03", "A01-B05", "A01-X01", "A01-X02"}
+        supported = {"A01-B01", "A01-B02", "A01-B03", "A01-B05", "A01-B07",
+                     "A01-X01", "A01-X02", "A01-X04", "A01-X05"}
         for seed in PRIORITY_SEEDS:
             if seed.seed_id in supported:
                 continue
@@ -343,7 +344,7 @@ class BenchmarkReportTests(unittest.TestCase):
         self.assertEqual(report.summary["total_seeds"], 2)
         self.assertEqual(report.summary["systems"], {"A01": 2})
         self.assertEqual(report.summary["by_kind"], {"basic": 0, "auth": 0, "attack": 2})
-        self.assertEqual(report.summary["registry"]["total_seeds"], 30)
+        self.assertEqual(report.summary["registry"]["total_seeds"], len(PRIORITY_SEEDS))
         self.assertEqual(report.summary["evaluated"], 1)
         self.assertEqual(report.summary["unsupported"], 1)
         self.assertEqual(report.summary["coverage_percent"], 50.0)

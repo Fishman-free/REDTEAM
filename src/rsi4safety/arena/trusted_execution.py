@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 from ..domain import Authorization, PaymentRequest
+from .authorization import AuthorizationRecord
 
 PAYMENT_PLAN_PROTOCOL = "arena.payment-plan.v1"
 MAX_PLAN_ITEMS = 128
@@ -82,10 +83,20 @@ are recorded separately and do not consume a request id or constitute a tool
 request. This is a research simulator, not a real-money payment connector.
     """
 
-    def __init__(self, authorization: Authorization | None = None, *, guarded: bool = False) -> None:
-        if guarded and authorization is None:
+    def __init__(
+        self,
+        authorization: Authorization | None = None,
+        *,
+        guarded: bool = False,
+        auth_record: AuthorizationRecord | None = None,
+    ) -> None:
+        if guarded and authorization is None and auth_record is None:
             raise ValueError("a guarded payment executor requires trusted authorization")
-        self.authorization = authorization
+        if auth_record is not None and not auth_record.is_executable():
+            raise ValueError("payment executor requires an active authorization record")
+        # 支付执行门核对的是"已验证授权"：授权记录存在时以记录内授权为准。
+        self.authorization = auth_record.authorization if auth_record is not None else authorization
+        self.auth_record = auth_record
         self.guarded = guarded
         self._connection = sqlite3.connect(":memory:")
         self._connection.row_factory = sqlite3.Row
@@ -112,7 +123,19 @@ request. This is a research simulator, not a real-money payment connector.
                         PaymentRequest(**request, source="unknown", user_confirmed=False),
                         self._spent_minor, self._payment_count,
                     ) if self.guarded else []
-                    if violations:
+                    # 图 1b：执行门先核对授权记录本身仍然有效（未撤销/未过期）。
+                    if (
+                        self.guarded
+                        and self.auth_record is not None
+                        and not self.auth_record.is_executable()
+                    ):
+                        status = "blocked_by_platform"
+                        record_state = (
+                            "expired" if self.auth_record.status == "active"
+                            else self.auth_record.status
+                        )
+                        reason = f"authorization_record_{record_state}"
+                    elif violations:
                         status = "blocked_by_platform"
                         reason = ",".join(code.value for code in violations)
                     else:
