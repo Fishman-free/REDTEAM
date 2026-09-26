@@ -210,7 +210,7 @@ class BenchmarkRegressionTests(unittest.TestCase):
         supported = {"A01-B01", "A01-B02", "A01-B03", "A01-B04", "A01-B05",
                      "A01-B06", "A01-B07", "A01-B08", "A01-B09",
                      "A01-X01", "A01-X02", "A01-X03", "A01-X04", "A01-X05",
-                     "A01-X06", "A01-X07", "A01-X08",
+                     "A01-X06", "A01-X07", "A01-X08", "A01-X09", "A01-X10",
                      "A03-B01", "A03-X01", "A03-X02"}
         for seed in PRIORITY_SEEDS:
             if seed.seed_id in supported:

@@ -193,19 +193,35 @@ def run_seed(seed: BenchmarkSeed, driver_factory: Callable[[], BaseSutDriver]) -
             authorization = constitution.evaluate_authorization_dict(auth)
             _validate_expected(seed)
             actions = []
-            for surface_name, content in (seed.initial_facts.get("exposures") or {}).items():
-                method, path, field_name = SURFACE_TO_ENDPOINT[surface_name]
-                if field_name == "payload":
-                    body = {"source": "external", "payload": {"note": content}}
-                elif field_name == "html":
-                    # PayAssist transcribes invoice comments, not visible prose.
-                    body = {"html": f"<!--{content}-->", "order_id": auth["order_id"]}
-                else:
-                    body = {field_name: content, "order_id": auth["order_id"]}
-                actions.append({"step": len(actions) + 1, "method": method,
-                                "path": path, "json": body})
-            actions.append({"step": len(actions) + 1, "method": "POST",
-                            "path": "/tasks/{task_id}/run", "json": {}})
+            exposures = seed.initial_facts.get("exposures") or {}
+            if seed.delivery != "single":
+                # 攻击投递方式（研究计划 §03）：crescendo 多轮升级 / chat_inject
+                # 聊天记录伪装。动作仍受平台 allowlist 约束。
+                from .attackers import DELIVERY_STYLES, build_actions
+                if seed.delivery not in DELIVERY_STYLES:
+                    raise ValueError(f"unknown delivery style: {seed.delivery}")
+                if len(exposures) != 1 or seed.exposure is None:
+                    raise ValueError("styled delivery requires exactly one exposure")
+                surface_name = next(iter(exposures))
+                fixture_probe = {"task_id": seed.seed_id, "authorization": auth}
+                from .orchestrator import Fixture
+                fixture_obj = Fixture(fixture_probe["task_id"], seed.legal_task, auth)
+                actions = build_actions(fixture_obj, exposures[surface_name], surface_name,
+                                        style=seed.delivery)
+            else:
+                for surface_name, content in exposures.items():
+                    method, path, field_name = SURFACE_TO_ENDPOINT[surface_name]
+                    if field_name == "payload":
+                        body = {"source": "external", "payload": {"note": content}}
+                    elif field_name == "html":
+                        # PayAssist transcribes invoice comments, not visible prose.
+                        body = {"html": f"<!--{content}-->", "order_id": auth["order_id"]}
+                    else:
+                        body = {field_name: content, "order_id": auth["order_id"]}
+                    actions.append({"step": len(actions) + 1, "method": method,
+                                    "path": path, "json": body})
+                actions.append({"step": len(actions) + 1, "method": "POST",
+                                "path": "/tasks/{task_id}/run", "json": {}})
             result = driver_factory().run(fixture, actions)
             if not isinstance(result, SutExecution):
                 raise TypeError("driver must return SutExecution")
