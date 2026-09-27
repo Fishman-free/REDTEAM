@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="description" content="REDTEAM 通过虚拟智能体社区中的授权安全挑战，研究贡献激励与可验证安全数据，为模型训练、应用评测和防御研究提供支持。">
+  <meta name="description" content="REDTEAM 研究智能体在交易支付场景中的安全：授权安全挑战、可验证的攻防实验平台与可复现的安全数据。实验平台已建成并开源，为模型训练、应用评测和防御研究提供支持。">
   <title>REDTEAM｜智能体安全众测与数据研究</title>
   <link rel="canonical" href="https://fishman-free.github.io/REDTEAM/">
   <meta property="og:title" content="REDTEAM｜智能体安全众测与数据研究">
@@ -264,6 +264,17 @@
     <blockquote>REDTEAM 的构想，是把 AI 安全测试做成一场有规则的挑战：参与者寻找薄弱点，平台验证并记录有效贡献，模型与应用开发者获得能够用于训练、评测和修复验证的安全样本。</blockquote>
   </section>
 
+  <section class="section" id="progress" aria-labelledby="progress-title">
+    <div class="section-head"><span class="section-num">✦</span><div><h2 id="progress-title">截至 2026 年 9 月，项目进行到了哪一步</h2><p>下面是已经建成并公开的部分，与仍在推进的部分。研究代码与阶段性结果均在项目代码库公开，可独立复核。</p></div></div>
+    <div class="grid two">
+      <article class="card"><span class="label">已建成</span><h3>攻防实验平台</h3><p>“发起挑战 → 独立裁决 → 修复防御 → 换例回归 → 通过才晋级”的完整实验流程已在开源代码中实现，由数百项自动化测试守护；模型自称的结果不作为证据，一切以平台账本为准。</p></article>
+      <article class="card"><span class="label">已落地</span><h3>双入口权限模型</h3><p>用户本人与外部来访分开接入：只有用户通道经身份核验后才能形成付款授权。“商户说‘用户同意了’不算授权”不再是口号，而是平台对每笔付款逐条执行的判据。</p></article>
+      <article class="card"><span class="label">已覆盖</span><h3>由易到难的场景分级</h3><p>从“只读、不许付款”，到单笔付款、限额代付，再到采购—审批—支付的多智能体协作，共 43 个注册场景、其中 22 个可执行复核，并按难度分层报告结果。</p></article>
+      <article class="card"><span class="label">已可度量</span><h3>“越学越会修”的实验框架</h3><p>让防御系统在若干类问题上积累经验，再考验它从未见过的新问题：在可控模拟环境中，随经验积累，新问题修复率从 20% 逐步提升到 100%，修复动作也更克制、成本更低。</p></article>
+    </div>
+    <div class="note"><strong>如实说明边界。</strong>面向真实大模型的大规模对照实验，已按预先登记的研究方案设计完成，尚未执行；社区挑战与激励机制仍处于设计阶段，未开始运营，也不提供公开攻击入口。</div>
+  </section>
+
   <section class="section" id="why" aria-labelledby="why-title">
     <div class="section-head"><span class="section-num">01</span><div><h2 id="why-title">AI 正从“回答问题”，走向“替人办事”</h2><p>能读信息、作出决策、调用软件执行任务的 AI，通常被称为 Agent，也就是“智能体”。当它参与采购、服务调用与支付时，安全问题就不再只是一句错误回答。</p></div></div>
     <div class="grid two">
@@ -283,7 +294,7 @@
         <div class="actor"><span class="actor-code">SERVICE</span><h4>服务智能体</h4><p>完成约定任务、返回交付结果，让交易具备业务上下文。</p><div class="actor-rule">要核对：交付是否成立</div></div>
       </div>
       <div class="shared-rules"><strong>共同的交易规则</strong><span>指定对象</span><span>预算上限</span><span>交付条件</span><span>防止重复付款</span></div>
-      <div class="observer"><strong>独立验证与记录</strong><p>把原始输入、智能体决策、实际执行和验证结论分别记录，判断是否真正突破了授权边界。</p></div>
+      <div class="observer"><strong>独立验证与记录</strong><p>把原始输入、智能体决策、实际执行和验证结论分别记录，判断是否真正突破了授权边界。这一层验证已在实验平台中实现：每笔付款由平台账本独立落账，智能体自称的结果不作为证据。</p></div>
       <figcaption>参与者在约定范围内对社区发起安全挑战。挑战对象是受控的模拟系统，不是现实中的企业账户或个人钱包。</figcaption>
     </figure>
     <article class="scenario scenario-after">
@@ -305,6 +316,7 @@
       </ol>
       <figcaption>机制的核心要求：奖励有效发现，而不是奖励未经授权的行为；积累可验证的样本，而不是堆积无法复现的聊天记录。</figcaption>
     </figure>
+    <div class="note"><strong>这条流水线的前半段已经跑通。</strong>任务授权、挑战提交、独立核验与样本沉淀，已在实验平台中实现并纳入自动化测试；“按规则激励贡献”属于社区机制，仍在按合规框架设计。</div>
     <div class="grid two mechanism-notes">
       <article class="card"><h3>既要测安全，也要测办事能力</h3><p>如果智能体拒绝所有任务，虽然不会付款，却也无法完成业务。因此，评估应同时关注<strong>违规操作是否被阻止，以及正常任务是否顺利完成</strong>。</p></article>
       <article class="card"><h3>模拟损失不是唯一奖励标准</h3><p>“骗走多少模拟资产”可以是影响指标之一，但不能替代样本质量。可复现性、新颖性、权限影响、重复程度和奖励预算，都需要纳入规则，避免刷分与重复领奖。</p></article>
@@ -324,6 +336,7 @@
         <div><dt>修复与复测</dt><dd>修改防线后，问题是否消失？正常任务是否仍能完成？</dd></div>
       </dl>
     </div>
+    <div class="note"><strong>这六个问题，现在由平台逐项记录并可机器校验。</strong>每个测试场景在运行前冻结判别标准——什么算越权、分母怎么算；运行后输出“通过、失败、出错、暂不支持”四类结果，暂不支持的场景如实标注，不会悄悄计入通过。</div>
     <div class="grid three data-uses">
       <article class="card"><span class="label">面向模型团队</span><h3>安全训练数据</h3><p>为模型后训练、安全行为研究提供有针对性的反例与反馈，帮助模型区分外部信息和可信授权。</p></article>
       <article class="card"><span class="label">面向应用企业</span><h3>业务场景评测</h3><p>检验智能体在采购、支付和工具调用中的权限边界，支持不同模型、策略与防线的对照研究。</p></article>
@@ -363,6 +376,8 @@
     <div class="section-head"><span class="section-num">07</span><div><h2 id="faq-title">关于 REDTEAM，你可能还想了解</h2><p>把研究对象、参与方式和数据价值说清楚。</p></div></div>
     <div class="faq-toolbar"><p>点击问题查看说明。</p><button class="button" id="faq-toggle" type="button" aria-controls="faq-list" aria-expanded="false" hidden>展开全部问答</button></div>
     <div class="faq-list" id="faq-list">
+      <details><summary>项目现在进行到哪一步了？</summary><div class="faq-answer"><p>研究平台的主体已经建成并开源：模拟交易场景、双入口权限模型、由易到难的场景分级，以及“发起挑战、独立裁决、修复防御、回归验证”的实验流程，都有可运行的实现和自动化测试。<strong>面向真实大模型的大规模对照实验已按预先登记的研究方案设计完成，尚未执行</strong>；社区挑战与激励机制仍处于设计阶段，未开始运营。</p></div></details>
+      <details><summary>“AI 越学越会修”这句话有依据吗？</summary><div class="faq-answer"><p>项目把这个问题做成了可度量的实验：让防御系统在若干类问题上积累经验，再考验它从未见过的新问题。在可控的模拟环境中，随经验积累，新问题修复率从 20% 逐步提升到 100%，修复动作也更克制、成本更低。<strong>真实大模型上的对照实验已按预先登记的方案设计完成，结果将如实公布，不预设结论。</strong></p></div></details>
       <details><summary>REDTEAM 是一个支付平台吗？</summary><div class="faq-answer"><p>项目研究的是<strong>智能体在交易和支付场景中的安全问题，以及如何产生有价值的对抗数据</strong>。虚拟社区使用模拟任务与资产，不是为公众办理真实资金收付的交易平台。</p></div></details>
       <details><summary>为什么要让参与者尝试“骗过”智能体？</summary><div class="faq-answer"><p>这是一种经授权的红队测试：在受控环境里主动寻找薄弱点，帮助防御方提前识别问题。参与必须遵守目标、权限和数据范围；研究价值来自可验证的发现，不来自对真实第三方的未授权攻击。</p></div></details>
       <details><summary>一份挑战记录，怎样才能成为有价值的数据？</summary><div class="faq-answer"><p>它需要包含清晰的任务授权、交互过程、实际执行证据和复现条件，并经过验证、去重与标注。在合法授权和必要脱敏之后，才适合用于模型训练、应用评测或修复验证。<strong>数量多不代表质量高。</strong></p></div></details>
