@@ -26,7 +26,11 @@ contract PaymentAgent {
     /// @notice ERC-20 asset this agent pays with.
     IERC20 public immutable token;
     /// @notice Account allowed to configure invoices and trigger payments.
-    address public operator;
+    /// @dev Immutable on purpose: the authorisation surface of a deployed agent is
+    /// fixed at construction and can never be reassigned. Note that this also
+    /// means there is no recovery path if the operator key itself leaks -- the
+    /// aggregate `maxPayment` bound is then the only limit on damage.
+    address public immutable operator;
     /// @notice Upper bound on a single payment and on `totalPaid`.
     uint256 public immutable maxPayment;
     /// @notice Cumulative amount paid out by this agent.
@@ -34,8 +38,15 @@ contract PaymentAgent {
 
     /// @notice Whether `account` is allowed to appear as merchant or participant.
     mapping(address => bool) public allowlisted;
-    /// @notice Operation ids and invoice ids that have already been consumed.
-    mapping(bytes32 => bool) public used;
+    /// @notice Operation ids that have already been consumed.
+    /// @dev Operation ids and invoice ids are tracked in separate namespaces so
+    /// that an id used as an operation id can never silently burn the invoice that
+    /// happens to share it. A single shared mapping meant a caller could retire an
+    /// invoice just by naming it as an unrelated operation id, denying the payment
+    /// it authorised.
+    mapping(bytes32 => bool) public usedOps;
+    /// @notice Invoice ids that have already been consumed.
+    mapping(bytes32 => bool) public usedInvoices;
 
     /// @notice A payment authorisation configured in advance by the operator.
     /// @param merchant Merchant the payment is attributed to.
@@ -96,6 +107,8 @@ contract PaymentAgent {
     /// separately, since the constructor transfers nothing.
     /// @param cap Maximum amount for a single payment and for `totalPaid`.
     constructor(IERC20 t, uint256 cap) {
+        require(address(t) != address(0), "zero token");
+        require(cap > 0, "zero cap");
         token = t;
         operator = msg.sender;
         maxPayment = cap;
@@ -153,11 +166,11 @@ contract PaymentAgent {
             i.configured && i.merchant == merchant && i.participant == participant && i.amount == amount,
             "invoice mismatch"
         );
-        require(!used[op] && !used[invoice], "duplicate");
+        require(!usedOps[op] && !usedInvoices[invoice], "duplicate");
         require(allowlisted[merchant] && allowlisted[participant], "not allowlisted");
         require(totalPaid + amount <= maxPayment, "cap");
-        used[op] = true;
-        used[invoice] = true;
+        usedOps[op] = true;
+        usedInvoices[invoice] = true;
         totalPaid += amount;
         token.safeTransfer(participant, amount);
         emit Payment(op, invoice, merchant, participant, amount);

@@ -1363,5 +1363,44 @@
     "archived_superseded": 1,
     "additional_superseded_snapshots": 1,
     "byte_identical": 165
-  }
+  },
+  "upstream_merges": [
+    {
+      "commit": "6394fc2cb4fc33183a997eb571e7541dcc212122",
+      "local_layout_commit": "1b2a754",
+      "note": "The baseline mapping above remains the historical reorganization snapshot. These later security changes are active at the existing local module paths, not archive contents. Original audit report and all upstream code/tests retained byte-for-byte. Current RTM design and core docs updated to describe renewal and cumulative settlement limits.",
+      "files": [
+        {
+          "original": "contracts/BountyVault.sol",
+          "current": "contracts/src/BountyVault.sol",
+          "upstream_sha256": "1417550b5b92a6f69ff1574cb4e8b42760442e01c9465b2c0a1fc13a2a7cda95"
+        },
+        {
+          "original": "contracts/ExperimentalToken.sol",
+          "current": "contracts/src/ExperimentalToken.sol",
+          "upstream_sha256": "802abed8905195278ebf0830bb31c5debdd19e5cddab6ade84f6d933304f5e3b"
+        },
+        {
+          "original": "contracts/PaymentAgent.sol",
+          "current": "contracts/src/PaymentAgent.sol",
+          "upstream_sha256": "e6a621da1d90a4ca2d5a35623029f9e5caff4b1000c7ead0d51f6698311bcbb5"
+        },
+        {
+          "original": "contracts/RewardSettlement.sol",
+          "current": "contracts/src/RewardSettlement.sol",
+          "upstream_sha256": "92c54f2e28c85a7340202c69906b0e6bbf37debd264ac73e362e87098f2f8962"
+        },
+        {
+          "original": "test/audit-poc.test.js",
+          "current": "contracts/test/audit-poc.test.js",
+          "upstream_sha256": "fd99e89410bbea7464bd85bfb5aa5f5828a30adfc23d8b1d8ecf51ed146c2a9f"
+        },
+        {
+          "original": "SECURITY_AUDIT_2026-09-27.md",
+          "current": "docs/references/research/SECURITY_AUDIT_2026-09-27.md",
+          "upstream_sha256": "f2418bff2b77a4e86dbf06fb0ebb42f52ea4f26ec18b761041ddac75c538ca5d"
+        }
+      ]
+    }
+  ]
 }

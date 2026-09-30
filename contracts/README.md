@@ -10,7 +10,7 @@
 | [test/](test/) / [tests/](tests/) | 合约/JS 测试与支付 Python 测试 |
 | [scenarios/](scenarios/) / [prompts/](prompts/) | 场景、可信采购输入、独立评估真相和提示词 |
 
-[PaymentAgent](src/PaymentAgent.sol) 约束付款；[ExperimentalToken](src/ExperimentalToken.sol) 提供预铸合成资产；[RewardSettlement](src/RewardSettlement.sol) 结算演示奖励。[RTMToken](src/RTMToken.sol) 与 [BountyVault](src/BountyVault.sol) 实现另一套发行与悬赏预算，尚未接入 payment-agent 演示或 Arena。两种奖励机制均保留，详见 [RTM 设计](../docs/references/research/RTM_BOUNTY_DESIGN.md)。
+[PaymentAgent](src/PaymentAgent.sol) 约束付款；[ExperimentalToken](src/ExperimentalToken.sol) 提供预铸合成资产；[RewardSettlement](src/RewardSettlement.sol) 结算演示奖励。[RTMToken](src/RTMToken.sol) 与 [BountyVault](src/BountyVault.sol) 实现另一套发行与悬赏预算，尚未接入 payment-agent 演示或 Arena。本版已合入 `6394fc2`：金库支持显式续期与可配置累计结算上限，禁用放弃所有权；付款操作与发票分别防重放，三个实验合约增加部署参数校验。累计上限默认不收紧，须由 owner 配置；过期续期仍受当前年预算限制，不保证兑付。两种奖励机制均保留，详见 [RTM 设计](../docs/references/research/RTM_BOUNTY_DESIGN.md)。
 
 以下命令从 `contracts/` 执行，需要 Node.js 22 和 Python 3.11+：
 

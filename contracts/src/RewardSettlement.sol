@@ -69,6 +69,8 @@ contract RewardSettlement {
     /// separately, since the constructor transfers nothing.
     /// @param c Maximum amount for a single reward and for `paid`.
     constructor(IERC20 t, uint256 c) {
+        require(address(t) != address(0), "zero token");
+        require(c > 0, "zero cap");
         token = t;
         evaluator = msg.sender;
         cap = c;

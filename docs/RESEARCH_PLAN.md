@@ -4,7 +4,7 @@
 
 依据包括[总研究构想原稿](references/research/RSI攻击悬赏与持续评估机制_研究构想.md)、[RTM 悬赏设计](references/research/RTM_BOUNTY_DESIGN.md)、[攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md)、[实验协议](references/research/EXPERIMENT_PROTOCOL.md)及[支付系统 PDF](../rsi4safety/docs/references/智能体支付系统和方案的设计.pdf)。2026-09-23 路线要求 RTM/BountyVault“保持独立研究组件”；2026-09-27 计划“暂不连接”限定当轮范围，没有废弃链上方案。
 
-评估基线为 `f97b37e`。本次整理恢复全部当前代码、测试和有效研究材料，只调整目录、运行入口、CI 与文档。维护主文档为本文和 [README](../README.md)；原始规格、预注册、日期化证据见[全项目参考索引](INDEX.md)。已知语义缺口列为后续工作，不因搬迁而视为修复。
+目录整理基线为 `f97b37e`，保留全部当前代码、测试和有效研究材料。2026-09-30 在本地目录结构上合入远端 `6394fc2` 的合约安全修复；下述链上状态已同步更新，原始审计记录见[合约安全审计](references/research/SECURITY_AUDIT_2026-09-27.md)。维护主文档为本文和 [README](../README.md)；原始规格、预注册、日期化证据见[全项目参考索引](INDEX.md)。已知语义缺口列为后续工作，不因搬迁而视为修复。
 
 ## 1. 总研究闭环与实验问题
 
@@ -38,32 +38,32 @@ flowchart LR
 | 部分 | 当前实现 | 尚未完成的连接/研究 |
 |---|---|---|
 | 支付决策与执行 | [redteam/](../contracts/redteam) 提供严格提议解析、SQLite 与 HTTP；[agent-flow.js](../contracts/scripts/agent-flow.js) 驱动本地 EVM 支付、证据和奖励 | SQLite 与 EVM 约束不同；未统一到 Arena 的任务/授权/证据协议 |
-| 合约支付约束 | [PaymentAgent](../contracts/src/PaymentAgent.sol) 检查配置发票、精确条款、白名单、操作/发票一次性和累计额度，使用 SafeERC20 | 配置权限、可信采购和实际交付事实仍由宿主/实验输入提供 |
+| 合约支付约束 | [PaymentAgent](../contracts/src/PaymentAgent.sol) 检查配置发票、精确条款、白名单、操作/发票独立命名空间的一次性和累计额度，使用 SafeERC20 | 配置权限、可信采购和实际交付事实仍由宿主/实验输入提供 |
 | 当前演示奖励 | [ExperimentalToken](../contracts/src/ExperimentalToken.sol) 提供预铸合成资产；[RewardSettlement](../contracts/src/RewardSettlement.sol) 由独立 evaluator 按配置金额、预算、唯一 claim 发奖 | 使用 XEXP 预充资奖励；并未调用 RTM 铸造 |
 | RTM 发行 | [RTMToken](../contracts/src/RTMToken.sol) 上限 2100 万、零预挖、365 天窗口年度减半、不可变单一 minter | 部署者须验证 minter 字节码和绑定关系；合约存在不等于验证其身份 |
-| RTM 悬赏预算 | [BountyVault](../contracts/src/BountyVault.sol) 一次绑定 RTM、登记整笔预留、同年结算、显式取消、额度与暂停机制 | 未绑定 Arena finding/version/evidence 摘要；新颖性、去重、验证者治理仍在链下方案层 |
+| RTM 悬赏预算 | [BountyVault](../contracts/src/BountyVault.sol) 一次绑定 RTM、整笔预留、同年结算、显式取消/过期续期、累计结算上限与暂停机制 | 未绑定 Arena finding/version/evidence 摘要；新颖性、去重、验证者治理仍在链下方案层 |
 | 外部攻击与验证 | [arena/](../rsi4safety/execution/src/rsi4safety/arena) 有受限动作、配对对照、可信账本、裁决、版本与审计 | 公开 A2A 会话服务、链上 commit–reveal、公开领奖和端到端提交优先权仍是设计 |
 | 持续改进与独立实验 | Arena、策略级 [learning.py](../rsi4safety/execution/src/rsi4safety/learning.py)、[rsi_eval/](../rsi4safety/execution/src/rsi4safety/rsi_eval)、[engineering.py](../rsi4safety/execution/src/rsi4safety/arena/engineering.py) 全部保留 | 研究原型有不同目的；待修评测口径、真实模型对照和跨域接线，不能因未接入而归档 |
 
 ### RTM 当前实际契约
 
-部署顺序是 BountyVault → 以 vault 为 minter 部署 RTMToken → vault 一次性绑定 token。RTMToken 不允许 owner 更换 minter；BountyVault 的 owner 可以更换 evaluator、调整单笔上限及暂停，因此 owner 仍是判奖权限的信任点。
+部署顺序是 BountyVault → 以 vault 为 minter 部署 RTMToken → vault 一次性绑定 token。RTMToken 不允许 owner 更换 minter；BountyVault 的 owner 可以更换 evaluator、调整单笔/累计结算上限及暂停，因此 owner 仍是判奖权限的信任点；本版禁用 `renounceOwnership`，仍允许转移所有权。
 
-`configureClaim(id, beneficiary, amount)` 固定受益人、整笔金额和当前发行年，预留预算；`settleClaim(id)` 只在同年结算；`cancelClaim(id)` 显式释放原年预留。三者都要求当前 evaluator 且未暂停。同 ID 终态不可复用，mint 失败时状态原子回滚。核心不变量为：
+`configureClaim(id, beneficiary, amount)` 固定受益人、整笔金额和当前发行年，预留预算；`settleClaim(id)` 只在同年结算；`cancelClaim(id)` 显式释放原年预留。另有 `renewClaim(id)` 把过期且未终结的 claim 显式绑定到当前年，保持受益人、金额和 ID；四者都要求当前 evaluator 且未暂停。同 ID 终态不可复用，mint 失败时状态原子回滚。核心不变量为：
 
 ```text
 mintedByYear[y] + reservedByYear[y] <= yearBudget(y)
 ```
 
-跨年未完成 claim 不自动迁移到下一年度，只能取消后另行审核新 ID。预留保护当前年的容量，不承诺未来兑付，也不保证全年预算不会被合法配置耗尽。不同 ID 可能描述相同攻击，合约自身无法识别。
+跨年未完成 claim 不自动迁移；evaluator 可以在当前年有足够容量时显式 `renewClaim`，或取消后另行审核新 ID。续期失败时保留原年预留；续期本身不检查当前 `maxPerClaim` 或累计结算上限，真正结算时仍检查这些上限。预留保护当前年的容量，不承诺未来兑付。`maxTotalSettled` 默认是 `uint256` 最大值，只有 owner 显式收紧才增加实际约束；登记/续期预留不扣除这项累计限额，因此已预留不保证可结算。不同 ID 可能描述相同攻击，合约自身无法识别。
 
-[攻击接口草案](references/ATTACK_INTERFACE_DESIGN.md) 的 `commitRound / submitClaim / finalizeRound / claimPayout` 是拟议接口，当前 BountyVault 实际 API 为上述 configure/settle/cancel。固定供应**上限**不等于禁止按计划增发；预算约束不等于判奖真实性。详细生命周期与测试边界见 [RTM 设计](references/research/RTM_BOUNTY_DESIGN.md)。
+[攻击接口草案](references/ATTACK_INTERFACE_DESIGN.md) 的 `commitRound / submitClaim / finalizeRound / claimPayout` 是拟议接口，当前 BountyVault 实际 API 为上述 configure/settle/cancel/renew。固定供应**上限**不等于禁止按计划增发；预算约束不等于判奖真实性。详细生命周期与测试边界见 [RTM 设计](references/research/RTM_BOUNTY_DESIGN.md)。
 
 ### 两套账本与证据
 
 payment-agent 使用严格 `PAY … / NONE`；EVM 评估器交叉核验指定 Payment 合约事件、指定 token 转账事件和精确整数金额。SQLite 故意保留重复发票等脆弱路径，EVM 则另有发票一次性与累计额度。应分别报告后端结果，不能合并成一个成功率。
 
-Arena 使用 `arena.payment-plan.v1` 和宿主模拟账本。后续桥接至少需要绑定目标版本、任务/授权摘要、反例与执行证据摘要、验证规则版本、奖励受益人、去重键及年度预算状态；当前代码没有提供这条完整链路。研究状态与链上交易状态还需处理重复调用、失败重试及跨年取消，不能只在 demo 末尾附加一次 mint 就声称总方案落地。
+Arena 使用 `arena.payment-plan.v1` 和宿主模拟账本。后续桥接至少需要绑定目标版本、任务/授权摘要、反例与执行证据摘要、验证规则版本、奖励受益人、去重键及年度预算状态；当前代码没有提供这条完整链路。研究状态与链上交易状态还需处理重复调用、失败重试及跨年续期或取消，不能只在 demo 末尾附加一次 mint 就声称总方案落地。
 
 ## 3. PDF 要求与当前实现
 

@@ -44,7 +44,7 @@ REDTEAM/
 | 模块 | 当前能力 | 入口 |
 |---|---|---|
 | 合约与支付实验 | `PaymentAgent` 约束付款；`RewardSettlement` 发放预充资实验奖励；`ExperimentalToken` 提供合成资产；Python/JS 执行并核验付款证据 | [contracts/README.md](contracts/README.md) |
-| RTM 悬赏机制 | `RTMToken` 固定发行上限、年度减半与不可变 minter；`BountyVault` 管理 claim 预留、同年结算与取消 | [RTM 设计](docs/references/research/RTM_BOUNTY_DESIGN.md)、[合约源码](contracts/src/) |
+| RTM 悬赏机制 | `RTMToken` 固定发行上限、年度减半与不可变 minter；`BountyVault` 管理 claim 预留、同年结算、取消/续期与累计结算上限 | [RTM 设计](docs/references/research/RTM_BOUNTY_DESIGN.md)、[合约源码](contracts/src/) |
 | RSI4Safety / Arena | 攻击→可信执行→独立裁决→候选修复→回归→晋级/回滚；保留策略、rsi_eval、跨域 engineering 实验 | [rsi4safety/README.md](rsi4safety/README.md) |
 
 Payment-agent 的 `PAY/NONE`、SQLite/EVM 账本与 Arena 的 `arena.payment-plan.v1`、宿主模拟账本分别维护。RTM 目前也是独立合约模块，尚未接入 Arena 判奖。各模块可运行不等于总研究闭环已连接完成。
@@ -88,12 +88,12 @@ CI 覆盖 Ubuntu/Windows 的支付 Python、RSI 和三个隔离靶标，以及 U
 |---|---|
 | RSI 完整回归（`rsi4safety/`） | **288 passed，163 subtests passed，1 skipped**（Windows 专用测试）；247.65 秒 |
 | 合约侧支付 Python（`contracts/`） | **38 passed，25 subtests passed** |
-| Solidity / EVM 测试（`contracts/`） | **55 passing**；单轮、多轮 demo 均通过 |
+| Solidity / EVM 测试（`contracts/`） | **74 passing**（合入远端新增 19 项回归）；单轮、多轮 demo 均通过 |
 | 三个独立支付靶标 | PayGate **19**、PayAssist **16**、PayChain **7** 项通过 |
 | 根目录入口 | 收集 **327** 项 Python 测试（326 项可在本机通过，1 项平台跳过）；路径回归、两轮 demo、A01-B01 benchmark 通过 |
-| 文件保全与文档 | **191** 个原文件全部有去向；30 份当前指南/研究文档的 **142** 个本地链接有效；有效源码和研究方案未归档 |
+| 文件保全与文档 | **191** 个原文件全部有去向；当前指南与研究文档的本地链接全部检查有效；有效源码和研究方案未归档 |
 
-本次移动仅改变目录、资源定位、包/测试/CI 配置及相应文档，不改变已有支付或判奖逻辑。旧 campaign 的运行时指纹会随源码布局变化；保留的历史状态不能默认跨布局恢复。
+目录整理保留本地模块划分；随后合入远端 `6394fc2`，增加合约续期、累计结算上限、所有权保护、付款 ID 隔离及部署参数校验。合并后重跑了 74 项合约测试、38 项支付 Python 测试和两种支付演示；上表 RSI/靶标结果来自此前同日验证，该部分代码在本次合并中未变。旧 campaign 的运行时指纹会随源码布局变化；保留的历史状态不能默认跨布局恢复。
 
 
 本地验证不代表真实模型实验、远端 CI 或链上—Arena 集成已经完成。本机 Hardhat 对 Node 25 有版本警告，CI 使用 Node 22；Python 环境有一项 Starlette/httpx 弃用警告。本次不执行在线模型、发布或部署。
