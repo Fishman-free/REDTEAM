@@ -32,6 +32,13 @@ contract BountyVault is Ownable, Pausable {
 
     /// @notice Cumulative amount settled through this vault.
     uint256 public totalSettled;
+    /// @notice Ceiling on `totalSettled`, i.e. on everything this vault may ever
+    /// mint. Defaults to no ceiling beyond the halving schedule itself, so the
+    /// owner may tighten it once the evaluator has been proven trustworthy.
+    /// @dev This is the second bound after `maxPerClaim`: the per-claim cap limits
+    /// a single compromised call, this one limits the aggregate a compromised
+    /// evaluator can reach across many calls.
+    uint256 public maxTotalSettled = type(uint256).max;
 
     /// @notice Amount reserved by configured-but-not-finalised claims in each year.
     mapping(uint256 => uint256) public reservedByYear;
@@ -74,6 +81,19 @@ contract BountyVault is Ownable, Pausable {
 
     /// @notice Emitted when an unsettled award is explicitly cancelled.
     event ClaimCancelled(bytes32 indexed id, address indexed beneficiary, uint256 amount, uint256 year);
+    /// @notice Emitted when the vault is bound to its RTM token.
+    /// @param rtm Address of the bound token.
+    event RtmInitialized(address indexed rtm);
+    /// @notice Emitted when an expired claim is re-bound to the current year.
+    event ClaimRenewed(
+        bytes32 indexed id,
+        address indexed beneficiary,
+        uint256 amount,
+        uint256 oldYear,
+        uint256 newYear
+    );
+    /// @notice Emitted when the cumulative settlement ceiling changes.
+    event MaxTotalSettledUpdated(uint256 oldMax, uint256 newMax);
 
     /// @notice Caller is not the configured evaluator.
     error NotEvaluator();
@@ -102,6 +122,15 @@ contract BountyVault is Ownable, Pausable {
     error YearBudgetUnavailable(uint256 year, uint256 requested, uint256 available);
     /// @notice A reservation was unexpectedly smaller than the claim being released.
     error ReservationInvariantBroken(uint256 year, uint256 reserved, uint256 required);
+    /// @notice The settlement would push `totalSettled` past `maxTotalSettled`.
+    /// @param requested Total that was requested.
+    /// @param limit Configured cumulative ceiling.
+    error TotalSettledCapExceeded(uint256 requested, uint256 limit);
+    /// @notice The claim is still bound to the current emission year, so there is
+    /// nothing to renew.
+    error ClaimNotExpired(uint256 claimYear, uint256 currentYear);
+    /// @notice Ownership renunciation is disabled for this vault.
+    error RenunciationDisabled();
 
     /// @notice Restricts a call to the configured evaluator account.
     modifier onlyEvaluator() {
@@ -122,6 +151,7 @@ contract BountyVault is Ownable, Pausable {
         if (address(rtm) != address(0)) revert RtmAlreadyInitialized();
         if (address(rtm_) == address(0) || rtm_.minter() != address(this)) revert ZeroAddress();
         rtm = rtm_;
+        emit RtmInitialized(address(rtm_));
     }
 
     /// @notice Rotates the evaluator account.
@@ -143,6 +173,19 @@ contract BountyVault is Ownable, Pausable {
         uint256 oldMax = maxPerClaim;
         maxPerClaim = newMax;
         emit MaxPerClaimUpdated(oldMax, newMax);
+    }
+
+    /// @notice Sets the ceiling on cumulative settlement.
+    /// @dev Lowering the ceiling below `totalSettled` simply blocks further
+    /// settlement until it is raised again; `pause()` remains the way to stop
+    /// everything. The ceiling is never a substitute for rotating a compromised
+    /// evaluator, which only the owner can do.
+    /// @param newMax New cumulative ceiling; must be non-zero.
+    function setMaxTotalSettled(uint256 newMax) external onlyOwner {
+        if (newMax == 0) revert ZeroAmount();
+        uint256 oldMax = maxTotalSettled;
+        maxTotalSettled = newMax;
+        emit MaxTotalSettledUpdated(oldMax, newMax);
     }
 
     /// @notice Returns current-year capacity not already minted or reserved.
@@ -210,11 +253,18 @@ contract BountyVault is Ownable, Pausable {
         uint256 reserved = reservedByYear[year];
         if (reserved < c.amount) revert ReservationInvariantBroken(year, reserved, c.amount);
 
+        uint256 settledTotal = totalSettled;
+        if (settledTotal + c.amount > maxTotalSettled) {
+            revert TotalSettledCapExceeded(settledTotal + c.amount, maxTotalSettled);
+        }
+
         reservedByYear[year] = reserved - c.amount;
         c.settled = true;
-        totalSettled += c.amount;
-        rtm.mint(c.beneficiary, c.amount);
+        totalSettled = settledTotal + c.amount;
+        // Effects precede the interaction and the log precedes it too, so the
+        // immutable token can never observe a half-updated vault.
         emit ClaimSettled(id, c.beneficiary, c.amount, year);
+        rtm.mint(c.beneficiary, c.amount);
     }
 
     /// @notice Explicitly cancels an unsettled claim and releases its old-year reservation.
@@ -236,6 +286,39 @@ contract BountyVault is Ownable, Pausable {
         emit ClaimCancelled(id, c.beneficiary, c.amount, c.emissionYear);
     }
 
+    /// @notice Re-binds an expired claim to the current RTM emission year.
+    /// @dev A claim is bound to the year it was configured in, so one the
+    /// evaluator could not settle before that year rolled over would otherwise
+    /// strand a legitimate bounty winner. Renewal releases the old year's
+    /// reservation and reserves the same amount in the current year, provided the
+    /// current year still has capacity. It never changes the beneficiary or the
+    /// amount and cannot be applied to a live, settled, or cancelled claim, so it
+    /// is equivalent to the evaluator cancelling and re-configuring the award and
+    /// grants no extra authority.
+    /// @param id Claim id; must be configured, unsettled, uncancelled, and expired.
+    function renewClaim(bytes32 id) external onlyEvaluator whenNotPaused {
+        if (address(rtm) == address(0)) revert RtmNotInitialized();
+        Claim storage c = claims[id];
+        if (!c.configured) revert ClaimNotConfigured();
+        if (c.settled) revert ClaimAlreadySettled();
+        if (c.cancelled) revert ClaimAlreadyCancelled();
+
+        uint256 year = rtm.currentYear();
+        uint256 oldYear = c.emissionYear;
+        if (oldYear == year) revert ClaimNotExpired(oldYear, year);
+
+        uint256 available = _availableYearBudget(year);
+        if (c.amount > available) revert YearBudgetUnavailable(year, c.amount, available);
+
+        uint256 reserved = reservedByYear[oldYear];
+        if (reserved < c.amount) revert ReservationInvariantBroken(oldYear, reserved, c.amount);
+
+        reservedByYear[oldYear] = reserved - c.amount;
+        c.emissionYear = year;
+        reservedByYear[year] += c.amount;
+        emit ClaimRenewed(id, c.beneficiary, c.amount, oldYear, year);
+    }
+
     /// @notice Pauses claim configuration, settlement, and cancellation.
     /// @dev Existing claims are retained and can be settled or cancelled after
     /// `unpause()`; pausing is a circuit breaker, not a seizure mechanism.
@@ -246,6 +329,15 @@ contract BountyVault is Ownable, Pausable {
     /// @notice Resumes claim configuration, settlement, and cancellation.
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// @notice Disabled: renouncing ownership would leave `initializeRtm`,
+    /// `pause`, `unpause`, `setEvaluator`, and `setMaxPerClaim` permanently
+    /// uncallable. Renouncing before initialisation bricks the vault outright and
+    /// renouncing while paused freezes bounty settlement forever, so ownership is
+    /// not renounceable here. Transfer it instead.
+    function renounceOwnership() public view override onlyOwner {
+        revert RenunciationDisabled();
     }
 
     function _remainingYearBudget(uint256 year) internal view returns (uint256) {

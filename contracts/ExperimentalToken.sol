@@ -15,6 +15,7 @@ contract ExperimentalToken is ERC20 {
     /// @notice Mints the whole `supply` to the deployer.
     /// @param supply Amount minted to `msg.sender`, in wei-denominated units.
     constructor(uint256 supply) ERC20("Experimental Token", "XEXP") {
+        require(supply > 0, "zero supply");
         _mint(msg.sender, supply);
     }
 }
