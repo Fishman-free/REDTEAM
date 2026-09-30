@@ -18,31 +18,30 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: rsi4safety
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install test and SUT dependencies
-        working-directory: .
         run: python -m pip install -r requirements-dev.txt
-      - name: Payment Python suite
-        working-directory: contracts
-        run: python -m pytest tests -q
-      - name: RSI Python and Arena suites (including promotion, resume and rollback)
+      - name: Root host suites (SQLite and RSI)
+        run: python -m pytest tests --ignore=tests/arena -q
+      - name: Root unittest parity (fail on any group)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in tests/test_*.py; do
+            python -m unittest discover -s tests -p "$(basename "$file")"
+          done
+      - name: Complete Arena suite (including promotion, resume and rollback)
         timeout-minutes: 20
-        run: python -m pytest execution/tests -q --durations=15 -o faulthandler_timeout=120
+        run: python -m pytest tests/arena -vv --durations=15 -o faulthandler_timeout=120
       - name: PayGate suite (isolated app import)
-        working-directory: rsi4safety/payment_agents/paygate
+        working-directory: sut/paygate
         run: python -m pytest tests -q
       - name: PayAssist suite (isolated app import)
-        working-directory: rsi4safety/payment_agents/payassist
-        run: python -m pytest tests -q
-      - name: PayChain suite (isolated app import)
-        working-directory: rsi4safety/payment_agents/paychain
+        working-directory: sut/payassist
         run: python -m pytest tests -q
       - name: Offline benchmark smoke (host-ledger evidence and strict exit status)
         run: python -m rsi4safety arena bench --campaign ci-benchmark --system A01 --seed-id A01-B01 --sut-app payassist
@@ -57,9 +56,6 @@ jobs:
     name: Local EVM contracts and payment agent
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: contracts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,7 +65,6 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: contracts/package-lock.json
       - name: Install locked EVM toolchain
         run: npm ci --no-audit --no-fund
       - name: Contract and payment-agent suites

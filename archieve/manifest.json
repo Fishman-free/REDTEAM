@@ -1,0 +1,1367 @@
+{
+  "baseline_commit": "f97b37e",
+  "date": "2026-09-30",
+  "note": "All 191 baseline tracked files have an accounted destination. The contracts and RSI subsystems are siblings; global documentation is under docs, RSI documentation under rsi4safety/docs. Current code and useful research remain active. Only the replaced original README is archived in the baseline mapping; the replaced CI snapshot is recorded separately. Local ignored bytecode and old install metadata are preserved without being treated as active source.",
+  "files": [
+    {
+      "original": ".env.example",
+      "current": "rsi4safety/.env.example",
+      "original_sha256": "56b98b5b57397e1716ef2ae7b66f4092d3b5939f3e08c72cb7f264c967733091",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": ".github/workflows/pages.yml",
+      "current": ".github/workflows/pages.yml",
+      "original_sha256": "f005c6d00361b9be38c778fa78efcf8fc20277f460710921298783a40925aeeb",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": ".github/workflows/tests.yml",
+      "current": ".github/workflows/tests.yml",
+      "original_sha256": "b983747419c62fd49c033e9ba3e7281e47b6f4d3abfb989e954cc3c51a88499a",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": ".gitignore",
+      "current": ".gitignore",
+      "original_sha256": "a61f41291fc1d10744e17346e6ccc83e4832b83c56867bdebaa4acca83a6c1c8",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "ATTACK_INTERFACE_DESIGN.md",
+      "current": "docs/references/ATTACK_INTERFACE_DESIGN.md",
+      "original_sha256": "c0c131ade80c5fd721606cbf39991e0e970ec540eb021acc783e58460008bf42",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "README.md",
+      "current": "archieve/history/README.md",
+      "original_sha256": "d403783cb96a3c40e7ca7a642d5d7e34ed2f288332eda4cd4c2294c5e5dedf1d",
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Original project guide superseded by the two current core documents; original bytes retained.",
+      "replaced_by": [
+        "README.md",
+        "docs/RESEARCH_PLAN.md"
+      ]
+    },
+    {
+      "original": "SECURITY_REVIEW_2026-09-18.md",
+      "current": "docs/references/research/SECURITY_REVIEW_2026-09-18.md",
+      "original_sha256": "f26c8b60cfa6aca0c0dbb7def03a83c3faae32a9d6f56d7bba2409e8aaf134e7",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "agents/attacker/.mcp.json",
+      "current": "rsi4safety/execution/agents/attacker/.mcp.json",
+      "original_sha256": "d1682620fb2a42b16f5e38d04ebd456022dacf8a643d037b1fe754201f72e7ae",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/CLAUDE.md",
+      "current": "rsi4safety/execution/agents/attacker/CLAUDE.md",
+      "original_sha256": "db5adf2f65cf876946b4e6eeeb10dc5a0675af0a40b61fffc0fadf6daf641f5a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/knowledge/owasp-llm-top10-summary.md",
+      "current": "rsi4safety/execution/agents/attacker/knowledge/owasp-llm-top10-summary.md",
+      "original_sha256": "b95f6bca227ca89dadff7570b2917e9c09e9bbb7b6a554debd81865bd2935bd8",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/knowledge/payment-fraud-patterns.md",
+      "current": "rsi4safety/execution/agents/attacker/knowledge/payment-fraud-patterns.md",
+      "original_sha256": "43457bde36d2786e6049461ea15d06f0ae3f7e24da4510e4f87addb9abd4d10d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/mcp/attacker_server.py",
+      "current": "rsi4safety/execution/agents/attacker/mcp/attacker_server.py",
+      "original_sha256": "c09b5f2be6e22676bd8b5557b2d8c61793dbf63007d5fa2a8ac8e921b9591d6a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/skills/conversational-injection/SKILL.md",
+      "current": "rsi4safety/execution/agents/attacker/skills/conversational-injection/SKILL.md",
+      "original_sha256": "5057fe5fd495d318dd8785974bc647b9631cc572bc65a422cd8e8e4b26bffb3d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/skills/craft-payment-attacks/SKILL.md",
+      "current": "rsi4safety/execution/agents/attacker/skills/craft-payment-attacks/SKILL.md",
+      "original_sha256": "ac34095138dbbf61164255103c484b558f575ba38e86e0f7c483ef268aebb71e",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/skills/experiment-first/SKILL.md",
+      "current": "rsi4safety/execution/agents/attacker/skills/experiment-first/SKILL.md",
+      "original_sha256": "d97b0e901c8d2de05be4c73a3b935ef3e3f7e1e1b831f975ebd3962c37ef8cb1",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/skills/recon-methodically/SKILL.md",
+      "current": "rsi4safety/execution/agents/attacker/skills/recon-methodically/SKILL.md",
+      "original_sha256": "5d4241512be7eeaf91070eb896ff7b16d86d3c3228ad6cd876b0bef86574d50d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/attacker/skills/submission-protocol/SKILL.md",
+      "current": "rsi4safety/execution/agents/attacker/skills/submission-protocol/SKILL.md",
+      "original_sha256": "82220b0798127ab442f7baeb85a28de4648d44604f705034345d1b633cf567ba",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/.mcp.json",
+      "current": "rsi4safety/execution/agents/defender/.mcp.json",
+      "original_sha256": "c2bbc882071e42080e3c73d0162c44da27994ae66a220cf972f959c1d7dd95f5",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/CLAUDE.md",
+      "current": "rsi4safety/execution/agents/defender/CLAUDE.md",
+      "original_sha256": "bc08e88ff76a2170b1c65848331a094aa91b24a4dde4a850396b8f767c25ad3c",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/knowledge/field-trust-matrix.md",
+      "current": "rsi4safety/execution/agents/defender/knowledge/field-trust-matrix.md",
+      "original_sha256": "8f233e3a88d33a9259cf1e7d5755765d9df22a6f05b41a867c4771ab47df0f15",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/knowledge/payassist-authorization-contract.md",
+      "current": "rsi4safety/execution/agents/defender/knowledge/payassist-authorization-contract.md",
+      "original_sha256": "601bebfe05658e297fb2091d787792529d36c21fc6187ae6c8849127f8adfbcf",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/knowledge/payment-agent-architecture.md",
+      "current": "rsi4safety/execution/agents/defender/knowledge/payment-agent-architecture.md",
+      "original_sha256": "570830893bef0c59352e21eb95b5665d569a7820702ae8a6c1269b9307703198",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/knowledge/secure-patching-checklist.md",
+      "current": "rsi4safety/execution/agents/defender/knowledge/secure-patching-checklist.md",
+      "original_sha256": "cb7e63a5e4870aeb58d51729a33d9c430412555b7c1769764e82c5b697db6ed9",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/mcp/defender_server.py",
+      "current": "rsi4safety/execution/agents/defender/mcp/defender_server.py",
+      "original_sha256": "595ed9833eb1f22fcae9cb51fce39546616c530f69b7fa555a0afa4c1963b7ef",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/skills/analyze-finding/SKILL.md",
+      "current": "rsi4safety/execution/agents/defender/skills/analyze-finding/SKILL.md",
+      "original_sha256": "b4e62947aede550af2af52cf3ce140bad81c80e785207d42e7694c39a96f1706",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/skills/patch-discipline/SKILL.md",
+      "current": "rsi4safety/execution/agents/defender/skills/patch-discipline/SKILL.md",
+      "original_sha256": "0d59b760413713955be899a2e652708050dda5b19b7701aee8ae1db640d73d0b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/skills/payassist-repair/SKILL.md",
+      "current": "rsi4safety/execution/agents/defender/skills/payassist-repair/SKILL.md",
+      "original_sha256": "64461f5cc421c308657cd53ae3b76ae9f149fe96c94a23161d3a94f1c88cd6e9",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/defender/skills/regression-first/SKILL.md",
+      "current": "rsi4safety/execution/agents/defender/skills/regression-first/SKILL.md",
+      "original_sha256": "757630a96f6550d4739f62aba69cc64faff305a8d6fd396248a54a99eedb5c28",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/judge/.mcp.json",
+      "current": "rsi4safety/execution/agents/judge/.mcp.json",
+      "original_sha256": "53c041279f2bb82fa3fb5133b01f367833f3a5256359e5625f109b8c3495bd20",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/judge/CLAUDE.md",
+      "current": "rsi4safety/execution/agents/judge/CLAUDE.md",
+      "original_sha256": "c55bf99080c90e8210536c2aa657c1248f969d3cd40573bb1d32e8d4c48c4cb6",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/judge/knowledge/verdict-protocol.md",
+      "current": "rsi4safety/execution/agents/judge/knowledge/verdict-protocol.md",
+      "original_sha256": "9b4d10bd5ab3e3db4af3c7f07677366fcda1c668f33e70bd59b3e9a9d8c02dcf",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/judge/knowledge/violation-code-reference.md",
+      "current": "rsi4safety/execution/agents/judge/knowledge/violation-code-reference.md",
+      "original_sha256": "744922215a7434b291517e96e35621f84baf1e170a404614a074528f2bef09eb",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "agents/judge/mcp/judge_server.py",
+      "current": "rsi4safety/execution/agents/judge/mcp/judge_server.py",
+      "original_sha256": "a6fa57155475871f79d3ccba245cb13fdcbd24551fe4347d2410a32b99a5a4e7",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "agents/judge/skills/adjudication-protocol/SKILL.md",
+      "current": "rsi4safety/execution/agents/judge/skills/adjudication-protocol/SKILL.md",
+      "original_sha256": "aafd7bcd22fad9b37581f745c7c044d710ceb3baf483290771b5e48a3647dfab",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "agents/judge/skills/severity-calibration/SKILL.md",
+      "current": "rsi4safety/execution/agents/judge/skills/severity-calibration/SKILL.md",
+      "original_sha256": "67dff4110ff09cf46ffa2055061657f4c30bbbda0d3a694ede265e77dedae9a2",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "contracts/BountyVault.sol",
+      "current": "contracts/src/BountyVault.sol",
+      "original_sha256": "5d6a1e2e745e4cc14b06ac17900061e826c1b999a530a43cfd1ce8f102c4313b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "contracts/ExperimentalToken.sol",
+      "current": "contracts/src/ExperimentalToken.sol",
+      "original_sha256": "dce284f52623659e556f54546ae483ace215fd0348bd0cc12618107e65298de5",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "contracts/PaymentAgent.sol",
+      "current": "contracts/src/PaymentAgent.sol",
+      "original_sha256": "e3aeea79df2ec123c204ba3946dcfe54d384f8fb59192281d9abd73206e690fa",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "contracts/RTMToken.sol",
+      "current": "contracts/src/RTMToken.sol",
+      "original_sha256": "30d23f5eac4f7a5901729350d8b17e5475889507ead1df7720f65530043f7025",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "contracts/RewardSettlement.sol",
+      "current": "contracts/src/RewardSettlement.sol",
+      "original_sha256": "e134e1c9f786ab4cd9606fad75359f4c376f57bd3a6f2e42473429c00dd47b03",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docker/agent/Dockerfile",
+      "current": "rsi4safety/execution/docker/agent/Dockerfile",
+      "original_sha256": "344371aa3c9573c45957646c4a3d6e5d4b35a6ed65120e15b31c6765a4aa8828",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docker/llm-gateway/Dockerfile",
+      "current": "rsi4safety/execution/docker/llm-gateway/Dockerfile",
+      "original_sha256": "83f60cd0ac8b367076c1cb94615863bb0a674128f2672ed224a75fce1c7234bd",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docker/llm-gateway/gateway.py",
+      "current": "rsi4safety/execution/docker/llm-gateway/gateway.py",
+      "original_sha256": "1d8cb626e50b2d9cb009a653d49e2dc9da754d67646b3554602554402384853b",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "docs/ARCHITECTURE.md",
+      "current": "rsi4safety/docs/references/research/ARCHITECTURE.md",
+      "original_sha256": "fcda7978d9d046fa4dba973ba2abfe55b6ae740ffebe44b881dfbbd7bc595b58",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/ARENA.md",
+      "current": "rsi4safety/docs/references/research/ARENA.md",
+      "original_sha256": "f57a58045d0ef53a48b6004069db351bee7c5f9428b9442ae119b6b0e5abb918",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/ARENA_EVOLUTION_SPEC.md",
+      "current": "rsi4safety/docs/references/research/ARENA_EVOLUTION_SPEC.md",
+      "original_sha256": "dd1eb3180abf1a24b659b751a1ef18135db0c1a395b7f6eafaa35de37f816d28",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/ARENA_SPEC.md",
+      "current": "rsi4safety/docs/references/research/ARENA_SPEC.md",
+      "original_sha256": "5bf26aa697a9782fc1760df130ba5f71751d09edc26465dbb4fb72e1bdf13253",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/BENCHMARK_SPEC.md",
+      "current": "rsi4safety/docs/references/research/BENCHMARK_SPEC.md",
+      "original_sha256": "4f0f82b6e776eb683d6d0c582116facfeecdde8f38d2a0ee858d35c3e5fbbb47",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/DEVELOPMENT_ROADMAP.md",
+      "current": "docs/references/research/DEVELOPMENT_ROADMAP.md",
+      "original_sha256": "e8e3a1056648225797555725c0ef7c0b901793f7489c8f4e675a40b4fedaee8d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/EXPERIMENT_2026-09-16.md",
+      "current": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-16.md",
+      "original_sha256": "9a70ad1831cdcbe37094ea54f8c82e7ce4a8a7170509bc539978adcc70830663",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/EXPERIMENT_2026-09-27.md",
+      "current": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-27.md",
+      "original_sha256": "3c926b368bfcbb864ad9f6f033eecab8521bf7603cab0023674793d09e305751",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/EXPERIMENT_PROTOCOL.md",
+      "current": "docs/references/research/EXPERIMENT_PROTOCOL.md",
+      "original_sha256": "e5a2f5f16f1178199e7e19cd0467075e0ae602e12b3e5a022b0216a1662a9b4a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/GLM_EXPERIMENTS.md",
+      "current": "rsi4safety/docs/references/research/GLM_EXPERIMENTS.md",
+      "original_sha256": "1d373eb447c756d016128bede3f3217fde603accd595d4adc027cd167034f390",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/INTEGRATION.md",
+      "current": "docs/references/research/INTEGRATION.md",
+      "original_sha256": "1a0489153fafb87999ef3a98ebe67eddc344676d56d0dc000e73802e28ba222d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/REPAIRER_COMPARISON_SPEC.md",
+      "current": "rsi4safety/docs/references/research/REPAIRER_COMPARISON_SPEC.md",
+      "original_sha256": "b0d8b748f407d71749b8bf0cc755ef853010b651e8267b85e105e3ff09fb4032",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/RESEARCH_PLAN_2026-09-27.md",
+      "current": "rsi4safety/docs/references/research/RESEARCH_PLAN_2026-09-27.md",
+      "original_sha256": "9146c57631cc3a0001ea83741d3072a7fbf6f505e9d708d8489c9491bea61abb",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/RSI_EVAL_RESULTS_2026-09-27.json",
+      "current": "rsi4safety/docs/references/research/RSI_EVAL_RESULTS_2026-09-27.json",
+      "original_sha256": "eb8e9c191cc981001e14dc12aee3b7095c49f02ace4ae56005d2e661449b5e1b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/RSI_IMPROVEMENT_PLAN.md",
+      "current": "rsi4safety/docs/references/research/RSI_IMPROVEMENT_PLAN.md",
+      "original_sha256": "a10b3d7bea3331c0bf04ea985766f9fc390eb4ed0bdaf447cefc9c0095d67f9a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/RSI_PREREGISTRATION.md",
+      "current": "rsi4safety/docs/references/research/RSI_PREREGISTRATION.md",
+      "original_sha256": "52a4234ccec8b0f3352add00143217b944b0909551f8597bd5523a43daa37753",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/RSI攻击悬赏与持续评估机制_研究构想.md",
+      "current": "docs/references/research/RSI攻击悬赏与持续评估机制_研究构想.md",
+      "original_sha256": "ba1a0ed26af8208096076e8ad46c1548cba9fe23851fc2bb047b8f2be105b076",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/RTM_BOUNTY_DESIGN.md",
+      "current": "docs/references/research/RTM_BOUNTY_DESIGN.md",
+      "original_sha256": "781b17d34fc84cd3ebec83fa6c8aa8fb9e13c31d78650d7f23e9c8380af61695",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/SURVEY.md",
+      "current": "rsi4safety/docs/references/research/SURVEY.md",
+      "original_sha256": "1cc1affce3869ee4011bf23df0a931ff7a1d5e45a05fe05fc2bac714fb79dd1b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/VALIDATION_2026-09-23.md",
+      "current": "docs/references/research/VALIDATION_2026-09-23.md",
+      "original_sha256": "6791e9e5b66685202fb72cd5edf49898b213a8cf17953e124a50da9473f7b1da",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/VALIDATION_2026-09-27.md",
+      "current": "rsi4safety/docs/references/research/VALIDATION_2026-09-27.md",
+      "original_sha256": "b25834a975c5b6c5d61e5591d3619fe93bafe9b5d1c8af43b4a2ebe61f1149ea",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "docs/arena/SEEDED_VULNS.md",
+      "current": "rsi4safety/docs/references/research/arena/SEEDED_VULNS.md",
+      "original_sha256": "19c9ac14b5f81b86195bd6e6c7b5c6ecc51afa5525a1508455befbdf6ef5c4d7",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "hardhat.config.js",
+      "current": "contracts/hardhat.config.js",
+      "original_sha256": "cf5f6e1d78db06637ec356400dfa51c87ee0d442b4560789695b0226f4d62ef0",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "index.html",
+      "current": "docs/site/index.html",
+      "original_sha256": "efb442346caee2e8748d7a4a95f755b99699fd95bb90dccfd671010d78da1df8",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "package-lock.json",
+      "current": "contracts/package-lock.json",
+      "original_sha256": "51b9a39adbfa489105d4eb2286aeba8c1e1d25f81b39a9f895cb15d03315869a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "package.json",
+      "current": "contracts/package.json",
+      "original_sha256": "5a63df88d76fe25e544bac75128e724f7025e69474b89ee1ef6eae22cd0d600d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "prompts/payment_agent_system_v1.txt",
+      "current": "contracts/prompts/payment_agent_system_v1.txt",
+      "original_sha256": "ce357e6d4bef08dcd03accc9bb62de887f42aed85d2da4eebca2e740c01cf715",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "pyproject.toml",
+      "current": "rsi4safety/pyproject.toml",
+      "original_sha256": "facc6b6379cfc3dbf0b3fd3d6a4dab5b36d2388f3505cca5bb5edaccd6dd1f24",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "redteam/__init__.py",
+      "current": "contracts/redteam/__init__.py",
+      "original_sha256": "2c79a6e015b086792fc4bb27281ee50626510e8d61d37be5ae907ae27bc06a1c",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/agent_runtime.py",
+      "current": "contracts/redteam/agent_runtime.py",
+      "original_sha256": "1804688be0a05e70882df6799aa950697d4b41bb6d6f607632855d0a56e034df",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/agents.py",
+      "current": "contracts/redteam/agents.py",
+      "original_sha256": "5a4ddde730e10821b0394be4e7a36b1057564a7d001817bd6bda59d60b7d3603",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/cli.py",
+      "current": "contracts/redteam/cli.py",
+      "original_sha256": "e1736fae20877ec749b7066a0f0cc25c0ed4d45e3290f1e3f71a10d5002d4832",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/core.py",
+      "current": "contracts/redteam/core.py",
+      "original_sha256": "87e26f9bb4af383baf30df6b7928c3fd9b896c319394166b9961554d7d11695e",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/llm.py",
+      "current": "contracts/redteam/llm.py",
+      "original_sha256": "b9359aba46d765d82603e73161a1187c6ecaca86a75a1d254f464d42d4dccdf3",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/policy.py",
+      "current": "contracts/redteam/policy.py",
+      "original_sha256": "271c32fedf58578707e4280dcefb255537d262a56c1e4af63fecc80fb4b3642a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/regression.py",
+      "current": "contracts/redteam/regression.py",
+      "original_sha256": "e92f85948e8e9cd6688dcb21285168f40f0b921129a6e673c53faccfeb01341c",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/scenario.py",
+      "current": "contracts/redteam/scenario.py",
+      "original_sha256": "14abe132d00e5852f83bda220adc71af702b15ea06ca9bc1495d98de2e559db8",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "redteam/server.py",
+      "current": "contracts/redteam/server.py",
+      "original_sha256": "be7f7dcb687a25a701380d0ba9e897cb09ca46fccd1ba62f6aa78fd9eff3a664",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "requirements-dev.txt",
+      "current": "rsi4safety/requirements-dev.txt",
+      "original_sha256": "71efdc93d21aa018c28a2fae25c330dacaefcb593cfd4183a41dcc181b494a14",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "scenarios/payment-delivery-v1/config.json",
+      "current": "contracts/scenarios/payment-delivery-v1/config.json",
+      "original_sha256": "ccb480989587eeec40c3c121086a398f1f05de218cf994aaf13c52d1de746697",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scenarios/payment-delivery-v1/evaluator-truth.json",
+      "current": "contracts/scenarios/payment-delivery-v1/evaluator-truth.json",
+      "original_sha256": "9553ccf9f56b9c0e7ffe9d2d249bc99f34fda17a74ebfa0ff70789587c586e32",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scenarios/payment-delivery-v1/trusted-feed.json",
+      "current": "contracts/scenarios/payment-delivery-v1/trusted-feed.json",
+      "original_sha256": "9553ccf9f56b9c0e7ffe9d2d249bc99f34fda17a74ebfa0ff70789587c586e32",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scripts/agent-demo.js",
+      "current": "contracts/scripts/agent-demo.js",
+      "original_sha256": "2c43cc80eae353124bbd17d5c81647490b82ec10b657f71975231665bbc67463",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scripts/agent-flow.js",
+      "current": "contracts/scripts/agent-flow.js",
+      "original_sha256": "50d9c9d7c772327766f5518b410484e24897b74d16bc14826cec51b9e5798275",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scripts/agent-multiround-demo.js",
+      "current": "contracts/scripts/agent-multiround-demo.js",
+      "original_sha256": "03d573fbd38ace664264aea424ab5fb0778801cdc0322232c46bf466ecd71d55",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scripts/evm-demo.js",
+      "current": "contracts/scripts/evm-demo.js",
+      "original_sha256": "91fb4407f362915cd6b014f4064d4c103fa78602cb3236087dd2939ec2f30ebd",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "scripts/payment-evaluator.js",
+      "current": "contracts/scripts/payment-evaluator.js",
+      "original_sha256": "1334920f9aec33b9002bc68b419913b5ce3c23051a678e3ea554254ea4b89068",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/__init__.py",
+      "current": "rsi4safety/execution/src/rsi4safety/__init__.py",
+      "original_sha256": "17896fb768c29933d16428892136d37ca9036e6786ddd65364a9cfeee96b1266",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/__main__.py",
+      "current": "rsi4safety/execution/src/rsi4safety/__main__.py",
+      "original_sha256": "3129adff95e0f38b87ab34cddfc27082c7892bcaec267ff5d40f160fdf55b44a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/__init__.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/__init__.py",
+      "original_sha256": "c70d6028485113db90421a679a8f12754607d23dcc94bfab906eaa3995026742",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/attackers.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/attackers.py",
+      "original_sha256": "e413a9cf00a45fbc9a10469e6c9cee65a36075ee1ec3492c529aa30f01c0f138",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/audit.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/audit.py",
+      "original_sha256": "e604cbc2a5b8734a0e96be78b182be998aa0dbb6dd8d5ef274a8c1d4666d7832",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/authorization.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/authorization.py",
+      "original_sha256": "a7f17e5e798375c6e639a2cf88c64d46127149cf834405a2c4924857abf5a5b7",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/benchmark.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/benchmark.py",
+      "original_sha256": "be07c52a34f07313c4de0a0d3cede673b924bfc051b906eb22f700ed75567316",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/benchmark_runner.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/benchmark_runner.py",
+      "original_sha256": "9e3414c42889f94fa24db501cde1ed1aa62ccb87ec0ad3ed85d349366dac2986",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/benchmark_seeds.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/benchmark_seeds.py",
+      "original_sha256": "f3ba6b08a1d5fad3cb77e06ec52d57a2d85a5a4afa9d77e959f5ffc627274c81",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "src/rsi4safety/arena/config.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/config.py",
+      "original_sha256": "e2ff8950db3045cf72efc88fb7f6c21e7d668c0812b8231e972bd8fbe4b7c3c6",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "src/rsi4safety/arena/constitution.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/constitution.py",
+      "original_sha256": "142dcc70f2e0c1426616842e96b10032489aab4f616928100530a0251c63ada0",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/continuous_scoring.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/continuous_scoring.py",
+      "original_sha256": "187483bd972c295a6aec680b3a5e15413b51b7a9d60e33067a14baf9fd45a6c4",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/control.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/control.py",
+      "original_sha256": "6ff329dfcbe5cebce2049e1ed2ae8d7c66f3634c7eaf0aaeb744ef893f51ed56",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "src/rsi4safety/arena/docker_host.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/docker_host.py",
+      "original_sha256": "50badf4e8f79167add80407ebfce6b5e6220956fe9997b0ea4c388cb82e5242b",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "src/rsi4safety/arena/engineering.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/engineering.py",
+      "original_sha256": "6cc5c27047de5c690a22324dd13f330c21b071cc2bccc1c8af13d8f63ebe9fee",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/exchange.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/exchange.py",
+      "original_sha256": "c7431a9361ce0a3c5b76c872d68000ada046df4d971b587c1f9a54872641f51e",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/experience.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/experience.py",
+      "original_sha256": "dc4f64f0da16df9f4ceef8a6b8f2888f5e5eb5a5a4a59ed794f15c5292fef0ba",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/feedback_policy.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/feedback_policy.py",
+      "original_sha256": "6c6902d752697719b4f56d0cba7e9fdd03c023954d6fb9d5408d1ec9a327bbe4",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/filelock.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/filelock.py",
+      "original_sha256": "0361eda6bb91558b0345c73a6193681926e85e6a5b7b7c7df5bd6fb446634b29",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/orchestrator.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/orchestrator.py",
+      "original_sha256": "b5009b66ca1bbf5c195e90885149d49aebc2ffef2d79de9c208faf0a68e048ba",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "src/rsi4safety/arena/reports.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/reports.py",
+      "original_sha256": "40bea86545fb4d54478350dc19080fc6d0d64f7e43532be8726677a078184bed",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/runtime.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/runtime.py",
+      "original_sha256": "fedf70605cd6b1a5baa810ae8d226557ba6e5825e85610945b3b5c7da190f331",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/scoring.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/scoring.py",
+      "original_sha256": "c149586dded6a6e6de6b8366eddc13f64013d5709bdc42a268278912b38fdcc4",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/sut_driver.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/sut_driver.py",
+      "original_sha256": "3d7c320cb0f97994d0038aa7541becd0a773369bf99d7b42d58746f4144f01b4",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/trusted_execution.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/trusted_execution.py",
+      "original_sha256": "5ea87ebeaf52667794dc49f66449061c4a9ed7638db2f0aabe79f01b2dbcce95",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/arena/versions.py",
+      "current": "rsi4safety/execution/src/rsi4safety/arena/versions.py",
+      "original_sha256": "a37ebba872b957b5ed57f7a2a48c2dd6c24f237752dbc96a836cc99779e0b4bb",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/benchmark.py",
+      "current": "rsi4safety/execution/src/rsi4safety/benchmark.py",
+      "original_sha256": "14357f54c337c841b0d0a7f52302cef8e2a7c5e3ac460cce60c03b45a2f89c83",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/campaign.py",
+      "current": "rsi4safety/execution/src/rsi4safety/campaign.py",
+      "original_sha256": "2667906846dc869e1ca3010fe07aeb3d00f522d813e807d2ce9bc029457add73",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/cli.py",
+      "current": "rsi4safety/execution/src/rsi4safety/cli.py",
+      "original_sha256": "72a536f06eb066c4963fee926eadcad149dba9094235b59ef4da6522a5dd969a",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "src/rsi4safety/config.py",
+      "current": "rsi4safety/execution/src/rsi4safety/config.py",
+      "original_sha256": "d277e667e12de5db3d01c495cf733248bca32270343cdd5013d9fd4687afedbb",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/core.py",
+      "current": "rsi4safety/execution/src/rsi4safety/core.py",
+      "original_sha256": "e6a88f7b6abeaeb5fe887002cde844a070a461e664bb47438033a84d2985cac4",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/domain.py",
+      "current": "rsi4safety/execution/src/rsi4safety/domain.py",
+      "original_sha256": "a60981cb9c776333610f0b9ebc03e31422321e01151360736e70cf0ad8bb92b8",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/learning.py",
+      "current": "rsi4safety/execution/src/rsi4safety/learning.py",
+      "original_sha256": "5f23cef0cee7b17353f1d1d1f13447959f88cb88848312e953506a0d88eb2362",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/model_agents.py",
+      "current": "rsi4safety/execution/src/rsi4safety/model_agents.py",
+      "original_sha256": "d3d55171c50ffb5c24e68246b7be4e75058a2df6e2eceaeae0681e2d3e83cf99",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/prompts.py",
+      "current": "rsi4safety/execution/src/rsi4safety/prompts.py",
+      "original_sha256": "1077d9b2e90355b082701e16536fe222eaf79f153a056aed539e78f521905bc2",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/providers.py",
+      "current": "rsi4safety/execution/src/rsi4safety/providers.py",
+      "original_sha256": "24890b5f28220ced403159d0a2bb2b1116b445a027d27d8288513bbd69f3ac44",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/rsi_eval/__init__.py",
+      "current": "rsi4safety/execution/src/rsi4safety/rsi_eval/__init__.py",
+      "original_sha256": "c8941e5c4a4d27382128e75eafae62d85380c0fe53eb9e433b2f061e604d466b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/rsi_eval/experiment.py",
+      "current": "rsi4safety/execution/src/rsi4safety/rsi_eval/experiment.py",
+      "original_sha256": "d50b28055107d429b18f75d9764c59e16427139b31cafb04cc589a1a07ef6c74",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/rsi_eval/families.py",
+      "current": "rsi4safety/execution/src/rsi4safety/rsi_eval/families.py",
+      "original_sha256": "30cc9897ae9678f8d7e05fd9b3524706c2b43ba0330287851b19ce955f5ef034",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/runner.py",
+      "current": "rsi4safety/execution/src/rsi4safety/runner.py",
+      "original_sha256": "41fd9cb48618e90328ccbbedb7f3206a066940a87daaf62a16e1a91f013aaff1",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "src/rsi4safety/scenarios.py",
+      "current": "rsi4safety/execution/src/rsi4safety/scenarios.py",
+      "original_sha256": "1b266b68e7f09c88a967f82b59e9e7f0d34f2625c24219b88d574986e4b2c584",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/Dockerfile",
+      "current": "rsi4safety/payment_agents/payassist/Dockerfile",
+      "original_sha256": "3f1728ea857e3a51ed56ca226367025ee464c7874d6b08bbff27ce3abf4c6a2d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/app/__init__.py",
+      "current": "rsi4safety/payment_agents/payassist/app/__init__.py",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/app/assistant.py",
+      "current": "rsi4safety/payment_agents/payassist/app/assistant.py",
+      "original_sha256": "2e13f87665e818ab551b7c5a2505dd166a69b2b331b5578e64a631477c3f9752",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/app/main.py",
+      "current": "rsi4safety/payment_agents/payassist/app/main.py",
+      "original_sha256": "d9797c5698cc79d1771a43198c055d1484dad9e497136e992720524ed67ba078",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/app/prompts.py",
+      "current": "rsi4safety/payment_agents/payassist/app/prompts.py",
+      "original_sha256": "c6c857b022e4f87bb53279a90c99d4b003357c11a6a0fb17330a81d31eea9c5b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/app/prompts_fixed.py",
+      "current": "rsi4safety/payment_agents/payassist/app/prompts_fixed.py",
+      "original_sha256": "b96e1bf061eb1e3267783e2ec20ffbe6e1183f23e4371d00eb9f8fb8438578b8",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/app/store.py",
+      "current": "rsi4safety/payment_agents/payassist/app/store.py",
+      "original_sha256": "21dce3101988eddc8768091b80a923f994282278938172f08586c2fa54a676fc",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/requirements.txt",
+      "current": "rsi4safety/payment_agents/payassist/requirements.txt",
+      "original_sha256": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/payassist/tests/test_payassist.py",
+      "current": "rsi4safety/payment_agents/payassist/tests/test_payassist.py",
+      "original_sha256": "5eec489ac7c077459e974b4511e8b846c8faad4424b18d3ca9bda66e7d7625d3",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "sut/paychain/app/__init__.py",
+      "current": "rsi4safety/payment_agents/paychain/app/__init__.py",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paychain/app/main.py",
+      "current": "rsi4safety/payment_agents/paychain/app/main.py",
+      "original_sha256": "88bfc7f587e8cca441064ab53b7f10a846a0571079bf0979067825d15c176934",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paychain/app/roles.py",
+      "current": "rsi4safety/payment_agents/paychain/app/roles.py",
+      "original_sha256": "3245974d5476b64a71c036e1e17959cc68eef5e6e2b061e8ad8c4e915355687f",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paychain/app/store.py",
+      "current": "rsi4safety/payment_agents/paychain/app/store.py",
+      "original_sha256": "a8abd1b73b96d4afe5ebbe4196775e46f953017e7d1658ea5333210b049f4625",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paychain/requirements.txt",
+      "current": "rsi4safety/payment_agents/paychain/requirements.txt",
+      "original_sha256": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paychain/tests/test_paychain.py",
+      "current": "rsi4safety/payment_agents/paychain/tests/test_paychain.py",
+      "original_sha256": "2d3f81623fbb078de7f06db0acd8edf4dee9cc76acb5145c35e1486860a98278",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "sut/paygate/Dockerfile",
+      "current": "rsi4safety/payment_agents/paygate/Dockerfile",
+      "original_sha256": "62b38dce7445ff9a3fb2bffa5427d55de5479b9c48d98eb22a98e0ef0767485b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/app/__init__.py",
+      "current": "rsi4safety/payment_agents/paygate/app/__init__.py",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/app/llm_agent.py",
+      "current": "rsi4safety/payment_agents/paygate/app/llm_agent.py",
+      "original_sha256": "8e0499472ff981cd7765db44c11cea8966f11eabbd205248a4879ddaa6353825",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/app/main.py",
+      "current": "rsi4safety/payment_agents/paygate/app/main.py",
+      "original_sha256": "fe9e428db87d02b27d232b989c88370bca2c7a7b780aef78b0ab7b3f0add452a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/app/policy.py",
+      "current": "rsi4safety/payment_agents/paygate/app/policy.py",
+      "original_sha256": "a4280076d4a48a0151c3bd2438e106bc752731472d08e66dd0d3cee6686fe81d",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/app/store.py",
+      "current": "rsi4safety/payment_agents/paygate/app/store.py",
+      "original_sha256": "3f8c20b69f18cf153ae895a98e6797e5338f0bd9cc6054fa7d2089055bcd7879",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/app/surfaces.py",
+      "current": "rsi4safety/payment_agents/paygate/app/surfaces.py",
+      "original_sha256": "06049d024841138cc495e6ffb0a56adafca00ef7e6bee8a99b7e87fa811fb3c3",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/requirements.txt",
+      "current": "rsi4safety/payment_agents/paygate/requirements.txt",
+      "original_sha256": "b3d82521a6cc3bd7abd00d737392a1c953910a3711e2aed8df1c36524892cf2a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "sut/paygate/tests/test_paygate.py",
+      "current": "rsi4safety/payment_agents/paygate/tests/test_paygate.py",
+      "original_sha256": "49b715573d293de9656584a36454496d8f9e8d119ce35108fb3126b78ec38482",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "test/agent-e2e.test.js",
+      "current": "contracts/test/agent-e2e.test.js",
+      "original_sha256": "fbe4ad521a20ebb7391ef2b9c4da3fa49024a78c520521bc95db52bd661c2956",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "test/agent-multiround.test.js",
+      "current": "contracts/test/agent-multiround.test.js",
+      "original_sha256": "f6149e27a797dcb05d6dac0a0daa6478fcb1890f9de7f680be1324421ee0f600",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "test/evm.test.js",
+      "current": "contracts/test/evm.test.js",
+      "original_sha256": "9358cea50a6b54297bff9145c77307421b7b2a9fa1fee96050e66c445af4f495",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "test/hardening.test.js",
+      "current": "contracts/test/hardening.test.js",
+      "original_sha256": "47b6f16b5281707c3f52bb5f31f40b2caffa4c8b6366fc5ec9aeb5e1be35497e",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "test/rtm-budget-model.test.js",
+      "current": "contracts/test/rtm-budget-model.test.js",
+      "original_sha256": "b8ddf4c1b1a30fd4d640d5af29af19e8e19c41a0a5ce2725d02cb21cdbbef18f",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "test/rtm.test.js",
+      "current": "contracts/test/rtm.test.js",
+      "original_sha256": "04bc1c5b1f08502ede33259b4c03d9f30f7841660c4997c0161098b2bc69607f",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/__init__.py",
+      "current": "rsi4safety/execution/tests/arena/__init__.py",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_attack_loop.py",
+      "current": "rsi4safety/execution/tests/arena/test_attack_loop.py",
+      "original_sha256": "7923c19c6798f19576fec61a7a6ac95673873dd7d50494b5b68dafc5e7500aa2",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_attacker_experiment.py",
+      "current": "rsi4safety/execution/tests/arena/test_attacker_experiment.py",
+      "original_sha256": "c39ebf791c32501205001b8b665c76a99de1a475d283179166fa0d6b8ee86226",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_audit.py",
+      "current": "rsi4safety/execution/tests/arena/test_audit.py",
+      "original_sha256": "59658fda2784ed0a0a043ee31b8ff96deaa0c9aad0d8dc612cd943b5dfc16c59",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_authorization.py",
+      "current": "rsi4safety/execution/tests/arena/test_authorization.py",
+      "original_sha256": "60ea713f65b5a18fbcc4202ceb48917391d5ea9adeabe959d35d4eb3871aa8a0",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_benchmark.py",
+      "current": "rsi4safety/execution/tests/arena/test_benchmark.py",
+      "original_sha256": "6ec447eabdb8b91b62ef978a49d6079f6c130bc5a752e1ffea0c8383e9a64f1e",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_constitution.py",
+      "current": "rsi4safety/execution/tests/arena/test_constitution.py",
+      "original_sha256": "cb41a32c2f35f9ce9bc741337c49800373e4537c7abf8ef39406278be38e7fce",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_engineering.py",
+      "current": "rsi4safety/execution/tests/arena/test_engineering.py",
+      "original_sha256": "55ac56002d909b76b116b61d9cc2e61508236615b86810d6fe47021af897cabe",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_exchange.py",
+      "current": "rsi4safety/execution/tests/arena/test_exchange.py",
+      "original_sha256": "69add043d1095ca1638a4dd730e09cf50c7afd5c5c0628d0075bb8c09a3cb4a5",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_experience.py",
+      "current": "rsi4safety/execution/tests/arena/test_experience.py",
+      "original_sha256": "75268c73e0ada77f2a9e68b7092f48ef9a5cbfd857e396a2f70a7899556229d1",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_gateway.py",
+      "current": "rsi4safety/execution/tests/arena/test_gateway.py",
+      "original_sha256": "6a2d6ddc717bc54b08953bea3c0df77085689654e0627a242fbd985b5fcc3c0c",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_orchestrator.py",
+      "current": "rsi4safety/execution/tests/arena/test_orchestrator.py",
+      "original_sha256": "76f565497204247f7e4baca1b4d14095dbb621458f6c3d6691f1c737dabed5c4",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_orchestrator_robustness.py",
+      "current": "rsi4safety/execution/tests/arena/test_orchestrator_robustness.py",
+      "original_sha256": "185beef2aa379453a928a30f3f8c846b8882eb65d6b5c301af76a7abda95799f",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_scenario_tiers.py",
+      "current": "rsi4safety/execution/tests/arena/test_scenario_tiers.py",
+      "original_sha256": "867f4b7590fe513692a52daeb92a30a2e5ccc905ce84a5ea556f9e6133f820bb",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_scoring.py",
+      "current": "rsi4safety/execution/tests/arena/test_scoring.py",
+      "original_sha256": "0ceefa00e8b186a97df5403e0c1899d328aae7d3d7026c3b68f57770fcda9ac1",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_sut_cleanup.py",
+      "current": "rsi4safety/execution/tests/arena/test_sut_cleanup.py",
+      "original_sha256": "ddbd5cd5d69920a8ced6e8d2412bdc35f366f57a809f7fd6dbeda3b13ef50140",
+      "kind": "active",
+      "modified_during_reorganization": true
+    },
+    {
+      "original": "tests/arena/test_trusted_execution.py",
+      "current": "rsi4safety/execution/tests/arena/test_trusted_execution.py",
+      "original_sha256": "027dcce56d42cc21779a7220fb6bc019f48fc6836d1822ffb8946ab1a0afa975",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/arena/test_versions.py",
+      "current": "rsi4safety/execution/tests/arena/test_versions.py",
+      "original_sha256": "434d5e989cd17a6e0ae332f2f842484653aa28edd72e5396f19eeb63ca1d418c",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_arena_cli.py",
+      "current": "rsi4safety/execution/tests/test_arena_cli.py",
+      "original_sha256": "63bed691cbab87aeb0ace1910691435c9e93d734d107f4dc2da80119a9784eb7",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_campaign.py",
+      "current": "rsi4safety/execution/tests/test_campaign.py",
+      "original_sha256": "a0af2b77a6c04914af965f922e46b533586b43db45fd2552fb8aed220ec79510",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_core.py",
+      "current": "contracts/tests/test_core.py",
+      "original_sha256": "7a246eb654e2ce3c77762682514a088f18dd351de9534731e064f5320ba85920",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_http_flow.py",
+      "current": "contracts/tests/test_http_flow.py",
+      "original_sha256": "3234a471627169b847fa991fe1de6883393c6db6f45d6ab967c1925ed4a79d63",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_llm.py",
+      "current": "contracts/tests/test_llm.py",
+      "original_sha256": "ac000ddfbfddae41644f09e394e9bc6dfc3e1087de0478e5feca6a00f370400b",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_model_agents.py",
+      "current": "rsi4safety/execution/tests/test_model_agents.py",
+      "original_sha256": "8c0393b8c021ada34ab0ba2517e343f120a41b95a14901949a0c8ae743348466",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_payment_scenario.py",
+      "current": "contracts/tests/test_payment_scenario.py",
+      "original_sha256": "62eb37b0f591b6e39ddd15b661a9bafd21d4606fb2aaef904e04e3ece4906c24",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_providers.py",
+      "current": "rsi4safety/execution/tests/test_providers.py",
+      "original_sha256": "28c1b982a0c1ad0f765633b040e458e914bdcc2adc88a3d3e4d698bc15a18011",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_rsi4safety_core.py",
+      "current": "rsi4safety/execution/tests/test_rsi4safety_core.py",
+      "original_sha256": "8caafe587fdc541cac208b7caced2fccbcef687780a2a74159002d8b8230abfe",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_rsi_eval.py",
+      "current": "rsi4safety/execution/tests/test_rsi_eval.py",
+      "original_sha256": "ad65c0785b0a833475006abc507ee86fca76ab5d45361ebf857bf7c8de8b0afb",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_runner.py",
+      "current": "rsi4safety/execution/tests/test_runner.py",
+      "original_sha256": "9a999b494602cd593cb41334d4a27532129c4bcfa9459e49cf3c475f3a6227a5",
+      "kind": "active",
+      "modified_during_reorganization": false
+    },
+    {
+      "original": "tests/test_security_regressions.py",
+      "current": "rsi4safety/execution/tests/test_security_regressions.py",
+      "original_sha256": "2cfae9b9ba5693d328f2fce860a1b8d78efc78a800b24c8a1283a9bc08e3464a",
+      "kind": "active",
+      "modified_during_reorganization": false
+    }
+  ],
+  "archived_snapshots": [
+    {
+      "original": ".github/workflows/tests.yml",
+      "current": "archieve/history/.github/workflows/tests.yml",
+      "original_sha256": "b983747419c62fd49c033e9ba3e7281e47b6f4d3abfb989e954cc3c51a88499a",
+      "archive_reason": "Superseded by current workflows covering the parallel contracts and RSI subsystem directories.",
+      "replaced_by": [
+        ".github/workflows/tests.yml"
+      ]
+    }
+  ],
+  "summary": {
+    "baseline_files": 191,
+    "active": 190,
+    "archived_superseded": 1,
+    "additional_superseded_snapshots": 1,
+    "byte_identical": 165
+  }
+}

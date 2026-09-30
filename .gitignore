@@ -24,3 +24,6 @@ build/
 .mimosa/
 .v2c/
 .video_agent/
+
+# Preserved machine-local leftovers from the repository reorganization.
+/archieve/local-residue/
