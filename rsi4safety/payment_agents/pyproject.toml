@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "payassist-agent"
+version = "0.2.0"
+description = "Multi-turn payment agents with frozen L0/L1 mandates and host evidence"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+
+[project.scripts]
+payassist = "payassist_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["payassist_agent*", "L0_readonly*", "L1_single_payment*"]
+
+[tool.setuptools.package-data]
+L0_readonly = ["scenarios/*.json", "cases.json"]
+L1_single_payment = ["scenarios/*.json", "cases.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
