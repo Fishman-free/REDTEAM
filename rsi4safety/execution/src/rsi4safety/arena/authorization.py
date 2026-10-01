@@ -147,6 +147,33 @@ class RejectedAuthorizationClaim:
         }
 
 
+def evaluate_change_overreach(parent: AuthorizationRecord,
+                              changed: Authorization) -> str | None:
+    """Return why ``changed`` exceeds the parent's authority envelope, or None.
+
+    收紧类变更（降低额度/上限、禁用付款、缩短窗口）永远允许；任何一类
+    **扩权**（提高总额、提高单笔或精确金额、放宽单笔上限、增加执行次数、
+    把禁止付款改为允许、取消确认门槛）都构成受限用户越权，fail-closed。
+    """
+    if changed.max_total_minor > parent.authorization.max_total_minor:
+        return f"max_total_minor {changed.max_total_minor} > parent {parent.authorization.max_total_minor}"
+    if changed.exact_amount_minor > parent.authorization.exact_amount_minor:
+        return (f"exact_amount_minor {changed.exact_amount_minor} > "
+                f"parent {parent.authorization.exact_amount_minor}")
+    parent_per = parent.authorization.max_per_payment_minor
+    if parent_per is not None:
+        if changed.max_per_payment_minor is None or changed.max_per_payment_minor > parent_per:
+            return "per-payment ceiling loosened beyond the parent envelope"
+    if changed.max_executions > parent.authorization.max_executions:
+        return f"max_executions {changed.max_executions} > parent {parent.authorization.max_executions}"
+    if not parent.authorization.allows_payment and changed.allows_payment:
+        return "payment re-enabled where the parent forbids it"
+    parent_threshold = parent.authorization.require_confirmation_above_minor
+    if parent_threshold is not None and changed.require_confirmation_above_minor is None:
+        return "confirmation gate removed beyond the parent envelope"
+    return None
+
+
 class AuthorizationGate:
     """身份与授权核验：只有用户通道 + 已核验身份能形成或变更授权（fail-closed）。
 
@@ -188,7 +215,10 @@ class AuthorizationGate:
         """用户对话入口：确认变更后形成新的授权记录（原记录置为 superseded）。
 
         变更只能由资金所有者（或其获授权人）在用户通道确认；外部通道声明的
-        "用户已同意" 永远不触发本方法。
+        "用户已同意" 永远不触发本方法。确认变更同样不能**自行扩大**权限：
+        新记录不得超出父授权的权限包络（额度、单笔上限、执行次数、付款资格），
+        越权变更 fail-closed 拒绝（研究计划 §03 p3：有身份但权限受限的
+        对话者试图越权）。扩权必须走对话之外的所有者操作，不属于评测通道。
         """
         self._require_user_channel(message)
         if parent.status != "active" or not parent.is_executable():
@@ -196,6 +226,11 @@ class AuthorizationGate:
         if not verification.verified or verification.subject != parent.subject:
             raise AuthorizationGateError(
                 "变更确认必须来自原授权主体本人（fail-closed）"
+            )
+        overreach = evaluate_change_overreach(parent, changed)
+        if overreach is not None:
+            raise AuthorizationGateError(
+                f"确认变更超出父授权包络（fail-closed）：{overreach}"
             )
         record = AuthorizationRecord(
             record_id=f"auth-{uuid.uuid4().hex[:12]}",
@@ -249,12 +284,17 @@ class UserChannelPlan:
     ``POST /tasks``); every later message is a 确认变更 the driver relays to
     the SUT via ``POST /user/confirm``. Attackers can never reach that
     endpoint: the action allowlist only covers external surfaces.
+
+    A confirmation that would exceed the parent's authority envelope is
+    rejected fail-closed: the plan keeps the parent record unchanged and
+    records the rejection in ``rejected_changes`` (evidence, never authority).
     """
 
     subject: str
     messages: tuple[EntryMessage, ...]
     record: AuthorizationRecord
     changed: bool  # a 确认变更 produced a successor authorization record
+    rejected_changes: tuple[dict, ...] = ()  # evidence of overreach confirmations
 
 
 def build_user_channel_plan(fixture: dict) -> UserChannelPlan | None:
@@ -288,6 +328,7 @@ def build_user_channel_plan(fixture: dict) -> UserChannelPlan | None:
     record = gate.form_authorization(opening, verification, authorization)
     messages: list[EntryMessage] = [opening]
     changed = False
+    rejected_changes: list[dict] = []
     for confirmation in channel.get("confirmations") or []:
         if not isinstance(confirmation, dict) or not str(confirmation.get("content") or "").strip():
             raise AuthorizationGateError("each user confirmation needs nonempty content")
@@ -300,11 +341,21 @@ def build_user_channel_plan(fixture: dict) -> UserChannelPlan | None:
         messages.append(message)
         changed_authorization = confirmation.get("changed_authorization")
         if changed_authorization:
-            record = gate.confirm_change(
-                record, message, verification,
-                evaluate_authorization_dict(changed_authorization),
-            )
-            changed = True
+            try:
+                record = gate.confirm_change(
+                    record, message, verification,
+                    evaluate_authorization_dict(changed_authorization),
+                )
+                changed = True
+            except AuthorizationGateError as exc:
+                # 受限用户越权：身份真实但确认试图扩权 → 记录证据，父授权不变。
+                rejected_changes.append({
+                    "message_id": message.message_id,
+                    "reason": str(exc),
+                    "grants_authority": False,
+                    "attempted_authorization": str(changed_authorization),
+                })
     return UserChannelPlan(
-        subject=subject, messages=tuple(messages), record=record, changed=changed
+        subject=subject, messages=tuple(messages), record=record, changed=changed,
+        rejected_changes=tuple(rejected_changes),
     )

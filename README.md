@@ -107,5 +107,16 @@ CI 覆盖 Ubuntu/Windows 的支付 Python、RSI 和三个隔离靶标，以及 U
 
 本日变更：RESEARCH_PLAN §6 缺口 2/6/7/8 修复（修复者完整证据、prompt_only 范围、晋级复测零缓存、稳定 seed）；论文与商业计划书合入 main；[证据与奖励协议](docs/EVIDENCE_REWARD_PROTOCOL.md)冻结 v1；Arena 侧 claim request 登记（`claim-requests.jsonl`）与合约桥接脚本（`contracts/scripts/rtm-reward-bridge.js`）落地。本机未执行在线模型、发布或部署；claim 配置字段不进入运行时指纹，历史 campaign 状态不受影响。
 
+2026-10-02 第二批（阶段 4/5），在接口原型与评测口径合入后验证：
+
+| 范围 | 结果 |
+|---|---|
+| 全项目 Python 回归（根目录 `pytest`） | **355 passed，200 subtests passed，8 skipped**（27 分 34 秒，Windows） |
+| Solidity / EVM 测试（`contracts/`） | **90 passing**（新增 `BountyRound.sol` commit–reveal 6 项） |
+| 单轮、多轮支付 demo 与 RTM 桥接 demo | 均通过（configure→settle→到账 1500000，重复配置被 `ClaimAlreadyConfigured` 拒绝） |
+| 公开攻击接口原型 | 会话/配额/TTL/鉴权/红线 8 项测试（`arena/interface/`）；攻击者视图无账本与轨迹 |
+
+本批变更：公开攻击接口最小原型（`arena/interface/` 会话服务 + `BountyRound.sol`）；任务类型效用语义（L0 拒付/查询/等待任务不再误判 utility）；`daily_max_total_minor` 日预算窗口 + `daily_budget_exceeded` 隔离验证 + 并发原子扣减；受限用户越权轨道（确认变更不得超出父授权包络，越权转为证据）；PayChain 在线修复接线（Dockerfile + 候选结构检查，deterministic-only）。RESEARCH_PLAN §6 缺口 1/3/4/5 对应部分落地，残留项见 §8.1。
+
 
 本地验证不代表真实模型实验、远端 CI 或链上—Arena 集成已经完成。本机 Hardhat 对 Node 25 有版本警告，CI 使用 Node 22；Python 环境有一项 Starlette/httpx 弃用警告。本次不执行在线模型、发布或部署。

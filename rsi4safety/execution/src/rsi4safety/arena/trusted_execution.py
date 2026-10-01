@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import time
 from typing import Any
 
@@ -90,6 +91,7 @@ request. This is a research simulator, not a real-money payment connector.
         guarded: bool = False,
         auth_record: AuthorizationRecord | None = None,
         prior_payments: list[dict] | None = None,
+        now_fn: Any = None,
     ) -> None:
         if guarded and authorization is None and auth_record is None:
             raise ValueError("a guarded payment executor requires trusted authorization")
@@ -99,7 +101,12 @@ request. This is a research simulator, not a real-money payment connector.
         self.authorization = auth_record.authorization if auth_record is not None else authorization
         self.auth_record = auth_record
         self.guarded = guarded
-        self._connection = sqlite3.connect(":memory:")
+        self._now = now_fn if now_fn is not None else time.time
+        # Cross-thread atomic deduction: each plan batch commits atomically and
+        # budget state is re-read under the lock (RESEARCH_PLAN §6-4). The
+        # connection is shared across threads but every access holds the lock.
+        self._lock = threading.Lock()
+        self._connection = sqlite3.connect(":memory:", check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.executescript(_SCHEMA)
         self._submitted: set[str] = set()
@@ -110,6 +117,17 @@ request. This is a research simulator, not a real-money payment connector.
         # 注入并直接计入账本与已耗预算；SUT 的输出永远改不了它们。
         for row in prior_payments or []:
             self._load_prior_payment(row)
+
+    def _spent_today_minor(self) -> int:
+        """Executed spend on the current local calendar day (daily window)."""
+        now = self._now()
+        row = self._connection.execute(
+            "SELECT COALESCE(SUM(amount_minor), 0) FROM payments "
+            "WHERE status = 'executed' AND amount_minor > 0 "
+            "AND date(created_at, 'unixepoch', 'localtime') = date(?, 'unixepoch', 'localtime')",
+            (now,),
+        ).fetchone()
+        return int(row[0])
 
     def _load_prior_payment(self, row: dict) -> None:
         status = row.get("status", "executed")
@@ -122,7 +140,7 @@ request. This is a research simulator, not a real-money payment connector.
             (str(row.get("request_id") or "prior"), str(row.get("order_id") or ""),
              str(row.get("recipient") or ""), amount, str(row.get("currency") or "CNY"),
              str(row.get("purpose") or "purchase"), status,
-             "trusted prior state", row.get("created_at") or time.time()),
+             "trusted prior state", row.get("created_at") or self._now()),
         )
         if status == "executed":
             self._submitted.add(str(row.get("request_id") or "prior"))
@@ -131,6 +149,10 @@ request. This is a research simulator, not a real-money payment connector.
 
     def accept_run_response(self, response: Any) -> list[dict]:
         plan = validate_payment_plan(response)
+        with self._lock:
+            return self._accept_run_response_locked(response, plan)
+
+    def _accept_run_response_locked(self, response: Any, plan: list[dict]) -> list[dict]:
         first_seq = self._connection.execute("SELECT COALESCE(MAX(seq), 0) FROM payments").fetchone()[0]
         with self._connection:
             for item in plan:
@@ -145,6 +167,7 @@ request. This is a research simulator, not a real-money payment connector.
                     violations = self.authorization.violations(
                         PaymentRequest(**request, source="unknown", user_confirmed=False),
                         self._spent_minor, self._payment_count,
+                        prior_spent_today_minor=self._spent_today_minor(),
                     ) if self.guarded else []
                     # 图 1b：执行门先核对授权记录本身仍然有效（未撤销/未过期）。
                     if (
@@ -170,7 +193,7 @@ request. This is a research simulator, not a real-money payment connector.
                     "status,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
                     (request["request_id"], request["order_id"], request["recipient"],
                      request["amount_minor"], request["currency"], request["purpose"],
-                     status, reason, time.time()),
+                     status, reason, self._now()),
                 )
         self.run_count += 1
         return [dict(row) for row in self._connection.execute("SELECT * FROM payments WHERE seq > ? ORDER BY seq", (first_seq,))]

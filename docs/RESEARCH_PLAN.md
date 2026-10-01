@@ -125,15 +125,15 @@ Arena 使用 `arena.payment-plan.v1` 和宿主模拟账本。后续桥接至少�
 
 以下为源码检查结论；不把历史计划中的声明当作已实现能力，也不以本次整理替代功能修复。
 
-1. **用户攻击入口未闭合。** [sut_driver.py](../rsi4safety/execution/src/rsi4safety/arena/sut_driver.py) 只允许攻击者操作外部面、有限查询和运行接口，禁止 `/user/confirm`。A01-B07 验证合法用户变更，不能替代 PDF p3 要求的“有身份但权限受限的对话者试图越权”。应建立独立用户攻击轨道，保留身份与权限边界，不能简单开放可信确认接口给外部攻击者。
+1. **用户攻击入口未闭合。**（2026-10-02 原型已落地） [sut_driver.py](../rsi4safety/execution/src/rsi4safety/arena/sut_driver.py) 只允许攻击者操作外部面、有限查询和运行接口，禁止 `/user/confirm`。A01-B07 验证合法用户变更，不能替代 PDF p3 要求的“有身份但权限受限的对话者试图越权”。应建立独立用户攻击轨道，保留身份与权限边界，不能简单开放可信确认接口给外部攻击者。**落地：**`confirm_change` 现在强制"确认变更不得超出父授权包络"（额度/单笔/次数/付款资格/确认门槛，收紧允许、扩权拒绝），越权确认在 fixture 编译时转为 `rejected_changes` 证据且父授权保持不变；三轨（合法变更/受限越权/外部伪装）在 `test_authorization.py::RestrictedUserOverreachTests` 验证。sut_driver 的外部动作 allowlist 维持不变。
 
 2. **完整证据未交给修复者。**（2026-10-02 已修复） [defender_package()](../rsi4safety/execution/src/rsi4safety/arena/feedback_policy.py) 只有攻击动作、任务夹具、摘要和诊断；[docker_host.py](../rsi4safety/execution/src/rsi4safety/arena/docker_host.py) 仅向 judge 挂载 `/evidence`。平台保存了 HTTP 轨迹和宿主账本，但防御者目前无法通过该交付包直接复核。诊断还包含按违规码推断原因的启发式结果，应与观测事实分开。**修复：**`_write_findings` 现为每个发现附 `execution_evidence`（成对 HTTP 轨迹、宿主账本行、bundle 引用与 manifest 摘要，事实与诊断分离），defender 容器只读挂载 `/evidence`；回归测试见 `test_p0_engineering_fixes.py::DefenderEvidenceTests`。
 
-3. **L0 与多笔任务的效用语义不足。** [constitution.evaluate()](../rsi4safety/execution/src/rsi4safety/arena/constitution.py) 将 `matching_executed == 1` 当作效用成功，因此正确的零付款只读任务仍得到 `utility_success=False`，多笔合法任务也无法自然表达。benchmark 又可凭 `executions: 0` 判定 L0 二元通过。需要按任务类型定义效用，并以可信汇总/查询/审批事件证明业务完成；没有付款仅能证明部分安全性质。
+3. **L0 与多笔任务的效用语义不足。**（2026-10-02 已落地） [constitution.evaluate()](../rsi4safety/execution/src/rsi4safety/arena/constitution.py) 将 `matching_executed == 1` 当作效用成功，因此正确的零付款只读任务仍得到 `utility_success=False`，多笔合法任务也无法自然表达。benchmark 又可凭 `executions: 0` 判定 L0 二元通过。需要按任务类型定义效用，并以可信汇总/查询/审批事件证明业务完成；没有付款仅能证明部分安全性质。**落地：**`evaluate()` 接受 `expected_kind`（execute=恰一笔合法付款；refuse_and_escalate/wait_approval=零付款即效用；query_state=不超出可信先验状态，`prior_executed` 由宿主声明），benchmark_runner 按种子任务类型传入；violation 核算对全部任务类型一致。
 
-4. **每日预算与审批仍是简化模型。** [Authorization](../rsi4safety/execution/src/rsi4safety/domain.py) 和 [TrustedPaymentExecutor](../rsi4safety/execution/src/rsi4safety/arena/trusted_execution.py) 有单笔上限、累计上限和可注入先前付款，但没有日期窗口、跨会话共享额度或并发原子扣减。L2 三个种子仍继承 `max_executions=1`；累计超额攻击同时违反收款方、用途或单笔上限，尚未隔离验证“多笔合法付款仅因日累计超限被拒”。PayChain 的审批由任务/外部文本规则模拟，缺少独立可信审批事件。
+4. **每日预算与审批仍是简化模型。**（2026-10-02 日窗口已落地；审批事件仍简化） [Authorization](../rsi4safety/execution/src/rsi4safety/domain.py) 和 [TrustedPaymentExecutor](../rsi4safety/execution/src/rsi4safety/arena/trusted_execution.py) 有单笔上限、累计上限和可注入先前付款，但没有日期窗口、跨会话共享额度或并发原子扣减。L2 三个种子仍继承 `max_executions=1`；累计超额攻击同时违反收款方、用途或单笔上限，尚未隔离验证“多笔合法付款仅因日累计超限被拒”。PayChain 的审批由任务/外部文本规则模拟，缺少独立可信审批事件。**落地：**`daily_max_total_minor` 日历窗口（与累计上限分别核算，宿主按自然日累计、跨日重置、时钟可注入）、新增 `daily_budget_exceeded` 违规码实现隔离验证（`test_evaluation_caliber.py`），L2 三种子解除 `max_executions=1` 并声明日上限，批量提交在平台锁下原子扣减（并发测试覆盖）。**仍未落地：**跨会话共享余额、PayChain 独立可信审批事件。
 
-5. **PayChain 在线修复未接通。** [候选结构检查](../rsi4safety/execution/src/rsi4safety/arena/orchestrator.py) 仅特殊处理 PayAssist，其他目标要求 `app/policy.py`；PayChain 只有 `roles.py`，且无 Dockerfile。当前适合离线基准研究，不能宣称完整在线攻击—修复 campaign 已支持。
+5. **PayChain 在线修复未接通。**（2026-10-02 已接通，deterministic-only） [候选结构检查](../rsi4safety/execution/src/rsi4safety/arena/orchestrator.py) 仅特殊处理 PayAssist，其他目标要求 `app/policy.py`；PayChain 只有 `roles.py`，且无 Dockerfile。当前适合离线基准研究，不能宣称完整在线攻击—修复 campaign 已支持。**落地：**PayChain 补 Dockerfile（镜像 payassist 模板，纯内存状态），`_check_sut_tree` 增加 paychain 分支（要求 `app/roles.py`），llm 模式 + paychain 显式拒绝（无规划模型接线前不会静默忽略）。PayChain 在线 campaign 走确定性三角色链。
 
 6. **`prompt_only` 的限制可能失效。**（2026-10-02 已修复） [\_check_prompt_only_scope()](../rsi4safety/execution/src/rsi4safety/arena/orchestrator.py) 从候选目录猜测父版本位置。对通常的 `patches/<id>/src` 路径会寻找 `patches/sut`，而实际活动源码是状态目录下的 `sut`；父目录不存在时直接允许。它还只检查候选中存在的 `.py` 文件，未完整覆盖删除及其他类型文件。因此 prompt-only/full-agent 的对照结果目前不能仅依赖这个检查保证权限一致。**修复：**检查改为显式传入活动父树 `config.sut_dir`，并对候选/父两侧做全文件树双向对比（新增、修改、删除均拦截）；测试覆盖越权修改、删除与非代码文件新增，以及 prompts-only 放行。
 
@@ -141,7 +141,7 @@ Arena 使用 `arena.payment-plan.v1` 和宿主模拟账本。后续桥接至少�
 
 8. **固定 seed 尚不足以跨进程复现。**（2026-10-02 已修复） [task_variant()](../rsi4safety/execution/src/rsi4safety/benchmark.py) 用 Python 内置 `hash()` 派生随机种子；它受进程哈希随机化影响。同一配置 seed 在不同进程中不保证生成相同夹具。应使用稳定摘要，并记录夹具清单与摘要；缓存和运行指纹不能替代可重建的数据集。**修复：**种子改由 `domain.stable_hash`（sha256 规范化 JSON）派生；测试在两个独立进程（随机 PYTHONHASHSEED）验证夹具完全一致（`test_benchmark_reproducibility.py`）。
 
-这些问题优先于将大文件拆小。`orchestrator.py` 同时负责会话、执行、证据、裁决、补丁、缓存和恢复，确实需要拆分，但应先固定接口及判据，再做职责拆分。缺口 2/6/7/8 已于 2026-10-02 修复并有回归测试；缺口 1/3/4/5 对应阶段 5 评测口径统一，缺口归属见 §8.1 验收记录。
+这些问题优先于将大文件拆小。`orchestrator.py` 同时负责会话、执行、证据、裁决、补丁、缓存和恢复，确实需要拆分，但应先固定接口及判据，再做职责拆分。缺口 1–8 中，2/6/7/8 已于 2026-10-02 第一批修复，1/3/4/5 已于同日第二批落地（4 的跨会话共享余额与审批可信事件除外）；缺口归属与残留见 §8.1 验收记录。
 
 ## 7. RSI 证据能支持到哪里
 
@@ -186,6 +186,8 @@ P0 固定可信边界与测量口径；链上桥接、外部提交与支付任�
 - **§6 缺口 2/6/7/8 已修复**（修复者完整输入、prompt_only 范围检查、晋级复测零缓存、跨进程可复现 seed），回归测试在 `rsi4safety/execution/tests/arena/test_p0_engineering_fixes.py` 与 `rsi4safety/execution/tests/test_benchmark_reproducibility.py`。
 - **跨模块证据与奖励协议冻结为 v1**：[EVIDENCE_REWARD_PROTOCOL.md](EVIDENCE_REWARD_PROTOCOL.md)。绑定五元组、去重键（`attack_digest`）、`claim_id` 推导规则两侧锚定：Python `claim_protocol.py` ↔ JS `contracts/scripts/claim-id.js`，测试 `test_claim_protocol.py` 与 `contracts/test/claim-id.test.js` 断言同一常量。两条结算流程（XEXP 演示 / RTM 铸造）分开报告，未接线处见协议 §5。
 - **P1「本地 RTM 判奖桥接」核心已落地（本地链）**：Arena 侧去重通过后写 claim request（`orchestrator._append_claim_request`，注册表 `claim-requests.jsonl`，同一内容只登记一次，测试 `test_claim_binding.py`）；合约侧 `contracts/scripts/rtm-reward-bridge.js` 消费注册表并驱动 `configureClaim/settleClaim`，6 项桥接测试覆盖重复领奖拒绝、配置/结算重试、单笔上限、年预算不足、暂停、evaluator 轮换、跨年续期与取消。**公开 commit–reveal 提交与外部身份绑定仍未接线**（协议 §5、P1「公开攻击接口最小原型」行未完成）。
+- **P1「公开攻击接口最小原型」核心已落地（2026-10-02 第二批）**：HTTP 会话服务 `rsi4safety/execution/src/rsi4safety/arena/interface/`（会话固定任务+动作配额+TTL+每 token 会话上限；攻击者视图经 `assert_feedback_bounded` 复核；无裁决/奖励/授权写路由；提交可重放记录存平台侧），8 项测试 `test_interface.py`。commit–reveal 最小版 `contracts/src/BountyRound.sol`：先承诺 materialHash 后揭示、同材料先到先得、关线后 verifier 才能裁决、pull 模式仅承诺人可领、池上限约束，6 项测试 `bounty-round.test.js`。**仍未接线**：会话提交 → 复现验证 → BountyRound/BountyVault 判奖的端到端链路、外部攻击者身份/钱包证明、A2A 公开部署。
 - P0「修复范围检查、候选门禁与复现性」行中的 PayChain 在线候选接线，与 P1「统一任务效用」「补齐双入口与状态模型」两行**未动**，为阶段 5 工作。
+- **2026-10-02 第二批（阶段 4/5）**：P1「公开攻击接口最小原型」核心落地（HTTP 会话服务 + `BountyRound.sol` commit–reveal，测试 `test_interface.py` 8 项、`bounty-round.test.js` 6 项；端到端接线仍未完成）；P1「统一任务效用」落地（`expected_kind` 效用语义，L0/查询/等待任务不再误判）；P1「补齐双入口与状态模型」部分落地（日预算窗口+隔离验证+并发原子扣减+受限用户越权轨道；跨会话共享余额与 PayChain 审批可信事件未做）；PayChain 在线候选接线完成（Dockerfile+结构检查，deterministic-only）。A02 退款与 B01/C01/D02/E04 非支付域适配器仍不在列（unsupported 21/43 如实标注）。
 
 当前维护原则是先保证授权、证据、判奖、评分和实验口径可信，再扩展场景与激励机制。总研究方案、合约、RSI 和独立实验均是活动内容；只有具有明确替代版本的资料才进入归档。原稿中的数量、路径与历史结论以当前两份维护文档及对应实测报告校正。
