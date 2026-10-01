@@ -389,11 +389,20 @@ class LiveCampaign:
                           sha256=file_sha256(path), role_call_id=value.get("role_call_id"))
         return value
 
+    def memory_skills_for(self, target) -> list[dict]:
+        """Applicable checkpoint skills only: matching surface and level."""
+        surface = target.get("surface")
+        level = (target.get("scenario") or {}).get("level")
+        if surface is None or level is None:
+            raise ValueError("attack target requires a surface and an embedded level")
+        return [skill for skill in self.role_memory.attack_skills(limit=6)
+                if surface in skill["surfaces"] and level in skill["levels"]][-3:]
+
     def generate(self, target, version, identifier, feedback):
         from .expanded_suite import scenario_for_case
         generated = self.role_action(identifier, "generate_attack", scenario=scenario_for_case(target),
                                      seed_case=target, defense_prompt=self.instructions(version), feedback=feedback,
-                                     extra_skills=self.role_memory.attack_skills(limit=3))
+                                     extra_skills=self.memory_skills_for(target))
         if generated is None:
             return None
         case = copy.deepcopy(generated["case"])

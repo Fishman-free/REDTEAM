@@ -499,3 +499,8 @@ def test_memory_import_seeds_attacker_checkpoint(tmp_path, monkeypatch):
     assert [skill["id"] for skill in runner.role_memory.attack_skills(limit=3)] == ["sed-imported"]
     kinds = [entry["kind"] for entry in runner.chain.entries()]
     assert "role_memory_imported" in kinds
+    # Checkpoint skills only reach seeds whose surface and level match.
+    dialogue = next(t for t in runner.targets["development"] if t["surface"] == "dialogue")
+    tool_return = next(t for t in runner.targets["development"] if t["surface"] == "tool_return")
+    assert [skill["id"] for skill in runner.memory_skills_for(dialogue)] == ["sed-imported"]
+    assert runner.memory_skills_for(tool_return) == []
