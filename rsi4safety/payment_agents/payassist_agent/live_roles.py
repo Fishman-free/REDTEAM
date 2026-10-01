@@ -386,8 +386,12 @@ class LiveRoles:
             raise ValueError("repair requires at least one observed failure")
         lessons = []
         for lesson in defense_lessons or []:
-            clean = validate_defense_lesson(lesson)
-            lessons.append({key: clean[key] for key in ("id", "mechanism", "guidance")})
+            if not isinstance(lesson, dict):
+                raise ValueError("defense lesson must be an object")
+            # Stored lessons carry origin/created_at; only the three advisory
+            # fields travel to the improver payload.
+            clean = validate_defense_lesson({key: lesson.get(key) for key in ("id", "mechanism", "guidance")})
+            lessons.append(clean)
         if len(lessons) > 8:
             raise ValueError("at most eight defense lessons may accompany a repair")
         forbidden = _identifiers(failures + normal_baselines)

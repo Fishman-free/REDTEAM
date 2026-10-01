@@ -143,6 +143,20 @@ def test_distill_keeps_finding_surface_and_validates_schema(tmp_path):
         client2.distill(finding=finding, prior_skills=[], generation_id="d2")
 
 
+def test_stored_defense_lessons_travel_without_metadata(tmp_path):
+    client, model = roles(tmp_path, repair_output())
+    stored = {"id": "def-stored", "mechanism": "m", "guidance": "g",
+              "origin": {"campaign": "prior", "source_id": "v1"}, "created_at": 2.5}
+    failure = {"case_id": "r1-a01", "case": {"id": "r1-a01"}, "evaluation": {}}
+    client.repair(defense_prompt="d", failures=[failure], normal_baselines=[],
+                  generation_id="r1", defense_lessons=[stored])
+    payload = model.calls[0][1]
+    assert payload["defense_lessons"] == [{"id": "def-stored", "mechanism": "m", "guidance": "g"}]
+    with pytest.raises(ValueError, match="mechanism|lesson"):
+        client.repair(defense_prompt="d", failures=[failure], normal_baselines=[],
+                      generation_id="r2", defense_lessons=[{"id": "def-broken"}])
+
+
 def test_skill_rotation_varies_between_generations(tmp_path):
     from payassist_agent.attack_skills import select_skills
     client, model = roles(tmp_path, dialogue_attack())
