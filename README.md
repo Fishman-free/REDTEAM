@@ -95,5 +95,17 @@ CI 覆盖 Ubuntu/Windows 的支付 Python、RSI 和三个隔离靶标，以及 U
 
 目录整理保留本地模块划分；随后合入远端 `6394fc2`，增加合约续期、累计结算上限、所有权保护、付款 ID 隔离及部署参数校验。合并后重跑了 74 项合约测试、38 项支付 Python 测试和两种支付演示；上表 RSI/靶标结果来自此前同日验证，该部分代码在本次合并中未变。旧 campaign 的运行时指纹会随源码布局变化；保留的历史状态不能默认跨布局恢复。
 
+2026-10-02，在 P0 修复、协议冻结与 RTM 桥接合入后验证：
+
+| 范围 | 结果 |
+|---|---|
+| 全项目 Python 回归（根目录 `pytest`） | **333 passed，197 subtests passed，8 skipped**（25 分 32 秒，Windows） |
+| Solidity / EVM 测试（`contracts/`） | **84 passing**（新增 6 项 RTM 桥接 + 4 项 claim-id 跨侧锚定） |
+| 单轮、多轮支付 demo | 均通过（`assertion_checks: passed`） |
+| RTM 悬赏桥接 demo（`npm run rtm:demo`） | configure→settle→RTM 到账 1500000，重复配置被 `ClaimAlreadyConfigured` 拒绝 |
+| 跨进程夹具复现 | 两个随机 `PYTHONHASHSEED` 进程生成完全相同夹具 |
+
+本日变更：RESEARCH_PLAN §6 缺口 2/6/7/8 修复（修复者完整证据、prompt_only 范围、晋级复测零缓存、稳定 seed）；论文与商业计划书合入 main；[证据与奖励协议](docs/EVIDENCE_REWARD_PROTOCOL.md)冻结 v1；Arena 侧 claim request 登记（`claim-requests.jsonl`）与合约桥接脚本（`contracts/scripts/rtm-reward-bridge.js`）落地。本机未执行在线模型、发布或部署；claim 配置字段不进入运行时指纹，历史 campaign 状态不受影响。
+
 
 本地验证不代表真实模型实验、远端 CI 或链上—Arena 集成已经完成。本机 Hardhat 对 Node 25 有版本警告，CI 使用 Node 22；Python 环境有一项 Starlette/httpx 弃用警告。本次不执行在线模型、发布或部署。

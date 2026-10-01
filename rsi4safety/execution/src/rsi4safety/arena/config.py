@@ -89,6 +89,13 @@ class ArenaConfig:
     repo_root: Path = field(default_factory=project_root)
     sut_override_dir: Path | None = None  # evaluation runs against a candidate tree
     attacker_hints: tuple[str, ...] = DEFAULT_ATTACKER_HINTS
+    # RTM claim binding (docs/EVIDENCE_REWARD_PROTOCOL.md): when a beneficiary
+    # and a positive amount are configured, every deduped validated finding
+    # emits a content-bound claim request for the on-chain bridge. Empty/zero
+    # keeps the registry empty; neither field enters public_dict/runtime
+    # fingerprints because it changes settlement, not execution semantics.
+    claim_beneficiary: str = ""
+    claim_amount: str = "0"
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", self.campaign_id):
@@ -115,6 +122,10 @@ class ArenaConfig:
         for role in ROLES:
             if not getattr(self, f"{role}_model"):
                 raise ValueError(f"{role}_model must be a non-empty model name")
+        if self.claim_beneficiary and not re.fullmatch(r"0x[0-9a-f]{40}", self.claim_beneficiary):
+            raise ValueError("claim_beneficiary must be a lowercase 0x address")
+        if self.claim_amount and (not self.claim_amount.isdigit() or int(self.claim_amount) < 0):
+            raise ValueError("claim_amount must be a non-negative decimal string")
 
     @property
     def exchange_dir(self) -> Path:

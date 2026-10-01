@@ -10,9 +10,12 @@
 | 区块链设计 | [RTM 悬赏代币与金库设计](references/research/RTM_BOUNTY_DESIGN.md) | RTMToken/BountyVault 当前预算预留、累计上限与认领/续期生命周期；与 Arena 的连接仍待实现 |
 | 外部参与接口 | [攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md) | 会话配额、承诺、验证和领奖的设计草案；拟议 round/commit–reveal/pull 接口不是当前合约 API |
 | 跨模块研究协议 | [实验协议](references/research/EXPERIMENT_PROTOCOL.md) | SQLite、EVM、RSI/Arena 的证据、指标分母与奖励边界；后端结果分别解释 |
+| 跨模块协议（冻结） | [跨模块证据与奖励协议 v1](EVIDENCE_REWARD_PROTOCOL.md) | Arena 验证发现 ↔ 链上 claim 的绑定五元组、`attack_digest` 去重与两侧一致的 `claim_id` 推导；未接线处见 §5 |
 | 跨模块路线 | [开发路线（2026-09-23）](references/research/DEVELOPMENT_ROADMAP.md) | 可信裁决、领域适配、证据与本地奖励对接；阶段性暂缓不等于废弃 |
 | 日期化证据 | [整合记录](references/research/INTEGRATION.md)、[2026-09-18 安全审查](references/research/SECURITY_REVIEW_2026-09-18.md)、[2026-09-23 全项目验收](references/research/VALIDATION_2026-09-23.md) | 双轨整合、合约/支付/RSI 回归与当时风险；旧结果不能替代当前验证 |
 | 合约审计记录 | [2026-09-27 合约审计](references/research/SECURITY_AUDIT_2026-09-27.md) | 远端 `6394fc2` 的审计与修复来源；原环境、结论和统计按原文保留，本次合并验证见项目 README |
+| 研究论文 | [面向支付智能体的对抗评测与经验驱动修复](paper/payment-agent-security-rsi.md)（[PDF](paper/payment-agent-security-rsi.pdf)） | 2026-09-27 论文稿：三环架构、L0-L3 基准与确定性泛化证据；明确不含真实模型结果 |
+| 商业计划 | [企业授权安全评估商业计划书](business/redteam-business-plan.md)（[PDF](business/redteam-business-plan.pdf)） | 企业侧落地路线（本地评测 → 封闭邀请赛 → 链上激励仅保留为隔离研究组件）；收入数字均为未验证假设；PDF 由根 `scripts/build_documents.py` 生成 |
 | RSI 子项目 | [RSI 参考索引](../rsi4safety/docs/INDEX.md)、[支付系统 PDF](../rsi4safety/docs/references/智能体支付系统和方案的设计.pdf) | 支付场景、Arena、策略进化、修复者对照、预注册、专项实验及原始提纲 |
 
 资料按职责分目录；总研究范围仍包括区块链经济约束、支付执行、外部反例、独立验证和持续改进。
