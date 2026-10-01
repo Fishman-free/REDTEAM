@@ -118,5 +118,15 @@ CI 覆盖 Ubuntu/Windows 的支付 Python、RSI 和三个隔离靶标，以及 U
 
 本批变更：公开攻击接口最小原型（`arena/interface/` 会话服务 + `BountyRound.sol`）；任务类型效用语义（L0 拒付/查询/等待任务不再误判 utility）；`daily_max_total_minor` 日预算窗口 + `daily_budget_exceeded` 隔离验证 + 并发原子扣减；受限用户越权轨道（确认变更不得超出父授权包络，越权转为证据）；PayChain 在线修复接线（Dockerfile + 候选结构检查，deterministic-only）。RESEARCH_PLAN §6 缺口 1/3/4/5 对应部分落地，残留项见 §8.1。
 
+2026-10-02 第三批（阶段 6），编排器拆分后验证：
+
+| 范围 | 结果 |
+|---|---|
+| 全项目 Python 回归（根目录 `pytest`） | **355 passed，200 subtests passed，8 skipped**（28 分 09 秒，Windows） |
+| Solidity / EVM 测试（`contracts/`） | 90 passing（本批无合约变更） |
+| 2 轮 dry-run campaign + 审计链 | `stage6-split-check` 完成，122 条链校验通过，报告结构不变 |
+
+本批变更：`orchestrator.py`（1324 行）按职责拆为 `fixtures.py` / `execution_cache.py` / `adjudication.py` / `promotion.py`，编排器壳保留生命周期、会话与报告（466 行）。全部 65 个函数/方法经规范化字节码逐一比对确认与拆分前一致；外部导入面（`ArenaOrchestrator`/`Fixture`/`_fixture`）通过再导出保持不变。纯重构，无行为变更。
+
 
 本地验证不代表真实模型实验、远端 CI 或链上—Arena 集成已经完成。本机 Hardhat 对 Node 25 有版本警告，CI 使用 Node 22；Python 环境有一项 Starlette/httpx 弃用警告。本次不执行在线模型、发布或部署。

@@ -141,7 +141,7 @@ Arena 使用 `arena.payment-plan.v1` 和宿主模拟账本。后续桥接至少�
 
 8. **固定 seed 尚不足以跨进程复现。**（2026-10-02 已修复） [task_variant()](../rsi4safety/execution/src/rsi4safety/benchmark.py) 用 Python 内置 `hash()` 派生随机种子；它受进程哈希随机化影响。同一配置 seed 在不同进程中不保证生成相同夹具。应使用稳定摘要，并记录夹具清单与摘要；缓存和运行指纹不能替代可重建的数据集。**修复：**种子改由 `domain.stable_hash`（sha256 规范化 JSON）派生；测试在两个独立进程（随机 PYTHONHASHSEED）验证夹具完全一致（`test_benchmark_reproducibility.py`）。
 
-这些问题优先于将大文件拆小。`orchestrator.py` 同时负责会话、执行、证据、裁决、补丁、缓存和恢复，确实需要拆分，但应先固定接口及判据，再做职责拆分。缺口 1–8 中，2/6/7/8 已于 2026-10-02 第一批修复，1/3/4/5 已于同日第二批落地（4 的跨会话共享余额与审批可信事件除外）；缺口归属与残留见 §8.1 验收记录。
+这些问题优先于将大文件拆分。`orchestrator.py` 同时负责会话、执行、证据、裁决、补丁、缓存和恢复，确实需要拆分，但应先固定接口及判据，再做职责拆分。缺口 1–8 中，2/6/7/8 已于 2026-10-02 第一批修复，1/3/4/5 已于同日第二批落地（4 的跨会话共享余额与审批可信事件除外）；缺口归属与残留见 §8.1 验收记录。**拆分已于 2026-10-02 第三批执行**（接口与判据冻结后）：`orchestrator.py`（1324 行）按职责拆为 `fixtures.py`、`execution_cache.py`、`adjudication.py`、`promotion.py` 四个模块，编排器壳保留生命周期、会话与报告（466 行）；全部 65 个函数/方法经规范化字节码逐一比对确认与拆分前一致，外部导入面（`ArenaOrchestrator`/`Fixture`/`_fixture`）通过再导出保持不变。
 
 ## 7. RSI 证据能支持到哪里
 
@@ -189,5 +189,6 @@ P0 固定可信边界与测量口径；链上桥接、外部提交与支付任�
 - **P1「公开攻击接口最小原型」核心已落地（2026-10-02 第二批）**：HTTP 会话服务 `rsi4safety/execution/src/rsi4safety/arena/interface/`（会话固定任务+动作配额+TTL+每 token 会话上限；攻击者视图经 `assert_feedback_bounded` 复核；无裁决/奖励/授权写路由；提交可重放记录存平台侧），8 项测试 `test_interface.py`。commit–reveal 最小版 `contracts/src/BountyRound.sol`：先承诺 materialHash 后揭示、同材料先到先得、关线后 verifier 才能裁决、pull 模式仅承诺人可领、池上限约束，6 项测试 `bounty-round.test.js`。**仍未接线**：会话提交 → 复现验证 → BountyRound/BountyVault 判奖的端到端链路、外部攻击者身份/钱包证明、A2A 公开部署。
 - P0「修复范围检查、候选门禁与复现性」行中的 PayChain 在线候选接线，与 P1「统一任务效用」「补齐双入口与状态模型」两行**未动**，为阶段 5 工作。
 - **2026-10-02 第二批（阶段 4/5）**：P1「公开攻击接口最小原型」核心落地（HTTP 会话服务 + `BountyRound.sol` commit–reveal，测试 `test_interface.py` 8 项、`bounty-round.test.js` 6 项；端到端接线仍未完成）；P1「统一任务效用」落地（`expected_kind` 效用语义，L0/查询/等待任务不再误判）；P1「补齐双入口与状态模型」部分落地（日预算窗口+隔离验证+并发原子扣减+受限用户越权轨道；跨会话共享余额与 PayChain 审批可信事件未做）；PayChain 在线候选接线完成（Dockerfile+结构检查，deterministic-only）。A02 退款与 B01/C01/D02/E04 非支付域适配器仍不在列（unsupported 21/43 如实标注）。
+- **2026-10-02 第三批（阶段 6）**：P2「按已稳定接口拆分编排器」完成——orchestrator.py 1324 行拆为 fixtures/execution_cache/adjudication/promotion 四模块 + 466 行编排壳；65 个函数规范化字节码逐一比对一致；2 轮 dry-run campaign（`stage6-split-check`）完成且 122 条审计链校验通过，报告结构不变。P2 剩余两行（五臂战役、修复者对照）按预注册待预算门禁。
 
 当前维护原则是先保证授权、证据、判奖、评分和实验口径可信，再扩展场景与激励机制。总研究方案、合约、RSI 和独立实验均是活动内容；只有具有明确替代版本的资料才进入归档。原稿中的数量、路径与历史结论以当前两份维护文档及对应实测报告校正。
