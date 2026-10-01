@@ -224,6 +224,7 @@ class ClaudeCodeRuntime:
         max_turns = config.max_turns_for(role)
         command = [
             "claude", "-p", WAKEUP_PROMPT,
+            "--model", config.model_for(role),
             "--output-format", "stream-json", "--verbose",
             "--max-turns", str(max_turns),
             "--dangerously-skip-permissions",

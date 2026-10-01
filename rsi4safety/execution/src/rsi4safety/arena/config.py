@@ -4,14 +4,14 @@ from dataclasses import dataclass, field
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from ..paths import project_root
+from ..config import DEFAULT_PAYMENT_MODEL, DEFAULT_RESEARCH_MODEL, require_research_model
 
 DEFAULT_GLM_ANTHROPIC_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
 DEFAULT_GLM_OPENAI_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4"
-DEFAULT_MODEL = "glm-5.3-flash"
-HAIKU_FALLBACK_MODEL = "glm-5.3-flash"
-SONNET_FALLBACK_MODEL = "glm-5.3"
+DEFAULT_MODEL = DEFAULT_RESEARCH_MODEL
 
 ROLES = ("attacker", "defender", "judge")
 
@@ -80,6 +80,8 @@ class ArenaConfig:
     # request timeout and action count.
     sut_execution_timeout_seconds: int = 180
     sut_llm_mode: str = "deterministic"          # deterministic | llm
+    sut_model: str | None = None
+    sut_base_url: str | None = None  # host-side OpenAI-compatible /v1 endpoint
     sut_app: str = "paygate"                      # SUT application under payment_agents/: paygate | payassist | paychain
     defender_scope: str = "full_agent"            # full_agent | prompt_only (repair route)
     docker_memory: str = "4g"
@@ -110,11 +112,35 @@ class ArenaConfig:
             raise ValueError("sut_llm_mode must be deterministic or llm")
         if self.dry_run and self.sut_llm_mode == "llm":
             raise ValueError("dry-run must use the deterministic SUT decision mode")
+        if self.sut_base_url:
+            url = urlsplit(self.sut_base_url)
+            if (url.scheme not in {"http", "https"} or not url.hostname
+                    or url.username or url.password or url.query or url.fragment):
+                raise ValueError("sut_base_url must be an HTTP(S) URL without credentials/query/fragment")
+            object.__setattr__(self, "sut_base_url", self.sut_base_url.rstrip("/"))
+        if self.sut_llm_mode == "llm" and self.sut_app == "paychain":
+            raise ValueError("PayChain has no LLM planner adapter yet; use payassist or paygate")
+        if self.sut_model is not None and not self.sut_model.strip():
+            raise ValueError("sut_model must be nonempty")
         if self.judge_mode not in {"programmatic", "claude"}:
             raise ValueError("judge_mode must be programmatic or claude")
         for role in ROLES:
-            if not getattr(self, f"{role}_model"):
-                raise ValueError(f"{role}_model must be a non-empty model name")
+            require_research_model(getattr(self, f"{role}_model"), f"{role}_model")
+
+    @property
+    def planning_model(self) -> str:
+        return self.sut_model or DEFAULT_PAYMENT_MODEL
+
+    @property
+    def docker_sut_base_url(self) -> str | None:
+        """Docker Desktop reaches a host loopback SSH forward via this hostname."""
+        if not self.sut_base_url:
+            return None
+        url = urlsplit(self.sut_base_url)
+        if url.hostname in {"127.0.0.1", "localhost"}:
+            netloc = "host.docker.internal" + (f":{url.port}" if url.port else "")
+            return urlunsplit((url.scheme, netloc, url.path, "", ""))
+        return self.sut_base_url
 
     @property
     def exchange_dir(self) -> Path:
@@ -172,9 +198,11 @@ class ArenaConfig:
             "ANTHROPIC_BASE_URL": "http://llm-gateway:8080",
             "ANTHROPIC_AUTH_TOKEN": gateway_token or "",
             "ANTHROPIC_MODEL": self.model_for(role),
-            "ANTHROPIC_DEFAULT_HAIKU_MODEL": HAIKU_FALLBACK_MODEL,
-            "ANTHROPIC_DEFAULT_SONNET_MODEL": SONNET_FALLBACK_MODEL,
-            "ANTHROPIC_DEFAULT_OPUS_MODEL": SONNET_FALLBACK_MODEL,
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": DEFAULT_MODEL,
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": DEFAULT_MODEL,
+            "ANTHROPIC_DEFAULT_OPUS_MODEL": DEFAULT_MODEL,
+            "ANTHROPIC_SMALL_FAST_MODEL": DEFAULT_MODEL,
+            "CLAUDE_CODE_SUBAGENT_MODEL": DEFAULT_MODEL,
             "API_TIMEOUT_MS": "300000",
             "MAX_THINKING_TOKENS": "31999",
             "DISABLE_AUTOUPDATER": "1",
@@ -206,6 +234,7 @@ class ArenaConfig:
             "attacker_experiment_budget": self.attacker_experiment_budget,
             "attacker_hints": list(self.attacker_hints),
             "sut_llm_mode": self.sut_llm_mode,
+            "sut_model": self.planning_model, "sut_base_url": self.sut_base_url,
             "sut_app": self.sut_app,
             "defender_scope": self.defender_scope,
             "session_deadline_seconds": self.session_deadline_seconds,

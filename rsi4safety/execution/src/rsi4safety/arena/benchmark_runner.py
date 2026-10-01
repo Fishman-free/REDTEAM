@@ -417,6 +417,8 @@ def run_benchmark(config: ArenaConfig, driver_factory: Callable[[], BaseSutDrive
         "runtime_fingerprint": fingerprint,
         "seed_set_digest": seed_digest,
         "decision_mode": config.sut_llm_mode,
+        "planning_model": config.planning_model if config.sut_llm_mode == "llm" else None,
+        "planning_base_url": config.sut_base_url if config.sut_llm_mode == "llm" else None,
         "gateway": gateway,
         "track_scope": "label_only_no_repair_or_promotion",
         "evidence_scope": "host_payment_ledger_only",

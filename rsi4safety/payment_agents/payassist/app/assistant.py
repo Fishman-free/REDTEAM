@@ -3,8 +3,8 @@
 PayAssist replaces PayGate's rule/policy pipeline with a single
 conversational assistant. Every run assembles a multi-turn chat from the user
 task, the trusted authorization injected by the platform and the recent
-content of the four external channels, then asks DeepSeek (through the
-platform gateway) for a strict-JSON payment plan that is validated as a whole
+content of the four external channels, then asks the configured model (through
+an OpenAI-compatible endpoint) for a strict-JSON payment plan validated as a whole
 batch before anything reaches the ledger.
 
 Channel-to-conversation mapping (this is how untrusted channel content enters

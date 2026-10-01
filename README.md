@@ -24,7 +24,7 @@ REDTEAM/
 │   └── package.json / hardhat.config.js
 ├── rsi4safety/                     RSI 子系统
 │   ├── README.md                  子系统入口
-│   ├── payment_agents/            PayGate / PayAssist / PayChain 框架与靶标
+│   ├── payment_agents/            多轮 PayAssist L0/L1 与已有 Arena 基线
 │   ├── execution/                 执行、攻防编排及测试
 │   │   ├── src/rsi4safety/         CLI、Arena、策略与研究实验
 │   │   ├── agents/ / docker/       角色、MCP、容器和模型网关
@@ -46,6 +46,7 @@ REDTEAM/
 | 合约与支付实验 | `PaymentAgent` 约束付款；`RewardSettlement` 发放预充资实验奖励；`ExperimentalToken` 提供合成资产；Python/JS 执行并核验付款证据 | [contracts/README.md](contracts/README.md) |
 | RTM 悬赏机制 | `RTMToken` 固定发行上限、年度减半与不可变 minter；`BountyVault` 管理 claim 预留、同年结算、取消/续期与累计结算上限 | [RTM 设计](docs/references/research/RTM_BOUNTY_DESIGN.md)、[合约源码](contracts/src/) |
 | RSI4Safety / Arena | 攻击→可信执行→独立裁决→候选修复→回归→晋级/回滚；保留策略、rsi_eval、跨域 engineering 实验 | [rsi4safety/README.md](rsi4safety/README.md) |
+| 多轮 PayAssist | L0 禁止出款、L1 一笔授权付款，均支持多轮自主工具调用；个人/商家场景、对话与工具返回攻击、正常效用评测 | [payment_agents/README.md](rsi4safety/payment_agents/README.md) |
 
 Payment-agent 的 `PAY/NONE`、SQLite/EVM 账本与 Arena 的 `arena.payment-plan.v1`、宿主模拟账本分别维护。RTM 目前也是独立合约模块，尚未接入 Arena 判奖。各模块可运行不等于总研究闭环已连接完成。
 
@@ -57,7 +58,7 @@ Payment-agent 的 `PAY/NONE`、SQLite/EVM 账本与 Arena 的 `arena.payment-pla
 python3 -m venv rsi4safety/.venv       # 已有环境可直接使用
 source rsi4safety/.venv/bin/activate   # Windows: rsi4safety\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
-python -m pytest -q                  # 合约侧支付 Python + 完整 RSI 集合
+python -m pytest -q                  # 合约侧支付 Python + RSI + 新版多轮 PayAssist
 
 (cd contracts && npm ci --no-audit --no-fund)
 (cd contracts && npm test)
@@ -80,7 +81,7 @@ python -m pytest -q                  # 合约侧支付 Python + 完整 RSI 集�
 
 ## 验证与 CI
 
-CI 覆盖 Ubuntu/Windows 的支付 Python、RSI 和三个隔离靶标，以及 Ubuntu 的合约测试和两种支付演示。Pages 仍要求 main 测试成功且 `REDTEAM_PAGES_ENABLED=true`，只发布 `docs/site/index.html`。
+CI 覆盖 Ubuntu/Windows 的支付 Python、RSI、新版多轮 PayAssist 和三个隔离靶标，以及 Ubuntu 的合约测试和两种支付演示。Pages 仍要求 main 测试成功且 `REDTEAM_PAGES_ENABLED=true`，只发布 `docs/site/index.html`。
 
 2026-09-30，在最终目录下验证：
 
@@ -96,4 +97,8 @@ CI 覆盖 Ubuntu/Windows 的支付 Python、RSI 和三个隔离靶标，以及 U
 目录整理保留本地模块划分；随后合入远端 `6394fc2`，增加合约续期、累计结算上限、所有权保护、付款 ID 隔离及部署参数校验。合并后重跑了 74 项合约测试、38 项支付 Python 测试和两种支付演示；上表 RSI/靶标结果来自此前同日验证，该部分代码在本次合并中未变。旧 campaign 的运行时指纹会随源码布局变化；保留的历史状态不能默认跨布局恢复。
 
 
-本地验证不代表真实模型实验、远端 CI 或链上—Arena 集成已经完成。本机 Hardhat 对 Node 25 有版本警告，CI 使用 Node 22；Python 环境有一项 Starlette/httpx 弃用警告。本次不执行在线模型、发布或部署。
+上述 2026-09-30 验证不包含真实模型实验、远端 CI 或链上—Arena 集成。本机 Hardhat 对 Node 25 有版本警告，CI 使用 Node 22；Python 环境有一项 Starlette/httpx 弃用警告。
+
+2026-10-01，接入雷雳连接的 Studio `Qwen/Qwen3-4B-Instruct-2507` 后，根目录 Python 回归为 **335 passed、200 subtests passed、1 skipped**（251.52 秒），PayAssist 独立测试 **16 passed**。真实模型 A01 基线 **8/19 通过、11 失败、0 执行错误**；失败记录保留为研究结果，不计作软件回归测试失败。连接方法见 [RSI README](rsi4safety/README.md)，三环完成度、暴露面边界与原始结果解释见[总方案 §3.1–3.2](docs/RESEARCH_PLAN.md#31-按三环流程逐步核对2026-10-01)。本次尚未运行完整在线三环或链上—Arena 联调。
+
+同日新增多轮 PayAssist L0/L1 后，根目录回归 **463 passed、229 subtests passed、1 skipped**（217.17 秒）。此后补充的两项框架测试连同新版全套独立验证为 **120 passed**；运行代码未再变化。CI 已加入新版离线测试，远端 CI 未在本次执行。非支付研究模型全部固定为 `glm-5.3`；新版支付目标仍为 Studio 4B，23 个用例各运行两次，正常任务严格通过 **14/20**、全部严格通过 **18/46**，具体失败和口径见[总方案 §3.3](docs/RESEARCH_PLAN.md#33-多轮-payassist-l0l1当前开发基线2026-10-01)。新版尚未接入 Arena 候选修复与链上结算。

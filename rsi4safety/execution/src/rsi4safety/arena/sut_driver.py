@@ -248,7 +248,10 @@ silently adding another. Target HTTP/database execution claims are untrusted.
             for action in actions:
                 status, response = self.http.call(
                     action["method"], action["path"], action.get("json"),
-                    timeout_seconds=min(30, self._remaining_seconds(f"action {action.get('step')}")))
+                    timeout_seconds=min(
+                        self.config.sut_execution_timeout_seconds
+                        if action["path"] == run_path and self.config.sut_llm_mode == "llm" else 30,
+                        self._remaining_seconds(f"action {action.get('step')}")))
                 if not 200 <= status < 300:
                     raise ValueError(f"HTTP error at step {action.get('step')}: {status}")
                 if action["path"] == run_path:
@@ -382,10 +385,21 @@ Use DockerSutDriver for externally authored or adversarial candidate code.
             "PAYGATE_GATEWAY": self.gateway,
             "PAYGATE_LLM_MODE": self.config.sut_llm_mode,
             # PayAssist reads its own mode env; deterministic enables offline bench.
-            **({"PAYASSIST_MODE": "deterministic"} if self.config.sut_app == "payassist" else {}),
+            **({"PAYASSIST_MODE": self.config.sut_llm_mode} if self.config.sut_app == "payassist" else {}),
             "SUT_RUN_NONCE": self.run_nonce,
             "PYTHONDONTWRITEBYTECODE": "1",
         })
+        if self.config.sut_llm_mode == "llm":
+            from urllib.parse import urlsplit
+            base_url = self.config.sut_base_url
+            if (not base_url or urlsplit(base_url).scheme != "http"
+                    or urlsplit(base_url).hostname not in {"127.0.0.1", "localhost"}):
+                raise ValueError("local LLM runs require an HTTP loopback SUT_BASE_URL (for example an SSH tunnel)")
+            env.update({"PAYGATE_LLM_URL": base_url + "/chat/completions",
+                        "PAYASSIST_MODEL": self.config.planning_model,
+                        "PAYGATE_LLM_MODEL": self.config.planning_model})
+            if os.environ.get("SUT_API_KEY"):
+                env["PAYGATE_LLM_TOKEN"] = os.environ["SUT_API_KEY"]
         self._log_file = tempfile.TemporaryFile()
         self._process = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "app.main:app",

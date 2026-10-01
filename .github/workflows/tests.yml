@@ -41,6 +41,9 @@ jobs:
       - name: PayAssist suite (isolated app import)
         working-directory: rsi4safety/payment_agents/payassist
         run: python -m pytest tests -q
+      - name: Multi-turn PayAssist L0/L1 offline suite (scripted model; no network calls)
+        working-directory: rsi4safety/payment_agents
+        run: python -m pytest tests -q
       - name: PayChain suite (isolated app import)
         working-directory: rsi4safety/payment_agents/paychain
         run: python -m pytest tests -q

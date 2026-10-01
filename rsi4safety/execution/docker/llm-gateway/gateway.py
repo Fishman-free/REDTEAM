@@ -10,8 +10,9 @@ Invariants (exercised by execution/tests/arena/test_gateway.py):
   * Rate limiting: per-client-IP token bucket (GATEWAY_RATE_LIMIT_PER_MIN
     requests per minute, burst == limit). GET /health is neither limited
     nor counted.
-  * Model allowlist: GATEWAY_ALLOWED_MODELS (comma separated), tolerating
-    "[1m]"-style variant suffixes on the requested model name.
+  * Model allowlist: glm-5.3 plus the explicitly configured SUT_MODEL.
+    GATEWAY_ALLOWED_MODELS can narrow that set; "[1m]"-style variant
+    suffixes are accepted without switching to another model.
   * No request smuggling: HTTP/1.0 semantics (one request per connection,
     `Connection: close` on every response), Content-Length must be a plain
     digit string <= 8 MiB, duplicate Content-Length / Transfer-Encoding are
@@ -42,8 +43,8 @@ LISTEN_PORT = 8080
 
 DEFAULT_OPENAI_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4"
 DEFAULT_ANTHROPIC_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
-DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-DEFAULT_ALLOWED_MODELS = "glm-5.3,glm-5.3-flash,deepseek-chat,deepseek-reasoner"
+DEFAULT_RESEARCH_MODEL = "glm-5.3"
+DEFAULT_ALLOWED_MODELS = DEFAULT_RESEARCH_MODEL
 DEFAULT_RATE_LIMIT_PER_MIN = 60
 
 MAX_BODY_BYTES = 8 * 1024 * 1024  # hard cap on forwarded request bodies
@@ -56,12 +57,6 @@ ROUTES = {
     "/v1/chat/completions": ("GLM_OPENAI_BASE_URL", DEFAULT_OPENAI_BASE_URL, "/chat/completions"),
     "/v1/messages": ("GLM_ANTHROPIC_BASE_URL", DEFAULT_ANTHROPIC_BASE_URL, "/v1/messages"),
 }
-
-# Model-prefix -> provider override: upstream base/path and credential env.
-MODEL_ROUTES = (
-    ("deepseek-", "DEEPSEEK_BASE_URL", DEFAULT_DEEPSEEK_BASE_URL,
-     "/chat/completions", "DEEPSEEK_API_KEY"),
-)
 
 _DIGITS_ONLY_RE = re.compile(r"\A\d+\Z")
 _MODEL_SUFFIX_RE = re.compile(r"\[[^\[\]]*\]\Z")
@@ -129,7 +124,11 @@ def _allowed_models() -> set:
     raw = os.environ.get("GATEWAY_ALLOWED_MODELS")
     if raw is None or not raw.strip():
         raw = DEFAULT_ALLOWED_MODELS
-    return {name.strip() for name in raw.split(",") if name.strip()}
+    selected = {name.strip() for name in raw.split(",") if name.strip()}
+    permitted = {DEFAULT_RESEARCH_MODEL}
+    if os.environ.get("SUT_MODEL"):
+        permitted.add(os.environ["SUT_MODEL"])
+    return selected & permitted
 
 
 def _gateway_token() -> str:
@@ -323,12 +322,19 @@ class Handler(BaseHTTPRequestHandler):
     def _forward(self, path: str, route, body: bytes, model: str, remaining: int) -> None:
         env_name, default_base, suffix = route
         api_key_env = "GLM_API_KEY"
-        # Per-model provider routing (e.g. deepseek-* -> the DeepSeek API).
-        for prefix, model_env, model_default, model_suffix, key_env in MODEL_ROUTES:
-            if model.startswith(prefix):
-                env_name, default_base, suffix = model_env, model_default, model_suffix
-                api_key_env = key_env
-                break
+        # Route only this explicitly configured planning model to the local
+        # backend. Never send a cloud credential to that backend, or fall
+        # through to the cloud when its endpoint is missing.
+        if _base_model(model) != DEFAULT_RESEARCH_MODEL:
+            if (_base_model(model) != os.environ.get("SUT_MODEL")
+                    or not os.environ.get("SUT_OPENAI_BASE_URL")):
+                self._send(503, {"error": "sut_backend_not_configured"})
+                return
+            if path != "/v1/chat/completions":
+                self._send(400, {"error": "sut_model_requires_openai_chat"})
+                return
+            env_name, default_base, suffix = "SUT_OPENAI_BASE_URL", "", "/chat/completions"
+            api_key_env = "SUT_API_KEY"
         base_url = os.environ.get(env_name) or default_base
         upstream_url = base_url.rstrip("/") + suffix
         api_key = os.environ.get(api_key_env, "")

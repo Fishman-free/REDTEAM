@@ -12,5 +12,7 @@
 | 基准与文献 | [基准设计](references/research/BENCHMARK_SPEC.md)、[相关工作映射](references/research/SURVEY.md) | 任务规格与设计来源；规格数不同于可执行数，论文效果不同于本仓库实测 |
 | 实现与运行参考 | [基础架构](references/research/ARCHITECTURE.md)、[Arena 手册](references/research/ARENA.md)、[模型实验](references/research/GLM_EXPERIMENTS.md) | 策略级 RSI 与 Arena 的原始技术背景；运行命令以当前 README 为准 |
 | 协议与靶标 | [Arena 内部契约](references/research/ARENA_SPEC.md)、[进化机制契约](references/research/ARENA_EVOLUTION_SPEC.md)、[预置漏洞](references/research/arena/SEEDED_VULNS.md) | 协议、信任边界和靶标来源；两份契约各有范围 |
+| 本地模型基线 | [2026-10-01 Studio 4B A01 结果](references/research/STUDIO_4B_BASELINE_2026-10-01.json) | 旧版单次计划基线，19 条真实模型用例，8 过/11 失败；见总方案 §3.1–3.2 |
+| 多轮支付框架 | [PayAssist L0/L1 入口与调研](../payment_agents/README.md)、[46 次真实模型结果](../payment_agents/evidence/STUDIO_4B_MULTITURN_2026-10-01.json)、[独立复核](../payment_agents/evidence/STUDIO_4B_MULTITURN_2026-10-01_AUDIT.json) | 6 场景、23 用例，任务效用与安全分别衡量；当前评估见总方案 §3.3 |
 | 日期化实验 | [2026-09-16 GLM 攻防实验](references/research/EXPERIMENT_2026-09-16.md)、[2026-09-27 确定性实验](references/research/EXPERIMENT_2026-09-27.md)、[对应 RSI 原始结果](references/research/RSI_EVAL_RESULTS_2026-09-27.json) | 已知反例修复与确定性观测；不背书已发现统计问题的泛化结论 |
 | 日期化验收 | [2026-09-27 研究计划对齐验收](references/research/VALIDATION_2026-09-27.md) | 双入口、场景、攻击环与 RSI 实验当时的验证；跨模块验收另见全项目索引 |

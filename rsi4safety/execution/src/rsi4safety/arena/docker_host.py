@@ -381,10 +381,15 @@ for path in [active, *active.rglob('*')]:
         self.ensure_networks()
         env = {
             "GLM_API_KEY": api_key or "",
-            "DEEPSEEK_API_KEY": os.getenv("DEEPSEEK_API_KEY", ""),
             "GLM_ANTHROPIC_BASE_URL": self.config.glm_base_url,
             "GLM_OPENAI_BASE_URL": self.config.glm_openai_base_url,
             "GATEWAY_TOKEN": gateway_token or "",
+            "SUT_MODEL": self.config.planning_model,
+            "SUT_OPENAI_BASE_URL": self.config.docker_sut_base_url or "",
+            "SUT_API_KEY": os.getenv("SUT_API_KEY", ""),
+            "GATEWAY_ALLOWED_MODELS": ",".join(sorted({
+                self.config.planning_model, *(self.config.model_for(r) for r in ("attacker", "defender", "judge")),
+            })),
         }
         container = self.client.containers.create(
             f"{self.prefix}-gateway:latest",
@@ -460,10 +465,11 @@ for path in [active, *active.rglob('*')]:
             "PAYGATE_GATEWAY": gateway,
             "PAYGATE_LLM_MODE": llm_mode or self.config.sut_llm_mode,
             "PAYGATE_LLM_URL": "http://llm-gateway:8080/v1/chat/completions",
+            "PAYGATE_LLM_MODEL": self.config.planning_model,
             **({"PAYGATE_LLM_TOKEN": self.gateway_token} if self.gateway_token else {}),
             # The conversational assistant SUT reads its own mode/model envs.
             **({"PAYASSIST_MODE": llm_mode or self.config.sut_llm_mode,
-                "PAYASSIST_MODEL": os.getenv("PAYASSIST_MODEL", "deepseek-chat")}
+                "PAYASSIST_MODEL": self.config.planning_model}
                if self.config.sut_app == "payassist" else {}),
         }
         # Ports publish reliably only while the default bridge membership (the

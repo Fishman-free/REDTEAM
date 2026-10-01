@@ -6,6 +6,15 @@ from pathlib import Path
 
 from .providers import CallBudget, OpenAICompatibleChatModel
 
+DEFAULT_RESEARCH_MODEL = "glm-5.3"
+DEFAULT_PAYMENT_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
+
+
+def require_research_model(model: str, setting: str = "model") -> None:
+    """Keep every non-payment role on the project's selected GLM model."""
+    if model != DEFAULT_RESEARCH_MODEL:
+        raise ValueError(f"{setting} must be {DEFAULT_RESEARCH_MODEL}; only the payment planner has a separate model")
+
 
 def load_env(path: Path = Path(".env")) -> None:
     """Read a simple local env file without evaluating shell syntax or overriding env."""
@@ -16,13 +25,14 @@ def load_env(path: Path = Path(".env")) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        if key in {"GLM_API_KEY", "GLM_BASE_URL", "GLM_MODEL", "DEEPSEEK_API_KEY"}:
+        if key in {"GLM_API_KEY", "GLM_BASE_URL", "GLM_MODEL",
+                   "SUT_MODEL", "SUT_BASE_URL", "SUT_API_KEY"}:
             os.environ.setdefault(key, value.strip().strip("\"'"))
 
 
 @dataclass(frozen=True)
 class ExperimentConfig:
-    model: str = "glm-5.3-flash"
+    model: str = DEFAULT_RESEARCH_MODEL
     base_url: str = "https://open.bigmodel.cn/api/coding/paas/v4"
     rounds: int = 3
     attacks_per_round: int = 3
@@ -36,6 +46,7 @@ class ExperimentConfig:
     concurrency: int = 3
 
     def __post_init__(self) -> None:
+        require_research_model(self.model)
         for name in ("rounds", "attacks_per_round", "max_candidates", "repetitions", "max_calls", "max_tokens", "max_output_tokens", "timeout_seconds", "concurrency"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise ValueError(f"{name} must be a positive integer")

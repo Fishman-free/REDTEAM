@@ -105,7 +105,8 @@ class GatewayTestCase(unittest.TestCase):
         })
         # The gateway must never be influenced by a developer-shell proxy.
         for var in ("http_proxy", "https_proxy", "all_proxy",
-                    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+                    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                    "SUT_MODEL", "SUT_OPENAI_BASE_URL", "SUT_API_KEY", "GATEWAY_ALLOWED_MODELS"):
             os.environ.pop(var, None)
         os.environ["NO_PROXY"] = "127.0.0.1,localhost"
         os.environ["no_proxy"] = "127.0.0.1,localhost"
@@ -197,6 +198,37 @@ class GatewayTestCase(unittest.TestCase):
         header_names = {name.lower() for name, _ in headers}
         self.assertIn("connection", header_names)
 
+    def test_studio_model_uses_dedicated_route_and_credentials(self):
+        model = "Qwen/Qwen3-4B-Instruct-2507"
+        os.environ.update({"SUT_MODEL": model,
+                           "SUT_OPENAI_BASE_URL": f"http://127.0.0.1:{self.stub.server_port}/studio/v1",
+                           "GATEWAY_ALLOWED_MODELS": model + ",glm-5.3"})
+        for key in ("", "studio-only-test-key"):
+            with self.subTest(key_present=bool(key)):
+                os.environ["SUT_API_KEY"] = key
+                status, _, data = self.post_json("/v1/chat/completions", self.chat_body(model),
+                                                 self.auth_headers)
+                self.assertEqual(status, 200)
+                payload = json.loads(data)
+                self.assertEqual(payload["saw_model"], model)
+                self.assertEqual(payload["path"], "/studio/v1/chat/completions")
+                self.assertEqual(payload["saw_authorization"], f"Bearer {key}")
+                self.assertNotEqual(payload["saw_authorization"], f"Bearer {STUB_API_KEY}")
+        # Role models still use their original provider and credential.
+        status, _, data = self.post_json("/v1/chat/completions", self.chat_body(), self.auth_headers)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(data)["saw_authorization"], f"Bearer {STUB_API_KEY}")
+        self.assertEqual(json.loads(data)["path"], "/chat/completions")
+
+    def test_studio_model_does_not_fall_through_to_cloud_messages_api(self):
+        model = "Qwen/Qwen3-4B-Instruct-2507"
+        os.environ.update({"SUT_MODEL": model, "SUT_OPENAI_BASE_URL": "http://127.0.0.1:1/v1",
+                           "GATEWAY_ALLOWED_MODELS": model})
+        status, _, data = self.post_json("/v1/messages", self.chat_body(model), self.auth_headers)
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(data)["error"], "sut_model_requires_openai_chat")
+        self.assertEqual(STUB_REQUESTS, [])
+
     def test_missing_gateway_token_env_refuses_forwarding_503(self):
         os.environ["GATEWAY_TOKEN"] = ""
         status, _, _ = self.post_json("/v1/chat/completions", self.chat_body(),
@@ -228,12 +260,28 @@ class GatewayTestCase(unittest.TestCase):
     # -- model allowlist ----------------------------------------------------------
 
     def test_model_outside_allowlist_400(self):
-        for model in ("gpt-4o", "glm-4.6", "glm-5.3-evil"):
+        for model in ("gpt-4o", "glm-4.6", "glm-5.3-evil", "glm-5.3-flash", "deepseek-chat"):
             with self.subTest(model=model):
                 status, _, _ = self.post_json("/v1/chat/completions",
                                               self.chat_body(model=model), self.auth_headers)
                 self.assertEqual(status, 400)
         self.assertEqual(len(STUB_REQUESTS), 0)
+
+    def test_allowlist_cannot_enable_other_research_models(self):
+        os.environ["GATEWAY_ALLOWED_MODELS"] = "glm-5.3,glm-5.3-flash,deepseek-chat"
+        for model in ("glm-5.3-flash", "deepseek-chat"):
+            with self.subTest(model=model):
+                status, _, _ = self.post_json("/v1/chat/completions", self.chat_body(model), self.auth_headers)
+                self.assertEqual(status, 400)
+        self.assertEqual(STUB_REQUESTS, [])
+
+    def test_missing_payment_endpoint_cannot_fall_back_to_cloud(self):
+        model = "Qwen/Qwen3-4B-Instruct-2507"
+        os.environ.update({"SUT_MODEL": model, "GATEWAY_ALLOWED_MODELS": model})
+        status, _, data = self.post_json("/v1/chat/completions", self.chat_body(model), self.auth_headers)
+        self.assertEqual(status, 503)
+        self.assertEqual(json.loads(data)["error"], "sut_backend_not_configured")
+        self.assertEqual(STUB_REQUESTS, [])
 
     def test_model_variant_suffix_allowed_and_body_forwarded_verbatim(self):
         status, _, data = self.post_json("/v1/chat/completions",
@@ -325,13 +373,13 @@ class GatewayTestCase(unittest.TestCase):
         self.assertEqual(STUB_REQUESTS[0]["path"], "/chat/completions")
 
     def test_anthropic_messages_passthrough_roundtrip(self):
-        payload = {"model": "glm-5.3-flash", "max_tokens": 16,
+        payload = {"model": "glm-5.3", "max_tokens": 16,
                    "messages": [{"role": "user", "content": "hello"}]}
         status, _, data = self.post_json("/v1/messages", payload, self.auth_headers)
         self.assertEqual(status, 200)
         body = json.loads(data)
         self.assertTrue(body["stub"])
-        self.assertEqual(body["saw_model"], "glm-5.3-flash")
+        self.assertEqual(body["saw_model"], "glm-5.3")
         self.assertEqual(len(STUB_REQUESTS), 1)
         seen = STUB_REQUESTS[0]
         self.assertEqual(seen["path"], "/v1/messages")

@@ -1,4 +1,5 @@
 -e .
+-e payment_agents
 -r payment_agents/paygate/requirements.txt
 httpx==0.28.1
 pytest>=8,<10

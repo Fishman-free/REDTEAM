@@ -22,6 +22,6 @@ package-dir = {"" = "execution/src"}
 where = ["execution/src"]
 
 [tool.pytest.ini_options]
-testpaths = ["execution/tests"]
-pythonpath = ["execution/src"]
+testpaths = ["execution/tests", "payment_agents/tests"]
+pythonpath = ["execution/src", "payment_agents"]
 norecursedirs = [".*", "archieve"]

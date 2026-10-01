@@ -12,7 +12,7 @@ from rsi4safety.providers import BudgetExceeded, CallBudget, ModelCallError, Ope
 
 
 def response(content='{"ok":true}'):
-    return io.BytesIO(json.dumps({"model": "glm-5.3-flash", "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+    return io.BytesIO(json.dumps({"model": "glm-5.3", "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
                                  "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}).encode())
 
 
@@ -21,7 +21,7 @@ class ProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             budget = CallBudget(2, 10_000)
-            model = OpenAICompatibleChatModel("glm-5.3-flash", api_key=os.environ.get("TEST_API_KEY", "test-not-real"), budget=budget,
+            model = OpenAICompatibleChatModel("glm-5.3", api_key=os.environ.get("TEST_API_KEY", "test-not-real"), budget=budget,
                                              audit_log=root / "calls.jsonl", cache_dir=root / "cache", use_cache=True)
             with patch("rsi4safety.providers.request.build_opener") as factory:
                 factory.return_value.open.return_value = response()
@@ -40,7 +40,7 @@ class ProviderTests(unittest.TestCase):
 
     def test_fresh_evaluation_never_reads_an_existing_cache_entry(self):
         with tempfile.TemporaryDirectory() as directory:
-            model = OpenAICompatibleChatModel("glm-5.3-flash", api_key="secret", cache_dir=Path(directory), use_cache=False)
+            model = OpenAICompatibleChatModel("glm-5.3", api_key="secret", cache_dir=Path(directory), use_cache=False)
             with patch("rsi4safety.providers.request.build_opener") as factory:
                 factory.return_value.open.side_effect = [response(), response()]
                 model.complete("system", "task")
@@ -62,7 +62,7 @@ class ProviderTests(unittest.TestCase):
 
     def test_rate_limit_retries_are_counted_and_auth_failure_is_not_retried(self):
         budget = CallBudget(5, 30_000)
-        model = OpenAICompatibleChatModel("glm-5.3-flash", api_key="secret", budget=budget)
+        model = OpenAICompatibleChatModel("glm-5.3", api_key="secret", budget=budget)
         with patch("rsi4safety.providers.request.build_opener") as factory, patch("rsi4safety.providers.time.sleep"):
             factory.return_value.open.side_effect = [HTTPError("url", 429, "limited", {}, None), response()]
             model.complete("system", "task")

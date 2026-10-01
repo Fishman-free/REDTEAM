@@ -4,18 +4,35 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import sys
 
 from .runner import ContinuousSafetyRunner
 from .campaign import ExperimentRunner
-from .config import ExperimentConfig, load_env
+from .config import DEFAULT_RESEARCH_MODEL, ExperimentConfig, load_env
 from .paths import project_root
 
 
 def _arena_parser(subparsers) -> None:
     arena = subparsers.add_parser(
-        "arena", help="three-agent (attacker/defender/judge) campaign with Docker and audit chain")
+        "arena", help="audited attack/repair campaigns and payment-agent benchmarks")
     arena_sub = arena.add_subparsers(dest="arena_command", required=True)
+    live = arena_sub.add_parser(
+        "live", help="real GLM 5.3 attack/repair roles against the multi-turn local payment agent")
+    live.add_argument("--campaign", default="payassist-live")
+    live.add_argument("--state-dir", type=Path)
+    live.add_argument("--env-file", type=Path, default=project_root() / ".env")
+    live.add_argument("--rounds", type=int, default=3)
+    live.add_argument("--attacks-per-round", type=int, default=8)
+    live.add_argument("--repetitions", type=int, default=2)
+    live.add_argument("--max-candidates", type=int, default=2)
+    live.add_argument("--seed", type=int, default=17)
+    live.add_argument("--max-sut-calls", type=int, default=2500,
+                      help="maximum local payment-model calls, including fresh retests")
+    live.add_argument("--max-role-calls", type=int, default=80)
+    live.add_argument("--max-role-tokens", type=int, default=2_500_000)
+    live.add_argument("--resume", action="store_true",
+                      help="resume an existing campaign only after its evidence is verified")
     def add_common(command):
         parser = arena_sub.add_parser(command)
         parser.add_argument("--campaign", default="arena-001")
@@ -23,11 +40,13 @@ def _arena_parser(subparsers) -> None:
         parser.add_argument("--env-file", type=Path, default=project_root() / ".env")
         parser.add_argument("--rounds", type=int, default=3)
         parser.add_argument("--repetitions", type=int, default=2)
-        parser.add_argument("--attacker-model", default=None)
-        parser.add_argument("--defender-model", default=None)
-        parser.add_argument("--judge-model", default=None)
+        parser.add_argument("--attacker-model", default=None, choices=(DEFAULT_RESEARCH_MODEL,))
+        parser.add_argument("--defender-model", default=None, choices=(DEFAULT_RESEARCH_MODEL,))
+        parser.add_argument("--judge-model", default=None, choices=(DEFAULT_RESEARCH_MODEL,))
         parser.add_argument("--sut-model", default=None,
                             help="Override the SUT planning model")
+        parser.add_argument("--sut-base-url", default=None,
+                            help="Payment planner OpenAI-compatible endpoint (separate from role models)")
         parser.add_argument("--attacker-max-turns", type=int, default=None)
         parser.add_argument("--defender-max-turns", type=int, default=None)
         parser.add_argument("--judge-max-turns", type=int, default=None)
@@ -43,7 +62,7 @@ def _arena_parser(subparsers) -> None:
     run.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
     run.add_argument("--sut-app", default="paygate", choices=("paygate", "payassist", "paychain"),
                      help="SUT application: paygate (deterministic policy SUT) or payassist "
-                          "(DeepSeek conversational payment assistant)")
+                          "(conversational payment assistant), or paychain (offline role prototype)")
     run.add_argument("--defender-scope", default="full_agent",
                      choices=("full_agent", "prompt_only"),
                      help="Repair route: full_agent (any source change) or "
@@ -70,6 +89,11 @@ def _arena_parser(subparsers) -> None:
                        help="filter by system ID; unimplemented adapters are reported as unsupported")
     bench.add_argument("--seed-id", action="append", choices=[s.seed_id for s in PRIORITY_SEEDS],
                        help="select a seed (repeatable); intersected with --system when both are set")
+    bench.add_argument("--sut-llm-mode", default="deterministic", choices=("deterministic", "llm"))
+    bench.add_argument("--sut-model", default=None)
+    bench.add_argument("--sut-base-url", default=None)
+    bench.add_argument("--env-file", type=Path, default=project_root() / ".env")
+    bench.add_argument("--sut-execution-timeout", type=int, default=180)
     bench.add_argument("--track", default="full_agent", choices=("full_agent", "prompt_only"))
     bench.add_argument("--sut-app", default="payassist", choices=("paygate", "payassist", "paychain"))
 
@@ -90,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
         command = subparsers.add_parser(name, help=help_text)
         command.add_argument("--state-dir", type=Path, default=project_root() / ".rsi4safety" / name)
         command.add_argument("--env-file", type=Path, default=project_root() / ".env")
-        command.add_argument("--model", default=None)
+        command.add_argument("--model", default=None, choices=(DEFAULT_RESEARCH_MODEL,))
         command.add_argument("--base-url", default=None)
         command.add_argument("--rounds", type=int, default=3)
         command.add_argument("--attacks-per-round", type=int, default=3)
@@ -107,14 +131,38 @@ def build_parser() -> argparse.ArgumentParser:
 def _run_arena(args) -> None:
     from .arena.config import ArenaConfig, glm_api_key
     from .arena.audit import HashChain
+    if hasattr(args, "env_file") and not getattr(args, "dry_run", False):
+        load_env(args.env_file)
+    if args.arena_command == "live":
+        # Keep the native dialogue/tool trace and its oracle; the legacy run
+        # command's one-shot payment-plan protocol cannot express this evidence.
+        from .arena.multiturn import run_live_campaign
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", args.campaign):
+            raise SystemExit("--campaign must be a safe alphanumeric identifier")
+        state_dir = args.state_dir or project_root() / ".rsi4safety" / "arena" / args.campaign
+        report = run_live_campaign(
+            state_dir, rounds=args.rounds, attacks_per_round=args.attacks_per_round,
+            repetitions=args.repetitions, max_candidates=args.max_candidates,
+            seed=args.seed, max_sut_calls=args.max_sut_calls,
+            max_role_calls=args.max_role_calls, max_role_tokens=args.max_role_tokens,
+            resume=args.resume,
+        )
+        summary = {key: report[key] for key in (
+            "status", "stop_reason", "active_version", "summary", "usage", "chain_head"
+        ) if key in report}
+        summary["report"] = str(state_dir.resolve() / "report.json")
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        if report.get("status") not in {"completed", "complete"}:
+            raise SystemExit(1)
+        return
     state_dir = args.state_dir or project_root() / ".rsi4safety" / "arena" / args.campaign
     config = ArenaConfig(
         campaign_id=args.campaign, state_dir=state_dir,
         rounds=getattr(args, "rounds", 1),
         repetitions=getattr(args, "repetitions", 1),
-        attacker_model=getattr(args, "attacker_model", None) or "glm-5.3-flash",
-        defender_model=getattr(args, "defender_model", None) or "glm-5.3-flash",
-        judge_model=getattr(args, "judge_model", None) or "glm-5.3-flash",
+        attacker_model=getattr(args, "attacker_model", None) or DEFAULT_RESEARCH_MODEL,
+        defender_model=getattr(args, "defender_model", None) or DEFAULT_RESEARCH_MODEL,
+        judge_model=getattr(args, "judge_model", None) or DEFAULT_RESEARCH_MODEL,
         attacker_max_turns=getattr(args, "attacker_max_turns", None) or 40,
         defender_max_turns=getattr(args, "defender_max_turns", None) or 96,
         judge_max_turns=getattr(args, "judge_max_turns", None) or 24,
@@ -122,6 +170,8 @@ def _run_arena(args) -> None:
         judge_mode=getattr(args, "judge_mode", "programmatic"),
         sut_llm_mode=getattr(args, "sut_llm_mode", "deterministic"),
         sut_execution_timeout_seconds=getattr(args, "sut_execution_timeout", 180),
+        sut_model=getattr(args, "sut_model", None) or os.getenv("SUT_MODEL") or os.getenv("PAYASSIST_MODEL"),
+        sut_base_url=getattr(args, "sut_base_url", None) or os.getenv("SUT_BASE_URL"),
         sut_app=getattr(args, "sut_app", "paygate"),
         defender_scope=getattr(args, "defender_scope", "full_agent"),
         resume_sessions=not getattr(args, "no_resume", False),
@@ -182,16 +232,12 @@ def _run_arena(args) -> None:
     from .arena.docker_host import DockerHost
     from .arena.orchestrator import ArenaOrchestrator
     from .arena.runtime import StubAgentRuntime
-    if args.sut_model:
-        import os
-        os.environ["PAYASSIST_MODEL"] = args.sut_model
     docker_host = None
     runtime = StubAgentRuntime()
     if not config.dry_run:
-        load_env(args.env_file)
         docker_host = DockerHost(config)
         docker_host.ping()
-        if not glm_api_key():
+        if not glm_api_key(args.env_file):
             raise SystemExit("GLM_API_KEY missing: put it in .env before a real campaign")
         runtime = None  # the orchestrator wires ClaudeCodeRuntime once containers are up
     def progress(phase: str, data: dict) -> None:
@@ -219,7 +265,7 @@ def main() -> None:
     if args.command in {"probe", "experiment", "repair-check"}:
         load_env(args.env_file)
         config = ExperimentConfig(
-            model=args.model or os.getenv("GLM_MODEL", "glm-5.3-flash"),
+            model=args.model or os.getenv("GLM_MODEL", DEFAULT_RESEARCH_MODEL),
             base_url=args.base_url or os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/coding/paas/v4"),
             rounds=args.rounds, attacks_per_round=args.attacks_per_round,
             max_candidates=args.max_candidates, repetitions=args.repetitions,

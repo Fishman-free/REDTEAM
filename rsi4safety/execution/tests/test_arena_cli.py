@@ -10,13 +10,16 @@ from rsi4safety.cli import _run_arena, build_parser
 
 class ArenaCliTests(unittest.TestCase):
     def test_run_and_smoke_share_optional_sut_model(self):
-        for command in ('run', 'smoke'):
+        for command in ('run', 'smoke', 'bench'):
             with self.subTest(command=command):
                 args = build_parser().parse_args(['arena', command])
                 self.assertIsNone(args.sut_model)
                 args = build_parser().parse_args([
-                    'arena', command, '--sut-model', 'test-model'])
+                    'arena', command, '--sut-model', 'test-model',
+                    '--sut-base-url', 'http://127.0.0.1:18081/v1', '--sut-llm-mode', 'llm'])
                 self.assertEqual(args.sut_model, 'test-model')
+                self.assertEqual(args.sut_base_url, 'http://127.0.0.1:18081/v1')
+                self.assertEqual(args.sut_llm_mode, 'llm')
 
     def test_smoke_reaches_orchestrator_without_attribute_error(self):
         args = build_parser().parse_args(['arena', 'smoke', '--campaign', 'cli-test'])
