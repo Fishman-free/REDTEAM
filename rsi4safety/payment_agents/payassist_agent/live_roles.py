@@ -350,7 +350,13 @@ class LiveRoles:
         _text(generation_id, "generation_id", 128)
         sedimented = []
         for skill in extra_skills or []:
-            clean = validate_sedimented_skill(skill)
+            if not isinstance(skill, dict):
+                raise ValueError("sedimented skill must be an object")
+            # Stored checkpoints carry origin/created_at metadata; only the
+            # seven advisory fields travel to the attacker payload.
+            clean = validate_sedimented_skill(
+                {key: skill.get(key) for key in ("id", "name", "mechanism", "craft",
+                                                 "example", "surfaces", "levels")})
             if scenario.level not in clean["levels"] or seed_case["surface"] not in clean["surfaces"]:
                 raise ValueError("sedimented skill does not apply to this seed's surface or level")
             sedimented.append(clean)

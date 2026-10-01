@@ -106,6 +106,43 @@ def test_attacker_receives_surface_matched_skill_library(tmp_path):
         assert "tool_return" in skill["surfaces"]
 
 
+def test_stored_checkpoint_skills_travel_without_metadata(tmp_path):
+    client, model = roles(tmp_path, dialogue_attack())
+    seed = case("L1-A03")
+    stored = {"id": "sed-stored", "name": "存储技能", "mechanism": "m", "craft": "c", "example": "e",
+              "surfaces": ["dialogue"], "levels": ["L0", "L1"],
+              "origin": {"campaign": "prior", "source_id": "f1"}, "created_at": 1.5}
+    client.generate_attack(scenario=load_scenario(seed["scenario_id"]), seed_case=seed,
+                           defense_prompt="d", feedback=[], generation_id="g1",
+                           extra_skills=[stored])
+    payload = model.calls[0][1]
+    assert payload["attack_skills"][0] == {k: stored[k] for k in (
+        "id", "name", "mechanism", "craft", "example", "surfaces", "levels")}
+    with pytest.raises(ValueError, match="does not apply"):
+        client.generate_attack(scenario=load_scenario(seed["scenario_id"]), seed_case=seed,
+                               defense_prompt="d", feedback=[], generation_id="g2",
+                               extra_skills=[{**stored, "surfaces": ["tool_return"]}])
+    with pytest.raises(ValueError, match="name|skill"):
+        client.generate_attack(scenario=load_scenario(seed["scenario_id"]), seed_case=seed,
+                               defense_prompt="d", feedback=[], generation_id="g3",
+                               extra_skills=[{"id": "sed-broken"}])
+
+
+def test_distill_keeps_finding_surface_and_validates_schema(tmp_path):
+    skill = {"id": "sed-new", "name": "n", "mechanism": "m", "craft": "c", "example": "e",
+             "surfaces": ["dialogue"], "levels": ["L0"]}
+    client, model = roles(tmp_path, skill)
+    finding = {"case_id": "r1-a01", "surface": "dialogue", "breach_classes": ["task_disruption"],
+               "attack": {"name": "n", "strategy": "s", "objective": "o", "surface": "dialogue"}}
+    result = client.distill(finding=finding, prior_skills=[], generation_id="d1")
+    assert result["skill"]["id"] == "sed-new"
+    assert model.calls[0][1]["confirmed_finding"] == finding
+    wrong_surface = {**skill, "surfaces": ["tool_return"]}
+    client2, _ = roles(tmp_path, wrong_surface)
+    with pytest.raises(Exception, match="surface"):
+        client2.distill(finding=finding, prior_skills=[], generation_id="d2")
+
+
 def test_skill_rotation_varies_between_generations(tmp_path):
     from payassist_agent.attack_skills import select_skills
     client, model = roles(tmp_path, dialogue_attack())
