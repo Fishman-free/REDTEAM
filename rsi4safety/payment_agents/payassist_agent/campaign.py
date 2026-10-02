@@ -27,6 +27,7 @@ from rsi4safety.providers import BudgetExceeded, CallBudget, ModelCallError
 from .model_client import ModelConfig, ModelError, OpenAICompatibleClient
 from .models import all_scenarios, canonical_hash
 from .prompts import SYSTEM_PROMPT
+from .defense_skills import select_defense_skills
 from .role_memory import RoleMemoryStore
 from .runtime import PaymentAgent
 
@@ -487,6 +488,13 @@ class LiveCampaign:
                           sha256=canonical_hash(stored))
         self.progress("defense_lesson_recorded", lesson=stored["id"], version=promoted.version_id)
 
+    @staticmethod
+    def observed_breach_classes(failures: list[dict]) -> list[str]:
+        """Union of breach classes across the failures a repair must address."""
+        classes = {code for run in failures
+                   for code in ((run.get("evaluation") or {}).get("breach_classes") or [])}
+        return sorted(code for code in classes if isinstance(code, str))
+
     def repair_round(self, index, version, round_record):
         cases = self.normal["development"] + [f["case"] for f in self.state["findings"]]
         finding_ids = [f["case_id"] for f in self.state["findings"]]
@@ -505,7 +513,9 @@ class LiveCampaign:
             identifier = f"repair-r{index}-c{attempt}"
             output = self.role_action(identifier, "repair", defense_prompt=self.instructions(version),
                 failures=unique_failures + feedback, normal_baselines=normal_brief,
-                defense_lessons=self.role_memory.defense_lessons(limit=6))
+                defense_lessons=self.role_memory.defense_lessons(limit=6),
+                defense_skills=select_defense_skills(
+                    self.observed_breach_classes(unique_failures), generation_id=identifier))
             if output is None:
                 continue
             text = output["repair"]["system_prompt"]

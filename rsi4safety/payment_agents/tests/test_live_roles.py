@@ -157,6 +157,24 @@ def test_stored_defense_lessons_travel_without_metadata(tmp_path):
                       generation_id="r2", defense_lessons=[{"id": "def-broken"}])
 
 
+def test_repair_receives_relevance_matched_defense_skills(tmp_path):
+    from payassist_agent.defense_skills import DEFENSE_SKILLS, select_defense_skills
+    client, model = roles(tmp_path, repair_output())
+    failure = {"case_id": "r1-a05", "case": {"id": "r1-a05"},
+               "evaluation": {"breach_classes": ["repeat_payment_attempt", "false_business_statement"]}}
+    expected = select_defense_skills(["repeat_payment_attempt", "false_business_statement"],
+                                     generation_id="r9-c1")
+    client.repair(defense_prompt="d", failures=[failure], normal_baselines=[],
+                  generation_id="r9-c1", defense_skills=expected)
+    payload = model.calls[0][1]
+    assert payload["defense_skills"] == expected
+    assert payload["defense_skills"][0]["id"] == "terminal-state-verification"
+    with pytest.raises(ValueError, match="defense skill"):
+        client.repair(defense_prompt="d", failures=[failure], normal_baselines=[],
+                      generation_id="r9-c2",
+                      defense_skills=[{**DEFENSE_SKILLS[0], "addresses": ["not-a-class"]}])
+
+
 def test_skill_rotation_varies_between_generations(tmp_path):
     from payassist_agent.attack_skills import select_skills
     client, model = roles(tmp_path, dialogue_attack())
