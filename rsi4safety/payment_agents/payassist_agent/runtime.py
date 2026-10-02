@@ -25,6 +25,7 @@ class PaymentAgent:
         self.messages = [{"role": "system", "content": system_prompt(scenario, instructions)}]
         self.instructions_sha256 = canonical_hash(self.messages[0]["content"])
         self.turns, self.model_calls, self.errors = [], [], []
+        self.execution_request_turn = None
         self.max_steps, self.max_turns, self.turn_timeout = max_steps, max_turns, turn_timeout
         self._lock = threading.RLock()
         self._halted = False
@@ -33,13 +34,22 @@ class PaymentAgent:
         with self._lock:
             self.tools.add_override(override)
 
-    def turn(self, content: str, *, channel: str = "owner", claimed_sender: str = "") -> dict:
-        """channel is assigned by the trusted caller/route, never parsed from content."""
+    def turn(self, content: str, *, channel: str = "owner", claimed_sender: str = "",
+             requests_execution: bool = False) -> dict:
+        """channel is assigned by the trusted caller/route, never parsed from content.
+
+        requests_execution is likewise control-side declared semantics for the
+        trusted owner channel: the host attests "this owner turn demands
+        execution of the authorized action". It never derives from text and
+        external turns can never set it.
+        """
         require_text(content, "content", 16000)
         if channel not in {"owner", "external"}:
             raise ValueError("channel must be owner or external")
         if not isinstance(claimed_sender, str) or len(claimed_sender) > 256:
             raise ValueError("claimed_sender must be bounded text")
+        if not isinstance(requests_execution, bool) or (requests_execution and channel != "owner"):
+            raise ValueError("only a trusted owner turn may request execution")
         with self._lock:
             if self._halted:
                 raise ValueError("session halted after model/protocol failure; create a fresh session")
@@ -48,6 +58,10 @@ class PaymentAgent:
             envelope = {"channel": "verified_owner" if channel == "owner" else "external_dialogue",
                         "authenticated_principal": self.scenario.owner_id if channel == "owner" else None,
                         "claimed_sender": claimed_sender, "content": content}
+            if channel == "owner":
+                envelope["owner_requests_execution"] = requests_execution
+                if requests_execution and self.execution_request_turn is None:
+                    self.execution_request_turn = len(self.turns) + 1
             self.turns.append(copy.deepcopy(envelope))
             self.messages.append({"role": "user", "content": json.dumps(envelope, ensure_ascii=False)})
             turn_number = len(self.turns)
@@ -153,4 +167,5 @@ class PaymentAgent:
                 "initial_world": self.tools.initial_world, "world": self.tools.world,
                 "payments": self.tools.world["payments"], "events": self.tools.events,
                 "reports": self.tools.reports, "errors": self.errors,
+                "execution_request_turn": self.execution_request_turn,
                 "turns": self.turns, "messages": self.messages, "model_calls": self.model_calls})

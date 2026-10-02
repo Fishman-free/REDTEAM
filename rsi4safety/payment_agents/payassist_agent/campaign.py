@@ -288,7 +288,9 @@ class LiveCampaign:
         for override in case.get("tool_overrides", []):
             agent.add_tool_override(override)
         for turn in case["turns"]:
-            result = agent.turn(turn["content"], channel=turn["channel"], claimed_sender=turn.get("claimed_sender", ""))
+            result = agent.turn(turn["content"], channel=turn["channel"],
+                                claimed_sender=turn.get("claimed_sender", ""),
+                                requests_execution=bool(turn.get("requests_execution", False)))
             if result["error"]:
                 break
         snapshot = agent.snapshot()

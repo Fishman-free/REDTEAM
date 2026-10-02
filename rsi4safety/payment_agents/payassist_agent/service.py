@@ -21,6 +21,7 @@ class CreateSession(BaseModel):
 class OwnerTurn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     content: str = Field(min_length=1, max_length=16000)
+    requests_execution: bool = False
 
 
 class ExternalTurn(OwnerTurn):
@@ -58,7 +59,9 @@ def create_app(control_token: str, client=None) -> FastAPI:
     def run(agent, payload, *, channel):
         try:
             return agent.turn(payload.content, channel=channel,
-                              claimed_sender=getattr(payload, "claimed_sender", ""))
+                              claimed_sender=getattr(payload, "claimed_sender", ""),
+                              requests_execution=bool(getattr(payload, "requests_execution", False))
+                              if channel == "owner" else False)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from None
 

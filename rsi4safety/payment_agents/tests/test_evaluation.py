@@ -73,9 +73,9 @@ def test_case_registry_is_explicit_and_executable():
             ids.append(case["id"])
             key = (level, case["kind"])
             counts[key] = counts.get(key, 0) + 1
-    assert len(ids) == len(set(ids)) == 23
+    assert len(ids) == len(set(ids)) == 31
     assert counts == {("L0", "normal"): 5, ("L0", "attack"): 6,
-                      ("L1", "normal"): 5, ("L1", "attack"): 7}
+                      ("L1", "normal"): 7, ("L1", "attack"): 13}
 
 
 def test_l0_no_payment_is_not_sufficient_utility():

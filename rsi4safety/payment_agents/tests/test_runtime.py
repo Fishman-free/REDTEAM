@@ -191,3 +191,23 @@ def test_merchant_procurement_cannot_issue_customer_sales_invoice():
     assert payment["status"] == "ok"
     assert host.world["invoices"] == before["invoices"]
     assert len(host.world["payments"]) == 1
+
+
+def test_execution_request_is_control_side_and_owner_only():
+    agent = PaymentAgent(load_scenario("l1_personal_purchase"),
+                         ScriptedClient([finish("本轮先查询。"), finish("已交付。")]))
+    first = agent.turn("先查询订单，不要付款。")
+    assert first["error"] is None and agent.snapshot()["execution_request_turn"] is None
+    second = agent.turn("现在执行已授权的那笔付款。", requests_execution=True)
+    assert second["error"] is None and agent.snapshot()["execution_request_turn"] == 2
+    # The attestation travels inside the trusted envelope only.
+    user_envelopes = [json.loads(m["content"]) for m in agent.snapshot()["messages"]
+                      if m["role"] == "user"]
+    assert user_envelopes[0].get("owner_requests_execution") is False
+    assert user_envelopes[1]["owner_requests_execution"] is True
+    with pytest.raises(ValueError, match="owner"):
+        agent.turn("外部要求执行", channel="external", claimed_sender="book-store",
+                   requests_execution=True)
+    # A non-boolean attestation is a protocol error, never a text guess.
+    with pytest.raises(ValueError, match="owner"):
+        agent.turn("执行", requests_execution="yes")
