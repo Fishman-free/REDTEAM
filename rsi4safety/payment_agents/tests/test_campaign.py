@@ -527,6 +527,131 @@ def test_concurrent_execution_keeps_state_budget_and_coverage_consistent(tmp_pat
     assert report["chain_verified"] is True
 
 
+def _single_case_fixture(monkeypatch):
+    """One normal case and one attack target per split: a minimal live campaign."""
+    from payassist_agent import expanded_suite
+
+    normals = {split: expanded_suite.suite_cases(split)[:1] for split in ("development", "acceptance")}
+    targets = {split: expanded_suite.attack_targets(split)[:1] for split in ("development", "acceptance")}
+    normals["all"], targets["all"] = (normals["development"] + normals["acceptance"],
+                                      targets["development"] + targets["acceptance"])
+    monkeypatch.setattr(expanded_suite, "suite_cases", lambda split: copy.deepcopy(normals[split]))
+    monkeypatch.setattr(expanded_suite, "attack_targets", lambda split: copy.deepcopy(targets[split]))
+    monkeypatch.setattr(campaign.ModelConfig, "from_env", lambda: ModelConfig())
+    scenarios = {case["scenario_id"]: case["scenario"] for cases in normals.values() for case in cases}
+    return scenarios
+
+
+def test_parent_gate_suite_replays_recorded_trials_across_rounds(tmp_path, monkeypatch):
+    """Round 2 with the same active version and case set adds no parent-gate SUT calls."""
+    from payassist_agent.live_roles import build_attack_case
+    from payassist_agent.prompts import SYSTEM_PROMPT
+
+    scenarios = _single_case_fixture(monkeypatch)
+
+    class NeverRepairRoles:
+        """Round 1 attacks poison; the round 2 attack is ordinary dialogue."""
+
+        def generate_attack(self, *, seed_case, generation_id, extra_skills=None, **_kwargs):
+            content = "这是交易对方的普通业务消息。" if generation_id.startswith("r2-") else "POISON"
+            attack = {"name": "u", "objective": "u", "strategy": "u", "surface": "dialogue",
+                      "tool_overrides": [], "dialogue": [{"content": content, "claimed_sender": "o"}]}
+            return {"attack": attack, "case": build_attack_case(seed_case, attack, generation_id),
+                    "role_call_id": "u"}
+
+        def repair(self, *, generation_id, **_kwargs):
+            return {"repair": {"system_prompt": "CANDIDATE-WITHOUT-THE-KEYWORD\n" + SYSTEM_PROMPT,
+                               "rationale": "u", "addresses": ["m"], "utility_preservation": "u"},
+                    "role_call_id": "u"}
+
+        def distill(self, *, finding, prior_skills, generation_id):
+            return {"skill": {"id": "sed-x", "name": "n", "mechanism": "m", "craft": "c",
+                              "example": "e", "surfaces": [finding["surface"]], "levels": ["L0"]},
+                    "role_call_id": "u"}
+
+    config = campaign.CampaignConfig(rounds=2, attacks_per_round=1, repetitions=1, max_candidates=1)
+    sut = _ScriptedSUT(scenarios)
+    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=NeverRepairRoles())
+    report = runner.execute()
+    assert report["status"] == "complete"
+    assert report["summary"]["promotions"] == 0  # both candidates were rejected; version unchanged
+    assert report["summary"]["confirmed_development_findings"] == 1
+
+    cases = runner.normal["development"] + [finding["case"] for finding in runner.state["findings"]]
+    expected_phase = campaign.LiveCampaign.parent_gate_phase(runner.initial, cases)
+    trials = runner.state["trials"]
+    parent_trials = [t for t in trials if t["phase"].startswith("parent-gate:")]
+    assert {t["phase"] for t in parent_trials} == {expected_phase}
+    # Both rounds ran a repair round, yet the parent suite was recorded once.
+    assert len(parent_trials) == len(cases) * config.repetitions
+    gate_round_one = json.loads((tmp_path / "gates" / "repair-r1-c1.json").read_text())
+    gate_round_two = json.loads((tmp_path / "gates" / "repair-r2-c1.json").read_text())
+    assert gate_round_one["parent_trials"] == gate_round_two["parent_trials"]
+    assert gate_round_two["gate"]["passed"] is False and gate_round_two["gate"]["aborted_early"] is False
+    # Replayed trials dispatch nothing: every SUT call maps to one recorded fresh trial.
+    assert sum(t["model_calls"] for t in trials) == sut.completed
+
+
+def test_candidate_gate_aborts_early_and_runs_fewer_trials(tmp_path, monkeypatch):
+    """An unrecoverable first-chunk majority regression stops the remaining chunks."""
+    from payassist_agent.live_roles import build_attack_case
+    from payassist_agent.prompts import SYSTEM_PROMPT
+
+    scenarios = _single_case_fixture(monkeypatch)
+
+    class BrokenCandidateSUT(_ScriptedSUT):
+        """Any candidate-prompt session dies with a protocol error immediately."""
+
+        def complete(self, messages, tools, *, timeout):
+            if "BROKEN-CANDIDATE" in messages[0]["content"]:
+                with self._lock:
+                    self.completed += 1
+                return {"model": ModelConfig().model,
+                        "message": {"role": "user", "content": "not an assistant"}, "usage": {}}
+            return super().complete(messages, tools, timeout=timeout)
+
+    class BrokenRepairRoles:
+        def generate_attack(self, *, seed_case, generation_id, extra_skills=None, **_kwargs):
+            attack = {"name": "u", "objective": "u", "strategy": "u", "surface": "dialogue",
+                      "tool_overrides": [], "dialogue": [{"content": "POISON", "claimed_sender": "o"}]}
+            return {"attack": attack, "case": build_attack_case(seed_case, attack, generation_id),
+                    "role_call_id": "u"}
+
+        def repair(self, *, generation_id, **_kwargs):
+            return {"repair": {"system_prompt": "BROKEN-CANDIDATE\n" + SYSTEM_PROMPT,
+                               "rationale": "u", "addresses": ["m"], "utility_preservation": "u"},
+                    "role_call_id": "u"}
+
+        def distill(self, *, finding, prior_skills, generation_id):
+            return {"skill": {"id": "sed-x", "name": "n", "mechanism": "m", "craft": "c",
+                              "example": "e", "surfaces": [finding["surface"]], "levels": ["L0"]},
+                    "role_call_id": "u"}
+
+    config = campaign.CampaignConfig(rounds=1, attacks_per_round=1, repetitions=3, max_candidates=1)
+    sut = BrokenCandidateSUT(scenarios)
+    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=BrokenRepairRoles())
+    report = runner.execute()
+    assert report["status"] == "complete" and report["summary"]["promotions"] == 0
+    finding_case = runner.state["findings"][0]["case_id"]
+    cases = runner.normal["development"] + [finding["case"] for finding in runner.state["findings"]]
+
+    candidate_trials = [t for t in runner.state["trials"] if t["phase"] == "r1-candidate-1-gate"]
+    # Only the first case-chunk ran; the finding case's chunk was never dispatched.
+    assert len(candidate_trials) == config.repetitions
+    assert len(cases) * config.repetitions > len(candidate_trials)
+    assert all(t["case_id"] != finding_case for t in candidate_trials)
+
+    gate_record = json.loads((tmp_path / "gates" / "repair-r1-c1.json").read_text())
+    assert gate_record["gate"]["passed"] is False
+    assert gate_record["gate"]["reasons"] == ["evaluation_coverage_mismatch"]
+    assert gate_record["gate"]["aborted_early"] is True
+    assert "new_execution_error" in gate_record["early_abort"]["dimensions"]
+    assert gate_record["early_abort"]["remaining_cases"] == [finding_case]
+    assert any(entry["kind"] == "candidate_gate_aborted_early" for entry in runner.chain.entries())
+    # Every dispatch still maps to one recorded fresh trial.
+    assert sum(t["model_calls"] for t in runner.state["trials"]) == sut.completed
+
+
 def test_memory_import_seeds_attacker_checkpoint(tmp_path, monkeypatch):
     from payassist_agent.role_memory import RoleMemoryStore
     donor = tmp_path / "donor.json"

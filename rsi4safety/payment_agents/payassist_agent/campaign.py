@@ -367,6 +367,41 @@ class LiveCampaign:
                 for repetition in range(1, self.config.repetitions + 1)]
         return self._run_jobs(jobs, version)
 
+    @staticmethod
+    def parent_gate_phase(version, cases) -> str:
+        """Stable parent-suite phase id: identical version and case set replay recorded trials."""
+        return f"parent-gate:{version.version_id}:{canonical_hash([case['id'] for case in cases])[:12]}"
+
+    def run_candidate_gate_suite(self, cases, version, phase, parent_runs):
+        """Run the candidate gate case-chunk by case-chunk with runtime-aware abort.
+
+        Each chunk holds every repetition of one case, so its majority verdict is
+        final the moment the chunk completes. A majority regression against the
+        parent suite on a completed case cannot be recovered by the remaining
+        cases, so no further chunk is dispatched.
+        """
+        parent_by_case = _runs_by_case(parent_runs)
+        runs, abort = [], None
+        for index, case in enumerate(cases):
+            chunk = [(case, phase, repetition) for repetition in range(1, self.config.repetitions + 1)]
+            runs.extend(self._run_jobs(chunk, version))
+            old = parent_by_case.get(case["id"], [])
+            if not old:
+                continue  # exact coverage is enforced by the gate itself
+            fresh = [run for run in runs if run["case_id"] == case["id"]]
+            reasons = _case_regression_reasons(old, fresh)
+            if reasons:
+                abort = {"case_id": case["id"], "dimensions": reasons,
+                         "remaining_cases": [later["id"] for later in cases[index + 1:]]}
+                self.chain.append("host", "candidate_gate_aborted_early", version=version.version_id,
+                                  phase=phase, case_id=case["id"], dimensions=reasons,
+                                  remaining_cases=abort["remaining_cases"])
+                self.progress("candidate_gate_aborted_early", version=version.version_id, phase=phase,
+                              case=case["id"], dimensions=reasons,
+                              remaining=len(abort["remaining_cases"]))
+                break
+        return runs, abort
+
     def paired(self, case, version, phase):
         return self._paired_many([case], version, lambda _case: phase)[0]
 
@@ -536,7 +571,9 @@ class LiveCampaign:
     def repair_round(self, index, version, round_record):
         cases = self.normal["development"] + [f["case"] for f in self.state["findings"]]
         finding_ids = [f["case_id"] for f in self.state["findings"]]
-        parent_runs = self.run_suite(cases, version, f"r{index}-parent-gate")
+        # A phase keyed by version and case set (not round) lets run_case replay
+        # recorded trials whenever neither the version nor the case set changed.
+        parent_runs = self.run_suite(cases, version, self.parent_gate_phase(version, cases))
         failures = [r for r in parent_runs if r["case_id"] in finding_ids and not functional_pass(r["evaluation"])]
         if not failures:
             return version
@@ -567,14 +604,16 @@ class LiveCampaign:
                 metadata={"role_call_id": output.get("role_call_id"), "mutable_surface": "system_prompt_only"})
             if self.instructions(candidate) != text:
                 raise ValueError("committed prompt differs from validated GLM proposal")
-            runs = self.run_suite(cases, candidate, f"r{index}-candidate-{attempt}-gate")
-            gate = promotion_gate(parent_runs, runs, finding_ids)
+            runs, abort = self.run_candidate_gate_suite(
+                cases, candidate, f"r{index}-candidate-{attempt}-gate", parent_runs)
+            gate = promotion_gate(parent_runs, runs, finding_ids, aborted_early=abort is not None)
             gate.update(candidate_package_digest=candidate.package_digest,
                         evaluation_id="gate-" + canonical_hash({"gate": gate,
                             "candidate": candidate.package_digest, "trials": [r["id"] for r in parent_runs + runs]})[:24])
             evaluation_path = self.root / "gates" / f"{identifier}.json"
             write_json(evaluation_path, {"parent_version": version.version_id, "candidate": candidate.version_id,
-                "gate": gate, "parent_trials": [r["id"] for r in parent_runs], "candidate_trials": [r["id"] for r in runs]})
+                "gate": gate, "early_abort": abort,
+                "parent_trials": [r["id"] for r in parent_runs], "candidate_trials": [r["id"] for r in runs]})
             self.memory.record_feedback(candidate.version_id, version.version_id, gate["evaluation_id"],
                 file_sha256(evaluation_path), gate["passed"], gate["reasons"],
                 lessons=output["repair"].get("rationale", ""), evaluation_path=evaluation_path,
@@ -592,8 +631,9 @@ class LiveCampaign:
                 self.progress("promoted", version=promoted.version_id, repaired=gate["repaired"], unresolved=gate["unresolved"])
                 return promoted
             feedback.append({"previous_candidate": text, "gate_rejection": gate,
-                             "regressed_traces": [r for r in runs if any(
-                                 item["case_id"] == r["case_id"] for item in gate.get("regressions", []))][:4]})
+                             "regressed_traces": [r for r in runs if r["case_id"] in
+                                 {item["case_id"] for item in gate.get("regressions", [])}
+                                 | ({abort["case_id"]} if abort else set())][:4]})
             self.save()
             self.progress("candidate_rejected", version=candidate.version_id, gate=gate)
         return version
@@ -726,6 +766,8 @@ class LiveCampaign:
                     "Acceptance has different entity/amount fixtures; mechanisms overlap, not a novel-mechanism generalization claim.",
                     "A development promotion is a verified partial improvement, not a production safety certificate.",
                     "Gate verdicts are per-case majority votes across repetitions, not single-run verdicts.",
+                    "Parent gate suites are keyed by version id and case-set hash: a round whose active version and case set are unchanged replays recorded trials instead of calling the model again.",
+                    "Candidate gate suites run case-chunk by case-chunk and stop dispatching once a completed chunk shows an unrecoverable majority regression; the aborted gate is then rejected for incomplete coverage.",
                     "Resume reuses only recorded exact stages; each new comparison/repetition is a fresh model execution."]}
 
 
