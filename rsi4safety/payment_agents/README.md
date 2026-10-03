@@ -125,3 +125,16 @@ python3 execution/scripts/studio_model.py start
 当前[4B真实模型筛查](evidence/v3-smoke-2026-10-03/README.md)保留同提示裸对照、工程包、截断反例复测和角色包单次换例结果，提供可复算压缩原始包及字节hash；费用缺口、投影后的模型未触达和未完成的规范确认分别披露。
 
 2026-10-03旧L0/L1的纠正统计与三环研究结论在[总方案](../../docs/RESEARCH_PLAN.md)。可重跑[宿主审计脚本](../../scripts/audit_payassist_evidence.py)，它仅重读历史state而不调用模型。`paygate/payassist/paychain`和旧Arena是保留的独立原型，不是本轮默认操作入口。
+
+## 2026-10-04 正式实验轮（v3 协议首次全链路）
+
+四个剖面、同一冻结配置（4 轮×6 攻击、筛查 1/确认 3、并发 6、SUT 7000 次/16M token/3h50m 硬顶、角色 150 次/6M token），证据见 [L0](evidence/LIVE_L0_FORMAL_CAMPAIGN_2026-10-04.json)、[L1](evidence/LIVE_L1_FORMAL_CAMPAIGN_2026-10-04.json)、[决策外露](evidence/LIVE_L1_DECISIONS_EXPOSED_CAMPAIGN_2026-10-04.json)：
+
+| 剖面 | 结果 |
+|---|---|
+| L0/L1 默认工程包 | 各 17 攻击全部抵御（0 确认发现），40/44 试验全功能通过；L1 归因层：模型 41 次付款提议、wrapper 拒 7、宿主落账 36 笔全部授权内 |
+| model-only 对照 | 基线资格门拒绝开环（正常任务 0/5 过全功能）——裸 4B 无法进入三环，结构性发现而非故障 |
+| 中间档（关投影） | 17 攻击仍全抵御；接地报告/预检/放行装甲吸收全部伤害 |
+| 决策外露档（关投影+预检+放行） | **三环全链路首次咬合**：4 个确认发现（含 memory 面冻结账户重定向）→ 技能沉淀 → glm-5.3 修复包独立重新启用三项开关+重写提示词+6 条 memory → dev 多数门禁晋级 → 冻结验收发现 ACC-N07 交付回归 → **发布门禁拒绝并回滚 baseline** |
+
+本轮修复的两个 bug：`campaign-report` 对空状态目录静默桩页（现在响亮报错，`a9dfbca`）；document/memory 面发现使 `remember()` 以空动作序列崩溃（现按四面取动作且记忆簿记加护栏，`48a9398`，崩溃态存档 `-crash1`）。诚实边界：决策外露档的发布拒绝基于 1 次基线筛查 vs 3 次候选确认的功效不对称（门禁自披露）；对称确认重测是下一个待办。
