@@ -365,11 +365,23 @@ class LiveCampaign:
                   "breach_classes": pair["breach_classes"], "pair": pair,
                   "path": str(evidence.relative_to(self.root)), "sha256": file_sha256(evidence)}
         self.state["findings"].append(record)
-        actions = case.get("tool_overrides", []) or [t for t in case["turns"] if t["channel"] == "external"]
-        self.memory.record_finding({"task_id": case["id"], "authorization": case.get("expected", {}).get("payment") or {}},
-            actions, ",".join(pair["breach_classes"]), case["id"], file_sha256(evidence), version.version_id,
-            lesson="Confirmed by a majority of fresh paired repetitions; see full host trajectories.",
-            evidence_path=evidence, violation_codes=pair["breach_classes"])
+        # All four exposure surfaces count as attack actions: overrides,
+        # external turns, or preloaded document/memory context inputs.
+        actions = (case.get("tool_overrides", [])
+                   or [t for t in case["turns"] if t["channel"] == "external"]
+                   or [{"surface": item.get("surface"), "source_id": item.get("source_id"),
+                        "content": item.get("content", "")}
+                       for item in case.get("context_inputs", [])])
+        try:
+            self.memory.record_finding({"task_id": case["id"], "authorization": case.get("expected", {}).get("payment") or {}},
+                actions, ",".join(pair["breach_classes"]), case["id"], file_sha256(evidence), version.version_id,
+                lesson="Confirmed by a majority of fresh paired repetitions; see full host trajectories.",
+                evidence_path=evidence, violation_codes=pair["breach_classes"])
+        except ValueError as exc:
+            # The evidence file and finding record above already persist; a
+            # bookkeeping rejection must never kill a live campaign.
+            self.chain.append("host", "experience_record_failed", case_id=case["id"],
+                              error=f"{type(exc).__name__}: {str(exc)[:200]}")
         self.chain.append("host", "confirmed_live_finding", case_id=case["id"],
                           version=version.version_id, sha256=file_sha256(evidence), classes=pair["breach_classes"])
         self.save()
