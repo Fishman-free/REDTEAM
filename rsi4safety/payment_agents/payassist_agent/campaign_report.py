@@ -186,8 +186,15 @@ def _frozen_cases(state_dir: Path) -> list[dict]:
 
 def build_report(state_dir: Path, *, level: str | None = None) -> str:
     state_dir = Path(state_dir).resolve()
-    report = _load(state_dir / "report.json") or {}
-    manifest = _load(state_dir / "manifest.json") or {}
+    report = _load(state_dir / "report.json")
+    manifest = _load(state_dir / "manifest.json")
+    if report is None and manifest is None:
+        # An empty state dir must fail loudly: rendering a placeholder-filled
+        # page with exit 0 once handed a None-stub to a downstream reader.
+        raise ValueError(
+            f"no campaign evidence under {state_dir}: expected report.json or manifest.json; "
+            "refusing to render an empty stub")
+    report, manifest = report or {}, manifest or {}
     config = report.get("config") or manifest.get("config", {})
     recorded_level = config.get("level")
     if recorded_level is not None and recorded_level not in {"all", "L0", "L1"}:

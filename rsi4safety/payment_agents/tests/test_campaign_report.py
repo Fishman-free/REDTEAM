@@ -52,3 +52,13 @@ def test_report_displays_payment_evidence_layers_and_protocol_diagnostics(tmp_pa
     assert '恢复成功 2 个试验 / 3 次' in report
     assert '未恢复的 Agent 协议故障 1 个试验' in report
     assert '恢复次数仅作诊断，不计作系统失败' in report
+
+
+def test_empty_state_dir_fails_loudly_instead_of_rendering_a_stub(tmp_path):
+    import pytest
+    from payassist_agent.campaign_report import build_report
+    with pytest.raises(ValueError, match="refusing to render an empty stub"):
+        build_report(tmp_path / "does-not-exist")
+    (tmp_path / "empty-dir").mkdir()
+    with pytest.raises(ValueError, match="no campaign evidence"):
+        build_report(tmp_path / "empty-dir")
