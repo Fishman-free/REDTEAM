@@ -8,6 +8,7 @@
 | [experiments/legacy-rsi](experiments/legacy-rsi/README.md) | 旧 Arena/策略实验与日期化验收 | 原结果用于对应历史实现，不为当前防御包背书 |
 | `docs/legacy-rsi/` | 旧落地计划、基础架构、操作手册与模型实验说明 | 被当前 README 和研究方案替代的操作/实现叙述；独立原型源码保留 |
 | `docs/2026-10-03-pre-consolidation/` | 本次收敛前的 README、研究方案和索引快照 | 保留原说明与迁移上下文 |
+| [远端合入前文档](docs/2026-10-03-origin-main/docs/RESEARCH_PLAN.md) | origin/main的原始入口、实施评估和日期验证 | 当前PayAssist路径与独立RTM/接口原型分别解释；原论文/商业计划保留在docs |
 | [history/README.md](history/README.md) | 2026-09-30 之前的原项目入口 | 由当前入口和研究方案替代 |
 | [history/.github/workflows/tests.yml](history/.github/workflows/tests.yml) | 旧目录布局的 CI | [当前 CI](../.github/workflows/tests.yml) |
 | `local-residue/`（Git 忽略） | 原目录字节码和安装元数据 | 仅本机残留，不是当前源码 |

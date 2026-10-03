@@ -27,4 +27,6 @@ python -m pytest -q
 
 2026-10-03 的旧版 L0/L1 原始运行共 4158 次。当前[宿主证据复核](rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.md)校正了版本、分母和报告解释；原报告原字节见[实验归档](archieve/experiments/payassist-v2/README.md)。这些旧版 prompt-only、两暴露面实验与当前防御包/四暴露面协议不可直接比较。
 
-[合约模块](contracts/README.md)、[总构想与独立规格](docs/INDEX.md)继续保留。链上预算/奖励尚未接入当前 PayAssist 裁决；未接入不等于废弃。归档去向、替代关系和 SHA-256 见[归档清单](archieve/manifest.json)。
+[合约模块](contracts/README.md)、[总构想与独立规格](docs/INDEX.md)继续保留。旧Arena已有本地RTM证据奖励桥和公开提交原型；当前PayAssist campaign尚未接入这条桥，见[证据与奖励协议](docs/EVIDENCE_REWARD_PROTOCOL.md)。
+
+[研究论文](docs/paper/payment-agent-security-rsi.md)（[PDF](docs/paper/payment-agent-security-rsi.pdf)）与[商业计划](docs/business/redteam-business-plan.md)（[PDF](docs/business/redteam-business-plan.pdf)）是保留的讨论稿。论文历史泛化统计和商业收入假设不替代当前验证。归档去向、替代关系和 SHA-256 见[归档清单](archieve/manifest.json)。

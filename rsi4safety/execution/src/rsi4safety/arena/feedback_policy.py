@@ -80,7 +80,12 @@ def assert_feedback_bounded(feedback: list[dict], payload_digests: set[str] | No
 
 
 def defender_package(finding: dict) -> dict:
-    """Complete hand-off for one confirmed failure (确认防守失败后交付)."""
+    """Complete hand-off for one confirmed failure (确认防守失败后交付).
+
+    The orchestrator attaches ``execution_evidence`` (paired HTTP traces, host
+    ledger rows and the evidence bundle reference) from the on-disk evidence
+    bundle; this function builds the finding-derived part only.
+    """
     submission = finding["manifest"]["attack_submission"]
     verdict = finding.get("verdict")
     return {

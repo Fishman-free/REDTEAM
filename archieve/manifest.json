@@ -1794,6 +1794,59 @@
       ],
       "raw_state": "rsi4safety/.rsi4safety/payassist-v2/ (Git ignored; not moved or modified)",
       "baseline_map_resolution": "Existing baseline current paths updated for moved files; original_sha256 retains the 2026-09-30 provenance value."
+    },
+    {
+      "date": "2026-10-03",
+      "scope": "Merge origin/main documentation without losing remote research or historical implementation records.",
+      "source_commit": "cbda4f8c0793069d4a5973c0905aa164372a1e10",
+      "records": [
+        {
+          "original": "README.md",
+          "source_commit": "cbda4f8c0793069d4a5973c0905aa164372a1e10",
+          "archived": "archieve/docs/2026-10-03-origin-main/README.md",
+          "sha256": "cfeb0f32c51636bdefce583c9880b5f1736230ea569654edae3356290f4c69a3",
+          "original_bytes_preserved": true,
+          "operation": "snapshot",
+          "reason": "Remote historical implementation/validation retained verbatim while the merged current entrypoints use the consolidated PayAssist design.",
+          "replaced_by": [
+            "README.md",
+            "docs/EVIDENCE_REWARD_PROTOCOL.md"
+          ]
+        },
+        {
+          "original": "docs/INDEX.md",
+          "source_commit": "cbda4f8c0793069d4a5973c0905aa164372a1e10",
+          "archived": "archieve/docs/2026-10-03-origin-main/docs/INDEX.md",
+          "sha256": "3f83a2c6402ee73120a75b0cce34f895c5941b7e465d162bb6419860415f4e78",
+          "original_bytes_preserved": true,
+          "operation": "snapshot",
+          "reason": "Remote historical implementation/validation retained verbatim while the merged current entrypoints use the consolidated PayAssist design.",
+          "replaced_by": [
+            "docs/INDEX.md",
+            "docs/EVIDENCE_REWARD_PROTOCOL.md"
+          ]
+        },
+        {
+          "original": "docs/RESEARCH_PLAN.md",
+          "source_commit": "cbda4f8c0793069d4a5973c0905aa164372a1e10",
+          "archived": "archieve/docs/2026-10-03-origin-main/docs/RESEARCH_PLAN.md",
+          "sha256": "4587db03cb10b32eb0e71042eedb724f42d9296bf8b9bb4946af90929be84985",
+          "original_bytes_preserved": true,
+          "operation": "snapshot",
+          "reason": "Remote historical implementation/validation retained verbatim while the merged current entrypoints use the consolidated PayAssist design.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "docs/EVIDENCE_REWARD_PROTOCOL.md"
+          ]
+        }
+      ],
+      "remote_research_retained": [
+        "docs/paper/payment-agent-security-rsi.md",
+        "docs/paper/payment-agent-security-rsi.pdf",
+        "docs/business/redteam-business-plan.md",
+        "docs/business/redteam-business-plan.pdf",
+        "docs/EVIDENCE_REWARD_PROTOCOL.md"
+      ]
     }
   ]
 }

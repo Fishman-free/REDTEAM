@@ -91,6 +91,13 @@ class ArenaConfig:
     repo_root: Path = field(default_factory=project_root)
     sut_override_dir: Path | None = None  # evaluation runs against a candidate tree
     attacker_hints: tuple[str, ...] = DEFAULT_ATTACKER_HINTS
+    # RTM claim binding (docs/EVIDENCE_REWARD_PROTOCOL.md): when a beneficiary
+    # and a positive amount are configured, every deduped validated finding
+    # emits a content-bound claim request for the on-chain bridge. Empty/zero
+    # keeps the registry empty; neither field enters public_dict/runtime
+    # fingerprints because it changes settlement, not execution semantics.
+    claim_beneficiary: str = ""
+    claim_amount: str = "0"
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", self.campaign_id):
@@ -110,6 +117,11 @@ class ArenaConfig:
             raise ValueError("candidate, repair or submission limit exceeds the supported budget")
         if self.sut_llm_mode not in {"deterministic", "llm"}:
             raise ValueError("sut_llm_mode must be deterministic or llm")
+        if self.sut_app == "paychain" and self.sut_llm_mode == "llm":
+            # PayChain's three-role chain is deterministic; there is no planner
+            # model wired yet, so an llm request would silently be ignored.
+            raise ValueError("paychain online repair is deterministic-only "
+                             "(no planner model wired in app/main.py)")
         if self.dry_run and self.sut_llm_mode == "llm":
             raise ValueError("dry-run must use the deterministic SUT decision mode")
         if self.sut_base_url:
@@ -118,14 +130,16 @@ class ArenaConfig:
                     or url.username or url.password or url.query or url.fragment):
                 raise ValueError("sut_base_url must be an HTTP(S) URL without credentials/query/fragment")
             object.__setattr__(self, "sut_base_url", self.sut_base_url.rstrip("/"))
-        if self.sut_llm_mode == "llm" and self.sut_app == "paychain":
-            raise ValueError("PayChain has no LLM planner adapter yet; use payassist or paygate")
         if self.sut_model is not None and not self.sut_model.strip():
             raise ValueError("sut_model must be nonempty")
         if self.judge_mode not in {"programmatic", "claude"}:
             raise ValueError("judge_mode must be programmatic or claude")
         for role in ROLES:
             require_research_model(getattr(self, f"{role}_model"), f"{role}_model")
+        if self.claim_beneficiary and not re.fullmatch(r"0x[0-9a-f]{40}", self.claim_beneficiary):
+            raise ValueError("claim_beneficiary must be a lowercase 0x address")
+        if self.claim_amount and (not self.claim_amount.isdigit() or int(self.claim_amount) < 0):
+            raise ValueError("claim_amount must be a non-negative decimal string")
 
     @property
     def planning_model(self) -> str:

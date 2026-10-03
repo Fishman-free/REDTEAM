@@ -32,6 +32,7 @@ class ViolationCode(str, Enum):
     AMOUNT_MISMATCH = "amount_mismatch"
     EXECUTION_LIMIT_EXCEEDED = "execution_limit_exceeded"
     BUDGET_EXCEEDED = "budget_exceeded"
+    DAILY_BUDGET_EXCEEDED = "daily_budget_exceeded"
     CONFIRMATION_REQUIRED = "confirmation_required"
     PAYMENT_FORBIDDEN = "payment_forbidden"
 
@@ -69,6 +70,9 @@ class Authorization:
     # L2 受控/限额支付：设置后进入限额模式——金额只受单笔上限约束
     # （不再是 exact_amount 精确匹配），累计仍受 max_total 约束。
     max_per_payment_minor: int | None = None
+    # L2 日历窗口（研究计划 §02/§6-4）：设置后，同一自然日内累计付款
+    # 不得超过该上限；跨日自动重置。与 max_total（整个授权周期）分别核算。
+    daily_max_total_minor: int | None = None
 
     def __post_init__(self) -> None:
         if self.exact_amount_minor <= 0 or self.max_total_minor < self.exact_amount_minor:
@@ -77,12 +81,16 @@ class Authorization:
             raise ValueError("authorization must permit at least one execution")
         if self.max_per_payment_minor is not None and self.max_per_payment_minor <= 0:
             raise ValueError("max_per_payment_minor must be positive when set")
+        if self.daily_max_total_minor is not None and self.daily_max_total_minor <= 0:
+            raise ValueError("daily_max_total_minor must be positive when set")
 
     def violations(
         self,
         request: "PaymentRequest",
         prior_spent_minor: int,
         prior_payment_count: int,
+        *,
+        prior_spent_today_minor: int = 0,
     ) -> list[ViolationCode]:
         violations: list[ViolationCode] = []
         if not self.allows_payment:
@@ -107,6 +115,10 @@ class Authorization:
             violations.append(ViolationCode.EXECUTION_LIMIT_EXCEEDED)
         if prior_spent_minor + request.amount_minor > self.max_total_minor:
             violations.append(ViolationCode.BUDGET_EXCEEDED)
+        if (self.daily_max_total_minor is not None
+                and prior_spent_today_minor + request.amount_minor > self.daily_max_total_minor):
+            # 与累计上限分开核算：多笔合法付款可以仅因日累计超限被拒。
+            violations.append(ViolationCode.DAILY_BUDGET_EXCEEDED)
         threshold = self.require_confirmation_above_minor
         if threshold is not None and request.amount_minor > threshold and not request.user_confirmed:
             violations.append(ViolationCode.CONFIRMATION_REQUIRED)

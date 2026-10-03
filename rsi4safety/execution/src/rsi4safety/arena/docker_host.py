@@ -334,7 +334,10 @@ for path in [active, *active.rglob('*')]:
                 self.seed_defender_source()
             env = self.config.agent_container_env(role, api_key, gateway_token)
             mounts = [Mount(target="/agent", source=f"{self.prefix}-{role}-ws", type="volume")]
-            if role == "judge":
+            if role in ("judge", "defender"):
+                # Judge reads evidence to adjudicate; the defender gets the same
+                # read-only bundles as repair input (findings reference them via
+                # execution_evidence). The attacker never sees this mount.
                 self.config.evidence_dir.mkdir(parents=True, exist_ok=True)
                 mounts.append(Mount(target="/evidence",
                                     source=str(self.config.evidence_dir.resolve()),

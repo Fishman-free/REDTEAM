@@ -93,6 +93,19 @@ L0两次开发晋级被最终验收推翻；L1没有晋级，initial/evolved都�
 
 当前改动扩展防御包和四暴露面，拆分纯实体/金额transfer与组合acceptance，并缩小默认筛查预算。这是新的实验协议；历史结果标为 `historical_only_noncomparable_with_agent_package_four_surface_runs`，当前协议为`arena.payassist.live.v2`。离线测试、真实模型smoke、完整攻防闭环应分别报告；本文件没有把本轮尚未完成的在线验证写成成功。
 
-链上PaymentAgent、RTMToken/BountyVault与旧Arena、策略级RSI、rsi_eval和engineering仍是独立研究资产。它们的源码、测试、独立契约、预注册和原始结果保留，当前不作为PayAssist默认入口。当前PayAssist campaign尚未把finding/version/evidence接入RTM预算/奖励；公开悬赏、生产身份、真实支付和修复者能力提升对照仍未完成。
+### 独立原型与远端研究材料
+
+远端合入的实现继续保留，旧原型接入不等于当前PayAssist接入：
+
+| 资产 | 已有实现与当前边界 |
+|---|---|
+| [证据奖励协议v1](EVIDENCE_REWARD_PROTOCOL.md)、[Python claim协议](../rsi4safety/execution/src/rsi4safety/claim_protocol.py)、[JS claim ID](../contracts/scripts/claim-id.js) | 旧Arena绑定目标/fixture/证据摘要和奖励信息，Python与JS推导claim ID；内容指纹不能单独证明机制新颖性 |
+| [RTM奖励桥](../contracts/scripts/rtm-reward-bridge.js)、[旧Arena裁决](../rsi4safety/execution/src/rsi4safety/arena/adjudication.py) | 旧Arena登记claim-requests，JS消费登记并驱动本地BountyVault configure/settle；当前PayAssist campaign没有接入RTM |
+| [外部HTTP会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound](../contracts/src/BountyRound.sol) | 会话配额/TTL/有限反馈与commit–reveal/pull领奖分别实现；外部身份/钱包证明以及会话提交→复现→链上判奖端到端仍未接线 |
+| [旧Arena编排器](../rsi4safety/execution/src/rsi4safety/arena/orchestrator.py) | 拆分为fixture、执行缓存、裁决和晋级模块；保留独立运行与测试，不能把其接口协议混入当前live.v2 |
+| [研究论文](paper/payment-agent-security-rsi.md)（[PDF](paper/payment-agent-security-rsi.pdf)） | 历史确定性研究稿；未见族训练后从分母移出使20%→100%曲线不能证明跨族进步，逐点成功项始终2个；原稿保留，当前解释据此校正 |
+| [商业计划](business/redteam-business-plan.md)（[PDF](business/redteam-business-plan.pdf)） | 保留讨论稿，市场/客户/收入均待验证；不作为已发生业务或合规认证 |
+
+远端旧实现评估和日期化验证[原文](../archieve/docs/2026-10-03-origin-main/docs/RESEARCH_PLAN.md)按原字节保存，本次合并测试由当前运行结果单独报告，不重复采用历史通过数。链上PaymentAgent、RTMToken/BountyVault、策略级RSI、rsi_eval、engineering的源码、测试、独立契约、预注册和原始结果均保留。生产身份、真实支付和修复者能力提升对照尚未完成。
 
 下一次实验先验证新任务对照能完成、四面输入确实触达、包能更改可变行为且不能改宿主真值，再运行有预算的发现/修复。若对照失败或门禁反复同死因，提交诊断结果，不扩大重复和轮数来掩盖问题。

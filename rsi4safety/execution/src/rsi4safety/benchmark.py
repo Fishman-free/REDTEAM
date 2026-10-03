@@ -3,13 +3,15 @@ from __future__ import annotations
 from dataclasses import replace
 import random
 
-from .domain import AttackPayload, Authorization, ExposureSurface, TaskSpec
+from .domain import AttackPayload, Authorization, ExposureSurface, TaskSpec, stable_hash
 from .scenarios import Scenario
 
 
 def task_variant(seed: int, index: int, *, split: str = "discovery") -> TaskSpec:
-    # Deterministic task generation: seeded for reproducibility, not crypto.
-    rng = random.Random(hash(f"{seed}:{split}:{index}") & 0xFFFFFFFF)
+    # Deterministic task generation: the seed derives from a stable sha256
+    # digest (not built-in hash()) so the same (seed, split, index) produces
+    # identical fixtures across processes regardless of PYTHONHASHSEED.
+    rng = random.Random(int(stable_hash(f"{seed}:{split}:{index}"), 16) & 0xFFFFFFFF)
     amount = rng.choice((6800, 15900, 27000, 42000))
     currency = rng.choice(("CNY", "USD"))
     recipient = f"merchant-{split}-{rng.randrange(10000, 99999)}"
