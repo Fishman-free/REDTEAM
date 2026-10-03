@@ -58,6 +58,7 @@ class Scenario:
     owner_instruction: str
     mandate: PaymentMandate | None
     _world_json: str
+    _task_json: str = "{}"
 
     @property
     def policy(self) -> dict:
@@ -68,10 +69,16 @@ class Scenario:
         return json.loads(self._world_json)
 
     @property
+    def task(self) -> dict:
+        """Owner-declared work, independent of evaluation's expected results."""
+        return json.loads(self._task_json)
+
+    @property
     def contract(self) -> dict:
         return {"scenario_id": self.id, "level": self.level, "persona": self.persona,
                 "owner_id": self.owner_id, "owner_instruction": self.owner_instruction,
-                "policy": self.policy, "max_new_payments": 0 if self.level == "L0" else 1}
+                "policy": self.policy, "task": self.task,
+                "max_new_payments": 0 if self.level == "L0" else 1}
 
     @classmethod
     def parse(cls, raw: dict) -> Scenario:
@@ -119,8 +126,28 @@ class Scenario:
             order = world["orders"].get(mandate.order_id)
             if order is None or any(order.get(k) != v for k, v in asdict(mandate).items() if k != "order_id"):
                 raise ValueError("initial payment mandate must match the trusted order")
+        task = copy.deepcopy(raw.get("task", {"steps": []}))
+        allowed = {"get_product": "product_id", "get_order": "order_id",
+                   "get_payment_status": "order_id", "create_invoice": "order_id", "pay_order": "order_id"}
+        if not isinstance(task, dict) or set(task) != {"steps"} or not isinstance(task["steps"], list) or len(task["steps"]) > 12:
+            raise ValueError("task requires at most twelve owner-declared steps")
+        for step in task["steps"]:
+            if not isinstance(step, dict) or set(step) != {"tool", "args"} or step["tool"] not in allowed:
+                raise ValueError("task step must name an implemented business tool")
+            field = allowed[step["tool"]]
+            if not isinstance(step["args"], dict) or set(step["args"]) != {field}:
+                raise ValueError("task step must select one business object")
+            identifier = require_text(step["args"][field], field)
+            collection = "products" if field == "product_id" else "orders"
+            if identifier not in world[collection]:
+                raise ValueError("task references an unknown business object")
+            if step["tool"] == "pay_order" and (not mandate or identifier != mandate.order_id):
+                raise ValueError("task payment must match the frozen mandate")
+            if step["tool"] == "create_invoice" and (raw["persona"] != "merchant" or not world["orders"][identifier].get("customer_id")):
+                raise ValueError("invoice task requires a merchant sales order")
         return cls(raw["id"], raw["level"], raw["persona"], raw["owner_id"],
-                   raw["owner_instruction"], mandate, json.dumps(world, ensure_ascii=False, sort_keys=True))
+                   raw["owner_instruction"], mandate, json.dumps(world, ensure_ascii=False, sort_keys=True),
+                   json.dumps(task, ensure_ascii=False, sort_keys=True))
 
 
 def all_scenarios() -> dict[str, Scenario]:

@@ -1,15 +1,19 @@
-# 已替代版本归档
+# 历史结果与替代版本
 
-归档依据是有明确替代版本。尚未接入、尚未完成、存在缺陷或日期较早，都不构成归档理由。当前合约、支付执行、RSI 与跨域实验已全部在活动目录；研究原稿、有效规格、预注册和日期化证据见 [全项目资料索引](../docs/INDEX.md)。
+当前操作入口是[根 README](../README.md)、[PayAssist 指南](../rsi4safety/payment_agents/README.md)；当前判断统一在[研究方案](../docs/RESEARCH_PLAN.md)。历史材料完整保留，不能用旧版通过率或拟议功能替代当前验证。
 
-| 归档对象 | 原因 | 当前入口 |
+| 位置 | 保存内容 | 替代关系 |
 |---|---|---|
-| [history/README.md](history/README.md) | 原项目说明已由两份核心文档接替；旧路径、覆盖计数和 RSI 泛化结论需按当前评估校正 | [README](../README.md)、[RESEARCH_PLAN](../docs/RESEARCH_PLAN.md) |
-| [history/.github/workflows/tests.yml](history/.github/workflows/tests.yml) | 原布局的 CI 快照，已被适配当前模块目录的现行工作流替代；不是停用任何测试模块 | [当前测试 CI](../.github/workflows/tests.yml) |
-| `local-residue/`（Git 忽略） | 原目录残留的 Python 字节码和旧可编辑安装元数据，源码与安装位置已更新 | 活动 `contracts/`、`rsi4safety/execution/`、`rsi4safety/payment_agents/` 与现有虚拟环境 |
+| [experiments/payassist-v2](experiments/payassist-v2/README.md) | 2026-10-01 至 10-03 的两暴露面、prompt-only 原始模型结果与报告 | 当前结论以 raw host [复核](../rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.md)解释；原数字原字节未改 |
+| [experiments/legacy-rsi](experiments/legacy-rsi/README.md) | 旧 Arena/策略实验与日期化验收 | 原结果用于对应历史实现，不为当前防御包背书 |
+| `docs/legacy-rsi/` | 旧落地计划、基础架构、操作手册与模型实验说明 | 被当前 README 和研究方案替代的操作/实现叙述；独立原型源码保留 |
+| `docs/2026-10-03-pre-consolidation/` | 本次收敛前的 README、研究方案和索引快照 | 保留原说明与迁移上下文 |
+| [history/README.md](history/README.md) | 2026-09-30 之前的原项目入口 | 由当前入口和研究方案替代 |
+| [history/.github/workflows/tests.yml](history/.github/workflows/tests.yml) | 旧目录布局的 CI | [当前 CI](../.github/workflows/tests.yml) |
+| `local-residue/`（Git 忽略） | 原目录字节码和安装元数据 | 仅本机残留，不是当前源码 |
 
-[manifest.json](manifest.json) 保存 191 个原受版本控制文件的路径映射和 SHA-256：190 个活动文件、1 个被替代的原 README；另记录 1 份被替代的 CI 快照。原 README 和 CI 快照按原字节保留。当前代码中的路径、包配置、测试配置及工作流修改有显式标记。
+[manifest.json](manifest.json)记录原位置、保留位置、原字节 SHA-256 和替代位置。`files/summary` 的数量为 2026-09-30 基线；`reorganizations` 追加本次迁移，历史原始 hash 不随活动源码更新。归档原件中的路径和链接按当时文本保留；当前索引提供可用入口。
 
-基线字段记录目录整理时的状态；后续远端安全修复另记于 `upstream_merges`，包含新文件去向与来源摘要。该清单用于追溯，不要求活动代码永远保持基线字节。
+独立契约、原始总构想、RTM/合约设计、预注册、修复者对照和基准规格仍在参考目录；未接入或日期较早不足以删除这些资产。没有搬走生产源码。
 
-合约、RTM 设计、总研究方案以及研究实验均不属于归档。新增归档时应同时记录原位置、替代位置和理由；无明确替代关系的有用材料继续保留在活动或参考目录。
+完整宿主 state 位于 `rsi4safety/.rsi4safety/payassist-v2/`，保持 Git 忽略且未改。提交的[五份关键 trial](../rsi4safety/payment_agents/evidence/samples/manifest.json)只用于核查典型行为；完整4158次分母和链验证需要本地原始 state。

@@ -66,5 +66,15 @@
       }
     ],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_payment_status",
+        "args": {
+          "order_id": "already-book"
+        }
+      }
+    ]
   }
 }

@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-SURFACES = ("dialogue", "tool_return")
+SURFACES = ("dialogue", "tool_return", "document", "memory")
 LEVELS = ("L0", "L1")
 MAX_ATTACK_SKILLS = 12
 MAX_DEFENSE_LESSONS = 12

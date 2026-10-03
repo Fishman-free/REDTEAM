@@ -46,7 +46,9 @@ class ModelConfig:
 
 
 class ModelError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, kind: str = "infrastructure"):
+        super().__init__(message)
+        self.kind = kind
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -82,7 +84,7 @@ class OpenAICompatibleClient:
             if not isinstance(choice, dict):
                 raise ModelError("invalid model choice")
             if choice.get("finish_reason") == "length":
-                raise ModelError("model output truncated")
+                raise ModelError("model output truncated", kind="agent_protocol")
             message = choice["message"]
             if not isinstance(message, dict) or message.get("role") != "assistant":
                 raise ModelError("invalid assistant role")

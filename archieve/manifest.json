@@ -311,17 +311,29 @@
     },
     {
       "original": "docs/ARCHITECTURE.md",
-      "current": "rsi4safety/docs/references/research/ARCHITECTURE.md",
+      "current": "archieve/docs/legacy-rsi/ARCHITECTURE.md",
       "original_sha256": "fcda7978d9d046fa4dba973ba2abfe55b6ae740ffebe44b881dfbbd7bc595b58",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "rsi4safety/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/ARCHITECTURE.md"
     },
     {
       "original": "docs/ARENA.md",
-      "current": "rsi4safety/docs/references/research/ARENA.md",
+      "current": "archieve/docs/legacy-rsi/ARENA.md",
       "original_sha256": "f57a58045d0ef53a48b6004069db351bee7c5f9428b9442ae119b6b0e5abb918",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "rsi4safety/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/ARENA.md"
     },
     {
       "original": "docs/ARENA_EVOLUTION_SPEC.md",
@@ -353,17 +365,29 @@
     },
     {
       "original": "docs/EXPERIMENT_2026-09-16.md",
-      "current": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-16.md",
+      "current": "archieve/experiments/legacy-rsi/EXPERIMENT_2026-09-16.md",
       "original_sha256": "9a70ad1831cdcbe37094ea54f8c82e7ce4a8a7170509bc539978adcc70830663",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "archieve/experiments/legacy-rsi/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-16.md"
     },
     {
       "original": "docs/EXPERIMENT_2026-09-27.md",
-      "current": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-27.md",
+      "current": "archieve/experiments/legacy-rsi/EXPERIMENT_2026-09-27.md",
       "original_sha256": "3c926b368bfcbb864ad9f6f033eecab8521bf7603cab0023674793d09e305751",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "archieve/experiments/legacy-rsi/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-27.md"
     },
     {
       "original": "docs/EXPERIMENT_PROTOCOL.md",
@@ -374,10 +398,16 @@
     },
     {
       "original": "docs/GLM_EXPERIMENTS.md",
-      "current": "rsi4safety/docs/references/research/GLM_EXPERIMENTS.md",
+      "current": "archieve/docs/legacy-rsi/GLM_EXPERIMENTS.md",
       "original_sha256": "1d373eb447c756d016128bede3f3217fde603accd595d4adc027cd167034f390",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "rsi4safety/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/GLM_EXPERIMENTS.md"
     },
     {
       "original": "docs/INTEGRATION.md",
@@ -395,24 +425,42 @@
     },
     {
       "original": "docs/RESEARCH_PLAN_2026-09-27.md",
-      "current": "rsi4safety/docs/references/research/RESEARCH_PLAN_2026-09-27.md",
+      "current": "archieve/docs/legacy-rsi/RESEARCH_PLAN_2026-09-27.md",
       "original_sha256": "9146c57631cc3a0001ea83741d3072a7fbf6f505e9d708d8489c9491bea61abb",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "rsi4safety/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/RESEARCH_PLAN_2026-09-27.md"
     },
     {
       "original": "docs/RSI_EVAL_RESULTS_2026-09-27.json",
-      "current": "rsi4safety/docs/references/research/RSI_EVAL_RESULTS_2026-09-27.json",
+      "current": "archieve/experiments/legacy-rsi/RSI_EVAL_RESULTS_2026-09-27.json",
       "original_sha256": "eb8e9c191cc981001e14dc12aee3b7095c49f02ace4ae56005d2e661449b5e1b",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "archieve/experiments/legacy-rsi/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/RSI_EVAL_RESULTS_2026-09-27.json"
     },
     {
       "original": "docs/RSI_IMPROVEMENT_PLAN.md",
-      "current": "rsi4safety/docs/references/research/RSI_IMPROVEMENT_PLAN.md",
+      "current": "archieve/docs/legacy-rsi/RSI_IMPROVEMENT_PLAN.md",
       "original_sha256": "a10b3d7bea3331c0bf04ea985766f9fc390eb4ed0bdaf447cefc9c0095d67f9a",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "rsi4safety/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/RSI_IMPROVEMENT_PLAN.md"
     },
     {
       "original": "docs/RSI_PREREGISTRATION.md",
@@ -451,10 +499,16 @@
     },
     {
       "original": "docs/VALIDATION_2026-09-27.md",
-      "current": "rsi4safety/docs/references/research/VALIDATION_2026-09-27.md",
+      "current": "archieve/experiments/legacy-rsi/VALIDATION_2026-09-27.md",
       "original_sha256": "b25834a975c5b6c5d61e5591d3619fe93bafe9b5d1c8af43b4a2ebe61f1149ea",
-      "kind": "active",
-      "modified_during_reorganization": false
+      "kind": "archived",
+      "modified_during_reorganization": false,
+      "archive_reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+      "replaced_by": [
+        "docs/RESEARCH_PLAN.md",
+        "archieve/experiments/legacy-rsi/README.md"
+      ],
+      "previous_active_path": "rsi4safety/docs/references/research/VALIDATION_2026-09-27.md"
     },
     {
       "original": "docs/arena/SEEDED_VULNS.md",
@@ -1401,6 +1455,345 @@
           "upstream_sha256": "f2418bff2b77a4e86dbf06fb0ebb42f52ea4f26ec18b761041ddac75c538ca5d"
         }
       ]
+    }
+  ],
+  "reorganizations": [
+    {
+      "date": "2026-10-03",
+      "scope": "Consolidated current PayAssist design and unchanged historical evidence; production source retained.",
+      "records": [
+        {
+          "original": "README.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/README.md",
+          "sha256": "76a985cfdd769be441ebc0abe2e8f09a70ecd6116130f663e9c19a9b2c362eea",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "docs/RESEARCH_PLAN.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/docs/RESEARCH_PLAN.md",
+          "sha256": "75c647186d6d189dbb283362e08585537ca2bfe160e62418a96dbf5d53f32984",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "rsi4safety/README.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/rsi4safety/README.md",
+          "sha256": "c55b3cbef3497b755288da82da19c2ad2e063b39a5dea74eb45ab0afc8f2475d",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "rsi4safety/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "rsi4safety/payment_agents/README.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/rsi4safety/payment_agents/README.md",
+          "sha256": "6c9163808773b6e8f4e82f47bbe4f8b2adefd4dda9c429e678c8a01690a5abc0",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "rsi4safety/payment_agents/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "docs/INDEX.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/docs/INDEX.md",
+          "sha256": "622896243acb59f8d54c79990596b1e764827f5594322adcd753bb4819c98f21",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "docs/INDEX.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "rsi4safety/docs/INDEX.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/rsi4safety/docs/INDEX.md",
+          "sha256": "78f59e6ae221efe738ef18ba07a66d0de8192558c38918997e24ea95bc4a9eb3",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "rsi4safety/docs/INDEX.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "archieve/README.md",
+          "archived": "archieve/docs/2026-10-03-pre-consolidation/archieve/README.md",
+          "sha256": "ccd7ea65d45a7fc847769cf43da6e6b48dca2fbb423fcce7c76ace180013bf15",
+          "reason": "Current entrypoints and implementation review replaced by the consolidated L0/L1 agent-package design.",
+          "replaced_by": [
+            "archieve/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "snapshot"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/L0_CAMPAIGN_REPORT_2026-10-03.md",
+          "archived": "archieve/experiments/payassist-v2/L0_CAMPAIGN_REPORT_2026-10-03.md",
+          "sha256": "ee01fae7e2e640ee7e405e04b41f23e0676a98977d6fc6863c5350408cd17a37",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/L0_FULL_CAMPAIGN_REPORT_2026-10-02.md",
+          "archived": "archieve/experiments/payassist-v2/L0_FULL_CAMPAIGN_REPORT_2026-10-02.md",
+          "sha256": "04060acfd5ab41042c3b7d3e403f72c37f3e80f6ab25cee11b1ec2efdf6ac9c6",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/L1_CAMPAIGN_REPORT_2026-10-03.md",
+          "archived": "archieve/experiments/payassist-v2/L1_CAMPAIGN_REPORT_2026-10-03.md",
+          "sha256": "1adcd74274e17e5eea9895075a0552e011b7dd6c62b748a14541da059ed86ce1",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/L1_FULL_CAMPAIGN_REPORT_2026-10-02.md",
+          "archived": "archieve/experiments/payassist-v2/L1_FULL_CAMPAIGN_REPORT_2026-10-02.md",
+          "sha256": "b79e49c2abd44a4c17d9177601c19a6d777d817a935eafac950f3541409d82a3",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/LIVE_L0_CAMPAIGN_2026-10-02.json",
+          "archived": "archieve/experiments/payassist-v2/LIVE_L0_CAMPAIGN_2026-10-02.json",
+          "sha256": "7c91df9a7bbc0da7904a10e842081fe6d28fb5ff6e88a127be00607be3e17884",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/LIVE_L0_CAMPAIGN_2026-10-03.json",
+          "archived": "archieve/experiments/payassist-v2/LIVE_L0_CAMPAIGN_2026-10-03.json",
+          "sha256": "3dd6691242c787f39198138a5132e6752f54dd72a5f60755eae070a3aaf24384",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/LIVE_L0_FULL_CAMPAIGN_2026-10-02.json",
+          "archived": "archieve/experiments/payassist-v2/LIVE_L0_FULL_CAMPAIGN_2026-10-02.json",
+          "sha256": "863eea781546b66ecf8b50bb1baf704418a60271933a6a435d138dff80fa88ef",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/LIVE_L1_CAMPAIGN_2026-10-03.json",
+          "archived": "archieve/experiments/payassist-v2/LIVE_L1_CAMPAIGN_2026-10-03.json",
+          "sha256": "ec73fe02338614cdf1c06740de365939334fc3569811715ed601038a78ba8ea2",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/LIVE_L1_FULL_CAMPAIGN_2026-10-02.json",
+          "archived": "archieve/experiments/payassist-v2/LIVE_L1_FULL_CAMPAIGN_2026-10-02.json",
+          "sha256": "a2e45f860e1bfeffae35ecc02fe9ff8cadfcfb0704fc055a328b6c07d13f1bfd",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/STUDIO_4B_MULTITURN_2026-10-01.json",
+          "archived": "archieve/experiments/payassist-v2/STUDIO_4B_MULTITURN_2026-10-01.json",
+          "sha256": "7abefceda9b47bc3b2867092ecbacd513dc31722d348bff168bf3fcc6e20e3ec",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/payment_agents/evidence/STUDIO_4B_MULTITURN_2026-10-01_AUDIT.json",
+          "archived": "archieve/experiments/payassist-v2/STUDIO_4B_MULTITURN_2026-10-01_AUDIT.json",
+          "sha256": "dea56760ec58cdf6c9ad5165c8eaa6bb4e8e8545f6ebffd82141e50b385c46b9",
+          "reason": "Historical prompt-only/two-surface results; retained unchanged, current host review corrects cohort and report interpretation.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.json"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/RESEARCH_PLAN_2026-09-27.md",
+          "archived": "archieve/docs/legacy-rsi/RESEARCH_PLAN_2026-09-27.md",
+          "sha256": "9146c57631cc3a0001ea83741d3072a7fbf6f505e9d708d8489c9491bea61abb",
+          "reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/ARCHITECTURE.md",
+          "archived": "archieve/docs/legacy-rsi/ARCHITECTURE.md",
+          "sha256": "fcda7978d9d046fa4dba973ba2abfe55b6ae740ffebe44b881dfbbd7bc595b58",
+          "reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/ARENA.md",
+          "archived": "archieve/docs/legacy-rsi/ARENA.md",
+          "sha256": "f57a58045d0ef53a48b6004069db351bee7c5f9428b9442ae119b6b0e5abb918",
+          "reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/GLM_EXPERIMENTS.md",
+          "archived": "archieve/docs/legacy-rsi/GLM_EXPERIMENTS.md",
+          "sha256": "1d373eb447c756d016128bede3f3217fde603accd595d4adc027cd167034f390",
+          "reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/RSI_IMPROVEMENT_PLAN.md",
+          "archived": "archieve/docs/legacy-rsi/RSI_IMPROVEMENT_PLAN.md",
+          "sha256": "a10b3d7bea3331c0bf04ea985766f9fc390eb4ed0bdaf447cefc9c0095d67f9a",
+          "reason": "Historical operating/implementation guidance superseded for current work; independent research prototypes remain active.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "rsi4safety/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-16.md",
+          "archived": "archieve/experiments/legacy-rsi/EXPERIMENT_2026-09-16.md",
+          "sha256": "9a70ad1831cdcbe37094ea54f8c82e7ce4a8a7170509bc539978adcc70830663",
+          "reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "archieve/experiments/legacy-rsi/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/EXPERIMENT_2026-09-27.md",
+          "archived": "archieve/experiments/legacy-rsi/EXPERIMENT_2026-09-27.md",
+          "sha256": "3c926b368bfcbb864ad9f6f033eecab8521bf7603cab0023674793d09e305751",
+          "reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "archieve/experiments/legacy-rsi/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/VALIDATION_2026-09-27.md",
+          "archived": "archieve/experiments/legacy-rsi/VALIDATION_2026-09-27.md",
+          "sha256": "b25834a975c5b6c5d61e5591d3619fe93bafe9b5d1c8af43b4a2ebe61f1149ea",
+          "reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "archieve/experiments/legacy-rsi/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/RSI_EVAL_RESULTS_2026-09-27.json",
+          "archived": "archieve/experiments/legacy-rsi/RSI_EVAL_RESULTS_2026-09-27.json",
+          "sha256": "eb8e9c191cc981001e14dc12aee3b7095c49f02ace4ae56005d2e661449b5e1b",
+          "reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "archieve/experiments/legacy-rsi/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "rsi4safety/docs/references/research/STUDIO_4B_BASELINE_2026-10-01.json",
+          "archived": "archieve/experiments/legacy-rsi/STUDIO_4B_BASELINE_2026-10-01.json",
+          "sha256": "afc4bd8d48463c6d2ba2c409bddd95492abf4baa97c88dceb6a68a9b9d439a22",
+          "reason": "Historical experiment/validation evidence; no longer a current capability claim.",
+          "replaced_by": [
+            "docs/RESEARCH_PLAN.md",
+            "archieve/experiments/legacy-rsi/README.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        }
+      ],
+      "raw_state": "rsi4safety/.rsi4safety/payassist-v2/ (Git ignored; not moved or modified)",
+      "baseline_map_resolution": "Existing baseline current paths updated for moved files; original_sha256 retains the 2026-09-30 provenance value."
     }
   ]
 }

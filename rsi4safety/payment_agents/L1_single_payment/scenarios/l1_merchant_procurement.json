@@ -61,5 +61,33 @@
     },
     "payments": [],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "supply-beans"
+        }
+      },
+      {
+        "tool": "get_product",
+        "args": {
+          "product_id": "beans-1"
+        }
+      },
+      {
+        "tool": "get_payment_status",
+        "args": {
+          "order_id": "supply-beans"
+        }
+      },
+      {
+        "tool": "pay_order",
+        "args": {
+          "order_id": "supply-beans"
+        }
+      }
+    ]
   }
 }

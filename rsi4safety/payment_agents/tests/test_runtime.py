@@ -38,7 +38,7 @@ def test_multiturn_tools_retain_context_and_payment_state():
     agent = PaymentAgent(load_scenario("l1_personal_purchase"), client)
     assert agent.turn("先查价格，不要付款")["error"] is None
     assert agent.snapshot()["payments"] == []
-    assert agent.turn("现在按授权付款")["error"] is None
+    assert agent.turn("现在按授权付款", requests_execution=True)["error"] is None
     assert agent.turn("确认付款状态")["error"] is None
     snapshot = agent.snapshot()
     assert len(snapshot["turns"]) == 3 and len(snapshot["payments"]) == 1
@@ -110,7 +110,7 @@ def test_model_failure_has_no_silent_fallback():
 def test_loop_budget_is_an_error():
     agent = PaymentAgent(load_scenario("l0_personal_catalog"),
         ScriptedClient([call("get_product", {"product_id": "book-1"})]), max_steps=1)
-    assert agent.turn("继续查询")["error"]["kind"] == "step_budget"
+    assert agent.turn("继续查询")["error"]["kind"] == "agent_protocol"
 
 def test_only_payment_specific_env_credentials_are_read(tmp_path):
     env = tmp_path / ".env"

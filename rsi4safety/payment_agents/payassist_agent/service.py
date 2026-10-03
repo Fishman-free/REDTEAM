@@ -10,12 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from .model_client import ModelConfig, OpenAICompatibleClient
 from .models import load_scenario
 from .runtime import PaymentAgent
+from .defense import DefensePackage
 
 
 class CreateSession(BaseModel):
     model_config = ConfigDict(extra="forbid")
     scenario_id: str = Field(min_length=1, max_length=128)
     allow_attacks: bool = False
+    defense_package: dict | None = None
 
 
 class OwnerTurn(BaseModel):
@@ -24,7 +26,9 @@ class OwnerTurn(BaseModel):
     requests_execution: bool = False
 
 
-class ExternalTurn(OwnerTurn):
+class ExternalTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    content: str = Field(min_length=1, max_length=16000)
     claimed_sender: str = Field(default="", max_length=256)
 
 
@@ -37,11 +41,20 @@ class ToolOverride(BaseModel):
     times: int = Field(default=1, ge=1, le=20)
 
 
-def create_app(control_token: str, client=None) -> FastAPI:
+class ContextInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    surface: str
+    source_id: str = Field(min_length=1, max_length=128)
+    content: str = Field(min_length=1, max_length=16000)
+
+
+def create_app(control_token: str, client=None, *, defense_package: dict | None = None) -> FastAPI:
     if not isinstance(control_token, str) or len(control_token) < 24:
         raise ValueError("a private controller token of at least 24 characters is required")
     model_client = client or OpenAICompatibleClient(ModelConfig.from_env())
-    app = FastAPI(title="PayAssist L0/L1 multi-turn lab", version="0.2.0")
+    if defense_package is not None:
+        DefensePackage.parse(defense_package)
+    app = FastAPI(title="PayAssist L0/L1 three-loop lab", version="0.3.0")
     sessions: dict[str, tuple[PaymentAgent, str | None]] = {}
     lock = threading.Lock()
 
@@ -73,7 +86,8 @@ def create_app(control_token: str, client=None) -> FastAPI:
     def create(payload: CreateSession, authorization: str | None = Header(default=None)):
         authenticate(authorization, control_token)
         try:
-            agent = PaymentAgent(load_scenario(payload.scenario_id), model_client)
+            package = payload.defense_package if payload.defense_package is not None else defense_package
+            agent = PaymentAgent(load_scenario(payload.scenario_id), model_client, defense_package=package)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         attacker_token = secrets.token_urlsafe(32) if payload.allow_attacks else None
@@ -109,6 +123,18 @@ def create_app(control_token: str, client=None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return {"queued": True}
+
+    @app.post("/sessions/{session_id}/context-inputs")
+    def context_input(session_id: str, payload: ContextInput, authorization: str | None = Header(default=None)):
+        agent, attacker_token = get_session(session_id)
+        if attacker_token is None:
+            raise HTTPException(status_code=403, detail="attack surface not enabled for this session")
+        authenticate(authorization, attacker_token)
+        try:
+            agent.add_context_input(payload.model_dump())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return {"queued": True, "surface": payload.surface}
 
     @app.get("/sessions/{session_id}")
     def snapshot(session_id: str, authorization: str | None = Header(default=None)):

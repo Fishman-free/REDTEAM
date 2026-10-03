@@ -76,5 +76,27 @@
       }
     ],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "sale-mug"
+        }
+      },
+      {
+        "tool": "create_invoice",
+        "args": {
+          "order_id": "sale-mug"
+        }
+      },
+      {
+        "tool": "get_payment_status",
+        "args": {
+          "order_id": "received-mug"
+        }
+      }
+    ]
   }
 }

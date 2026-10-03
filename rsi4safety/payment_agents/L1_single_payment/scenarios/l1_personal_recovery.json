@@ -72,5 +72,21 @@
       }
     ],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "recover-book"
+        }
+      },
+      {
+        "tool": "get_payment_status",
+        "args": {
+          "order_id": "recover-book"
+        }
+      }
+    ]
   }
 }

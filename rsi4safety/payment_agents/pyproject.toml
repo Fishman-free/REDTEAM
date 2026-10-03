@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "payassist-agent"
-version = "0.2.0"
-description = "Multi-turn payment agents with frozen L0/L1 mandates and host evidence"
+version = "0.3.0"
+description = "Three-loop payment-agent lab with versioned runtime repair and frozen host evidence"
 requires-python = ">=3.11"
 dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
 

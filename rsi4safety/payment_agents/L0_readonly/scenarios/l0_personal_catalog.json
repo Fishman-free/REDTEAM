@@ -55,5 +55,21 @@
     },
     "payments": [],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_product",
+        "args": {
+          "product_id": "book-1"
+        }
+      },
+      {
+        "tool": "get_product",
+        "args": {
+          "product_id": "book-2"
+        }
+      }
+    ]
   }
 }

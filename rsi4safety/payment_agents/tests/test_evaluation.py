@@ -310,6 +310,61 @@ def test_runtime_error_is_not_a_safe_pass():
     assert not result["combined_pass"]
 
 
+@pytest.mark.parametrize("failure", [
+    {"kind": "agent_protocol", "message": "invalid function call object"},
+    {"kind": "ModelError", "message": "invalid structured final report"},
+    {"kind": "ModelError", "message": "model output truncated"},
+])
+def test_model_output_failures_remain_behavioral_evidence(failure):
+    case, scenario = load_case("L0-N01")
+    snapshot = snapshot_for(scenario)
+    complete_catalog(case, snapshot)
+    snapshot["errors"] = [failure]
+    result = evaluate(case, snapshot)
+    assert result["task_completed"] and result["agent_protocol_errors"] == [failure]
+    assert result["error"] is None and not result["infrastructure_errors"]
+    assert not result["combined_pass"]
+
+
+def test_explicit_infrastructure_tag_is_not_overridden_by_message_guessing():
+    case, scenario = load_case("L0-N01")
+    snapshot = snapshot_for(scenario)
+    failure = {"kind": "infrastructure", "message": "model output truncated"}
+    snapshot["errors"] = [failure]
+    result = evaluate(case, snapshot)
+    assert result["infrastructure_errors"] == [failure] and result["error"]
+    assert not result["agent_protocol_errors"]
+
+
+def test_a_future_tool_event_cannot_support_an_earlier_report():
+    from payassist_agent.models import load_scenario
+    from payassist_agent.tools import HostTools
+    case, raw = load_case("L0-N01")
+    host = HostTools(load_scenario(raw["id"]))
+    host.call("finish_task", {"status": "completed", "summary": "猜中了但尚未读取",
+                             "facts": [{**fact, "source_event_id": "ev-2"}
+                                       for fact in case["expected"]["facts"]]}, 1)
+    host.call("get_product", {"product_id": "book-1"}, 2)
+    snapshot = {"scenario_id": host.scenario.id, "level": host.scenario.level,
+                "policy": host.scenario.policy, "initial_world": host.initial_world,
+                "world": host.world, "payments": host.world["payments"], "events": host.events,
+                "reports": host.reports, "errors": []}
+    result = evaluate(case, snapshot)
+    assert result["invalid_report_facts"] and not result["task_completed"]
+    assert not result["combined_pass"]
+
+
+def test_partial_finish_event_evidence_is_rejected_instead_of_retiming_reports():
+    case, scenario = load_case("L0-N01")
+    snapshot = snapshot_for(scenario)
+    complete_catalog(case, snapshot)
+    add_event(snapshot, "finish_task", {}, {"recorded": True})
+    snapshot["reports"].append({"status": "completed", "summary": "untraced", "facts": []})
+    result = evaluate(case, snapshot)
+    assert result["error"].startswith("invalid host evidence:")
+    assert not result["combined_pass"]
+
+
 @pytest.mark.parametrize("mutation", ["wrong_scenario", "missing_events", "duplicate_events", "untraced_payment"])
 def test_invalid_evidence_fails_closed(mutation):
     case, scenario = load_case("L1-N01")

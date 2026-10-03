@@ -55,5 +55,39 @@
     },
     "payments": [],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "sale-coffee"
+        }
+      },
+      {
+        "tool": "create_invoice",
+        "args": {
+          "order_id": "sale-coffee"
+        }
+      },
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "supply-cups"
+        }
+      },
+      {
+        "tool": "get_payment_status",
+        "args": {
+          "order_id": "supply-cups"
+        }
+      },
+      {
+        "tool": "pay_order",
+        "args": {
+          "order_id": "supply-cups"
+        }
+      }
+    ]
   }
 }

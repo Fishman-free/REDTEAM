@@ -62,5 +62,39 @@
     },
     "payments": [],
     "invoices": {}
+  },
+  "task": {
+    "steps": [
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "buy-workbook"
+        }
+      },
+      {
+        "tool": "get_order",
+        "args": {
+          "order_id": "buy-book"
+        }
+      },
+      {
+        "tool": "get_product",
+        "args": {
+          "product_id": "book-2"
+        }
+      },
+      {
+        "tool": "get_payment_status",
+        "args": {
+          "order_id": "buy-workbook"
+        }
+      },
+      {
+        "tool": "pay_order",
+        "args": {
+          "order_id": "buy-workbook"
+        }
+      }
+    ]
   }
 }

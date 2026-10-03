@@ -1,0 +1,51 @@
+{
+  "schema_version": "payassist.host-evidence-samples.v1",
+  "scope": "Five diagnostic samples, not the full 2205-trial denominator. Exact byte copies of original local host trials.",
+  "samples": [
+    {
+      "trial_id": "e1995e11da8c3ee93e6f4b1ae0a9248b8d7b3a3c1f6583b0c7096e02f3506516",
+      "sha256": "a6ab393a7879bd13fab4e32f772cfea544aa691dec9eb312bfcba7d6982cf519",
+      "case_id": "r4-a05",
+      "version": "baseline-v0",
+      "repetition": 1,
+      "source": "rsi4safety/.rsi4safety/payassist-v2/campaign-L1-20261003/trials/e1995e11da8c3ee93e6f4b1ae0a9248b8d7b3a3c1f6583b0c7096e02f3506516.json",
+      "file": "e1995e11da8c3ee93e6f4b1ae0a9248b8d7b3a3c1f6583b0c7096e02f3506516.json"
+    },
+    {
+      "trial_id": "ea2b5709186fb4a1651c57cc67d55a2483a2372b6ad0b82d04d52f9b01f30227",
+      "sha256": "4f701eef8b9660cd0dfe5b849c27b4ec7eb6644fbad3eb1be8b95b7febcfa9c8",
+      "case_id": "r4-a05",
+      "version": "baseline-v0",
+      "repetition": 2,
+      "source": "rsi4safety/.rsi4safety/payassist-v2/campaign-L1-20261003/trials/ea2b5709186fb4a1651c57cc67d55a2483a2372b6ad0b82d04d52f9b01f30227.json",
+      "file": "ea2b5709186fb4a1651c57cc67d55a2483a2372b6ad0b82d04d52f9b01f30227.json"
+    },
+    {
+      "trial_id": "f795cc0fcf1a0aec61ffd385361cce09d27eb56af5036846e313e6eddb212dfd",
+      "sha256": "847d7c27dac8d9b7481ac4f87fb836c3ce4c53a6249821372632d8eca8a394cf",
+      "case_id": "r4-a05",
+      "version": "baseline-v0",
+      "repetition": 7,
+      "source": "rsi4safety/.rsi4safety/payassist-v2/campaign-L1-20261003/trials/f795cc0fcf1a0aec61ffd385361cce09d27eb56af5036846e313e6eddb212dfd.json",
+      "file": "f795cc0fcf1a0aec61ffd385361cce09d27eb56af5036846e313e6eddb212dfd.json"
+    },
+    {
+      "trial_id": "6a281e63d16eff5dcef3e4e966aef20a9de8b020c37dd195fafb50a449b59e2a",
+      "sha256": "b22fc657e6d466b09a26490302b2d7121b6b00c4c3b2d30f5ca8c8f300fe750f",
+      "case_id": "ACC-N13",
+      "version": "baseline-v0",
+      "repetition": 9,
+      "source": "rsi4safety/.rsi4safety/payassist-v2/campaign-L1-20261003/trials/6a281e63d16eff5dcef3e4e966aef20a9de8b020c37dd195fafb50a449b59e2a.json",
+      "file": "6a281e63d16eff5dcef3e4e966aef20a9de8b020c37dd195fafb50a449b59e2a.json"
+    },
+    {
+      "trial_id": "d04df456c9cd025f7ae1cd9130ed876ba65de00321939069d849e5cb1a17c0c7",
+      "sha256": "69e5bcc8d408287fdbb3a004e34e02f0acb551922bb6dfadeff06532b12e1228",
+      "case_id": "DEV-N15",
+      "version": "baseline-v0",
+      "repetition": 3,
+      "source": "rsi4safety/.rsi4safety/payassist-v2/campaign-L1-20261003/trials/d04df456c9cd025f7ae1cd9130ed876ba65de00321939069d849e5cb1a17c0c7.json",
+      "file": "d04df456c9cd025f7ae1cd9130ed876ba65de00321939069d849e5cb1a17c0c7.json"
+    }
+  ]
+}
