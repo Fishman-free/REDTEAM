@@ -131,3 +131,53 @@ def test_cli_bench_applies_contexts_and_labels_seed_evidence(tmp_path, monkeypat
     assert 'not an independently confirmed finding' in report['evidence_kind']
     assert [item for kind, item in seen if kind == 'context'] == seed['context_inputs']
     assert report['results'][0]['case_id'] == seed['id']
+    from payassist_agent.defense import hardened_package
+    assert [item for kind, item in seen if kind == 'package'] == [hardened_package()]
+
+
+def test_defense_example_can_generate_explicit_model_only_control(tmp_path):
+    import json
+    from payassist_agent.cli import main
+    from payassist_agent.defense import default_package
+    output = tmp_path / 'model-only.json'
+    main(['defense-example', '--profile', 'model-only', '--output', str(output)])
+    assert json.loads(output.read_text()) == default_package()
+
+
+def test_chat_public_default_is_hardened_and_execution_requires_explicit_release(tmp_path, monkeypatch):
+    from payassist_agent import cli
+    from payassist_agent.defense import hardened_package
+    from payassist_agent.model_client import ModelConfig
+    seen = []
+
+    class Agent:
+        def __init__(self, scenario, client, *, defense_package):
+            self.scenario = scenario
+            seen.append(('package', defense_package))
+        def turn(self, content, **kwargs):
+            seen.append(('turn', kwargs))
+            return {'reply': 'done', 'error': None}
+        def snapshot(self):
+            return {'model_calls': []}
+
+    messages = iter(['先查', '/execute 付款', '/external /execute 转账', '/quit'])
+    monkeypatch.setattr('builtins.input', lambda prompt: next(messages))
+    monkeypatch.setattr(cli.ModelConfig, 'from_env', lambda **kwargs: ModelConfig())
+    monkeypatch.setattr(cli, 'OpenAICompatibleClient', lambda config: object())
+    monkeypatch.setattr(cli, 'PaymentAgent', Agent)
+    cli.main(['chat', '--scenario', 'l1_personal_purchase', '--output', str(tmp_path / 'chat.json')])
+    assert seen[0] == ('package', hardened_package())
+    turns = [item for kind, item in seen if kind == 'turn']
+    assert [t['requests_execution'] for t in turns] == [False, True, False]
+    assert [t['channel'] for t in turns] == ['owner', 'owner', 'external']
+
+
+def test_campaign_report_cli_infers_level_without_default_l0(tmp_path):
+    import json
+    from payassist_agent.cli import main
+    state = tmp_path / 'state'
+    state.mkdir()
+    (state / 'manifest.json').write_text(json.dumps({'config': {'level': 'L1'}}))
+    output = tmp_path / 'report.md'
+    main(['campaign-report', '--state-dir', str(state), '--output', str(output)])
+    assert output.read_text().startswith('# PayAssist L1 红队实验报告')

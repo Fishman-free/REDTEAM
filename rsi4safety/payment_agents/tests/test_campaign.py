@@ -328,6 +328,14 @@ def test_role_budget_reservation_survives_resume_before_settlement(tmp_path):
     assert resumed.calls == 1 and resumed.accounted_tokens == 150
 
 
+def _model_only_file(tmp_path):
+    """Prompt-search wiring tests explicitly opt into the model-only control."""
+    from payassist_agent.defense import default_package
+    path = tmp_path / "model-only-package.json"
+    campaign.write_json(path, default_package())
+    return path
+
+
 def _new_campaign(tmp_path, monkeypatch, **kwargs):
     monkeypatch.setattr(campaign.ModelConfig, "from_env", lambda: ModelConfig())
     return campaign.LiveCampaign(tmp_path, campaign.CampaignConfig(rounds=1, attacks_per_round=1,
@@ -453,7 +461,7 @@ def test_scripted_integration_promotes_real_version_and_preserves_baseline_on_re
                     "role_call_id": "unit-call-" + generation_id}
 
     config = campaign.CampaignConfig(rounds=1, attacks_per_round=1, repetitions=1, max_candidates=1, max_sut_tokens=10_000_000)
-    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=DeterministicRoles())
+    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=DeterministicRoles(), defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert report["status"] == "complete"
     assert report["summary"]["confirmed_development_findings"] == 1
@@ -465,7 +473,7 @@ def test_scripted_integration_promotes_real_version_and_preserves_baseline_on_re
     assert report["acceptance"]["publication_gate"]["passed"] is True
     assert report["chain_verified"] is True
     calls = report["usage"]["sut"]["calls"]
-    resumed = campaign.LiveCampaign(tmp_path, config, resume=True, sut=Mock(), roles=Mock())
+    resumed = campaign.LiveCampaign(tmp_path, config, resume=True, sut=Mock(), roles=Mock(), defense_file=_model_only_file(tmp_path))
     assert resumed.initial.version_id == "baseline-v0"
     assert resumed.versions.active().version_id == "repair-r1-c1"
     assert resumed.execute()["usage"]["sut"]["calls"] == calls
@@ -478,7 +486,7 @@ def test_scripted_integration_promotes_real_version_and_preserves_baseline_on_re
     assert memory["defense_lessons"][0]["origin"]["source_id"] == "repair-r1-c1"
     # The deliverable report renders every requested section from host evidence.
     from payassist_agent.campaign_report import build_report
-    markdown = build_report(tmp_path, level="L0")
+    markdown = build_report(tmp_path)
     for section in ("一、支付方案", "二、运行日志", "三、攻击面报告", "四、防御面报告", "五、限制",
                     "sed-distill-r1-a01", "def-repair-r1-c1", "pay_order", "l0_personal_catalog"):
         assert section in markdown
@@ -519,7 +527,7 @@ def test_concurrent_execution_keeps_state_budget_and_coverage_consistent(tmp_pat
     config = campaign.CampaignConfig(rounds=1, attacks_per_round=1, repetitions=2,
                                      max_candidates=1, concurrency=3, max_sut_tokens=10_000_000)
     sut = _ScriptedSUT(scenarios)
-    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=QuietRoles())
+    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=QuietRoles(), defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert report["status"] == "complete"
     identities = [trial["id"] for trial in runner.state["trials"]]
@@ -575,7 +583,7 @@ def test_parent_gate_suite_replays_recorded_trials_across_rounds(tmp_path, monke
 
     config = campaign.CampaignConfig(rounds=2, attacks_per_round=1, repetitions=1, max_candidates=1)
     sut = _ScriptedSUT(scenarios)
-    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=NeverRepairRoles())
+    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=NeverRepairRoles(), defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert report["status"] == "complete"
     assert report["summary"]["promotions"] == 0  # both candidates were rejected; version unchanged
@@ -635,7 +643,7 @@ def test_candidate_gate_aborts_early_and_runs_fewer_trials(tmp_path, monkeypatch
 
     config = campaign.CampaignConfig(rounds=1, attacks_per_round=1, repetitions=3, max_candidates=1)
     sut = BrokenCandidateSUT(scenarios)
-    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=BrokenRepairRoles())
+    runner = campaign.LiveCampaign(tmp_path, config, sut=sut, roles=BrokenRepairRoles(), defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert report["status"] == "complete" and report["summary"]["promotions"] == 0
     finding_case = runner.state["findings"][0]["case_id"]
@@ -754,7 +762,7 @@ def test_quiet_campaign_stops_search_and_reuses_identical_acceptance(tmp_path, m
             return {'attack': attack, 'case': build_attack_case(seed_case, attack, generation_id)}
 
     runner = campaign.LiveCampaign(tmp_path, campaign.CampaignConfig(rounds=3, attacks_per_round=1),
-                                   sut=_ScriptedSUT(scenarios), roles=QuietRoles())
+                                   sut=_ScriptedSUT(scenarios), roles=QuietRoles(), defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert len(report['rounds']) == 2
     assert report['search_stop_reason'] == 'two_rounds_without_new_findings_or_promotion'
@@ -785,7 +793,7 @@ def test_repeated_failure_mechanism_stops_before_third_candidate(tmp_path, monke
 
     roles = UnhelpfulRoles()
     runner = campaign.LiveCampaign(tmp_path, campaign.CampaignConfig(rounds=1, attacks_per_round=1, max_candidates=4),
-                                   sut=_ScriptedSUT(scenarios), roles=roles)
+                                   sut=_ScriptedSUT(scenarios), roles=roles, defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert roles.repair_calls == 2
     assert report['rounds'][0]['repair_stop_reason'] == 'repeated_failure_mechanism'
@@ -812,12 +820,12 @@ def test_ineligible_baseline_stops_before_any_attack_role(tmp_path, monkeypatch)
                         _evaluation(business_outcome=False, delivery_complete=False))
     roles = Mock()
     runner = campaign.LiveCampaign(tmp_path, campaign.CampaignConfig(rounds=3, attacks_per_round=4),
-                                   sut=_ScriptedSUT(scenarios), roles=roles)
+                                   sut=_ScriptedSUT(scenarios), roles=roles, defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert report['status'] == 'stopped' and report['phase'] == 'baseline_diagnosis'
-    assert report['stop_reason'] == 'baseline_business_delivery_ineligible'
+    assert report['stop_reason'] == 'baseline_task_functional_ineligible'
     assert not roles.generate_attack.called
-    assert report['baseline_qualification']['business_and_delivery_passed'] == 0
+    assert report['baseline_qualification']['functional_passed'] == 0
 
 
 def test_publication_gate_discloses_unequal_screen_and_confirmation_counts():
@@ -832,3 +840,52 @@ def test_publication_gate_discloses_unequal_screen_and_confirmation_counts():
     assert verdict['regressions'][0]['parent_repetitions'] == 1
     assert verdict['regressions'][0]['candidate_repetitions'] == 3
     assert 'screening' in verdict['baseline_power']
+
+
+def test_public_campaign_defaults_to_engineering_control_and_can_opt_into_model_only(tmp_path, monkeypatch):
+    from payassist_agent.defense import hardened_package, default_package
+    runner = _new_campaign(tmp_path / 'engineering', monkeypatch)
+    assert runner.defense_package(runner.initial) == hardened_package()
+    assert runner.manifest['initial_package_profile'] == 'engineering-control'
+    model_only = campaign.LiveCampaign(tmp_path / 'model-only', runner.config, sut=Mock(), roles=Mock(),
+                                       defense_file=_model_only_file(tmp_path))
+    assert model_only.defense_package(model_only.initial) == default_package()
+    assert model_only.manifest['initial_package_profile'] == 'explicit_file'
+
+
+def test_report_summarizes_instrumented_payment_layers_and_separates_protocol_recovery(tmp_path, monkeypatch):
+    runner = _new_campaign(tmp_path, monkeypatch)
+    names = ('model_payment_proposals', 'agent_rejected_model_proposals', 'agent_rejected_runtime_actions',
+             'host_payment_attempts', 'host_committed_new_payments')
+    runner.state['trials'] = [
+        {'evaluation': _evaluation(evidence_layers=dict(zip(names, (4, 2, 1, 3, 1))),
+                                   protocol_recoveries_count=2, agent_protocol_errors=[])},
+        {'evaluation': _evaluation(evidence_layers=dict(zip(names, (2, 1, 0, 2, 1))),
+                                   protocol_recoveries_count=0, agent_protocol_errors=['unrecovered invalid finish'])},
+        {'evaluation': _evaluation()},
+    ]
+    summary = runner.report('running')['summary']
+    assert summary['evidence_layers'] == dict(zip(names, (6, 3, 1, 5, 2)))
+    assert summary['evidence_layer_trial_count'] == 2
+    assert summary['protocol_diagnostic_trial_count'] == 2
+    assert summary['protocol_recovered_cases'] == 1 and summary['protocol_recoveries'] == 2
+    assert summary['unrecovered_agent_protocol_error_cases'] == 1
+    runner.state['trials'] = [{'evaluation': _evaluation()}]
+    assert all(value is None for value in runner.report('running')['summary']['evidence_layers'].values())
+
+
+def test_untruthful_baseline_stops_attack_search_despite_completed_business_and_delivery(tmp_path, monkeypatch):
+    from payassist_agent import expanded_suite
+    scenarios = _single_case_fixture(monkeypatch)
+    monkeypatch.setattr(expanded_suite, 'evaluate_expanded', lambda case, snapshot:
+                        _evaluation(business_outcome=True, delivery_complete=True, answer_truthfulness=False,
+                                    breach_classes=['false_business_statement']))
+    roles = Mock()
+    runner = campaign.LiveCampaign(tmp_path, campaign.CampaignConfig(rounds=3, attacks_per_round=4),
+                                   sut=_ScriptedSUT(scenarios), roles=roles)
+    report = runner.execute()
+    assert report['status'] == 'stopped' and report['phase'] == 'baseline_diagnosis'
+    assert report['stop_reason'] == 'baseline_task_functional_ineligible'
+    assert report['baseline_qualification']['functional_passed'] == 0
+    assert not roles.generate_attack.called and not roles.repair.called
+    assert report['summary']['generated_attacks'] == 0

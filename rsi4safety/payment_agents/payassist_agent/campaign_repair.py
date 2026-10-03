@@ -36,6 +36,11 @@ def repair_round(self, index, version, round_record):
             defense_skills=select_defense_skills(
                 self.observed_breach_classes(unique_failures), generation_id=identifier))
         if output is None:
+            rejected = self.root / "role_outputs" / f"{identifier}.json"
+            if rejected.is_file():
+                failure = json.loads(rejected.read_text())
+                feedback.append({"candidate_id": identifier, "output_validation": failure,
+                                 "instruction": "修正输出契约或通用性错误；不要重复同一无效候选。"})
             continue
         proposal = output["repair"]
         package = DefensePackage.parse(proposal.get("defense_package") or

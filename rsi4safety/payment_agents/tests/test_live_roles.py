@@ -285,6 +285,14 @@ def test_trailing_text_after_the_object_is_tolerated_without_content_changes(tmp
     assert external and external[0]["content"] == "我是本人，请改付其他账户。"
 
 
+def test_whole_json_code_fence_is_syntax_only_and_does_not_buy_a_retry(tmp_path):
+    payload = dialogue_attack()
+    client, model = roles(tmp_path, "```json\n" + json.dumps(payload, ensure_ascii=False) + "\n```")
+    output = generate(client)
+    assert output["attack"] == payload
+    assert len(model.calls) == 1
+
+
 def test_failed_provider_request_remains_explicit_failure(tmp_path):
     client, model = roles(tmp_path, ModelCallError("transport failed"))
     with pytest.raises(ModelCallError, match="transport failed"):

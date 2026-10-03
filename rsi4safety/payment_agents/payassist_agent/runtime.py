@@ -46,6 +46,7 @@ class PaymentAgent:
         self._halted = False
         self.context_inputs = []
         self.proposals = []
+        self.protocol_recoveries = []
 
     def add_context_input(self, item: dict):
         """Documents and imported memories are data, never trusted instructions."""
@@ -66,16 +67,17 @@ class PaymentAgent:
 
     def _invoke(self, name, args, turn_number, *, actor="model"):
         args = copy.deepcopy(args)
+        if name == "pay_order" and actor == "model":
+            self.proposals.append({"tool": name, "args": args, "actor": actor, "channel_turn": turn_number})
         if not isinstance(args, dict):
             receipt = self.tools.call(name, args, turn_number)
             self.tools.events[-1]["actor"] = actor
             return receipt
         if name == "pay_order":
-            if actor == "model":
-                self.proposals.append({"tool": name, "args": args, "channel_turn": turn_number})
             blocked = self.workflow.before_payment(args, execution_open=self.tools.execution_open,
                 invoke=lambda tool, values: self._invoke(tool, values, turn_number, actor="agent_runtime"))
             if blocked:
+                self.workflow.blocks[-1].update(actor=actor, channel_turn=turn_number)
                 return blocked
         elif name == "finish_task":
             self.workflow.complete(execution_open=self.tools.execution_open,
@@ -137,11 +139,18 @@ class PaymentAgent:
                         raise AgentProtocolError("turn deadline exhausted")
                     if len(json.dumps(self.messages, ensure_ascii=False)) > 200000:
                         raise AgentProtocolError("conversation context budget exhausted")
-                    response = self.client.complete(copy.deepcopy(self.messages), tool_definitions(), timeout=remaining)
+                    attempt = {"turn": turn_number, "step": step+1, "model": None,
+                               "usage": {}, "status": "pending"}
+                    self.model_calls.append(attempt)
+                    try:
+                        response = self.client.complete(copy.deepcopy(self.messages), tool_definitions(), timeout=remaining)
+                    except ModelError as exc:
+                        attempt.update(status=exc.kind, model=exc.model, usage=exc.usage)
+                        raise
                     if not isinstance(response, dict):
+                        attempt["status"] = "agent_protocol"
                         raise AgentProtocolError("model response must be an object")
-                    self.model_calls.append({"turn": turn_number, "step": step+1,
-                                             "model": response.get("model"), "usage": response.get("usage", {})})
+                    attempt.update(model=response.get("model"), usage=response.get("usage", {}), status="ok")
                     message = response["message"]
                     if not isinstance(message, dict) or message.get("role") != "assistant":
                         raise AgentProtocolError("invalid assistant role")
@@ -218,6 +227,21 @@ class PaymentAgent:
                         break
                 except (ModelError, ValueError, KeyError, TypeError) as exc:
                     kind = getattr(exc, "kind", "agent_protocol")
+                    # A bounded engineering fallback uses the registered task
+                    # and observed receipts, never partially parsed model output.
+                    if (kind == "agent_protocol" and self.package.runtime["ground_reports"]
+                            and self.package.runtime["complete_workflow"]
+                            and report_repairs < self.package.runtime["max_protocol_repairs"]):
+                        report_repairs += 1
+                        recovered = self._invoke("finish_task", {
+                            "status": "needs_clarification", "summary": "运行时核验后的业务结果。", "facts": []},
+                            turn_number, actor="agent_runtime")
+                        if recovered["status"] == "ok":
+                            text = self.tools.reports[-1]["summary"]
+                            self.messages.append({"role": "assistant", "content": text})
+                            self.protocol_recoveries.append({"turn": turn_number, "kind": kind,
+                                "message": str(exc)[:300], "action": "runtime_grounded_delivery"})
+                            break
                     error = {"turn": turn_number, "kind": kind, "message": str(exc)[:300]}
                     self.errors.append(error)
                     self._halted = True
@@ -231,7 +255,7 @@ class PaymentAgent:
 
     def snapshot(self) -> dict:
         with self._lock:
-            return copy.deepcopy({"schema_version": "payassist.multiturn.v1", "session_id": self.id,
+            return copy.deepcopy({"schema_version": "payassist.multiturn.v2", "session_id": self.id,
                 "scenario_id": self.scenario.id, "level": self.scenario.level,
                 "persona": self.scenario.persona, "owner_id": self.scenario.owner_id,
                 "policy": self.scenario.policy, "contract": self.scenario.contract,
@@ -244,4 +268,5 @@ class PaymentAgent:
                 "execution_request_turn": self.execution_request_turn,
                 "execution_open": self.tools.execution_open, "context_inputs": self.context_inputs,
                 "model_proposals": self.proposals, "agent_blocks": self.workflow.blocks,
+                "protocol_recoveries": self.protocol_recoveries,
                 "turns": self.turns, "messages": self.messages, "model_calls": self.model_calls})

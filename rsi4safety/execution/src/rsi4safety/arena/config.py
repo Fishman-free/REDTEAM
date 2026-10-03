@@ -121,7 +121,7 @@ class ArenaConfig:
             # PayChain's three-role chain is deterministic; there is no planner
             # model wired yet, so an llm request would silently be ignored.
             raise ValueError("paychain online repair is deterministic-only "
-                             "(no planner model wired in app/main.py)")
+                             "(no LLM planner model wired in app/main.py)")
         if self.dry_run and self.sut_llm_mode == "llm":
             raise ValueError("dry-run must use the deterministic SUT decision mode")
         if self.sut_base_url:

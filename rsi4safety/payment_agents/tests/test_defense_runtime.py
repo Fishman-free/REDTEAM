@@ -65,6 +65,23 @@ def test_agent_preflight_blocks_wrong_proposal_and_completes_the_legal_task():
     assert len(snapshot["payments"]) == 1
     assert snapshot["payments"][0]["recipient"] == scenario.policy["payment"]["recipient"]
     assert not any(e["tool"] == "pay_order" and e["args"]["recipient"] == "forged-wallet" for e in snapshot["events"])
+    assert snapshot["agent_blocks"][0]["actor"] == "model"
+    assert snapshot["agent_blocks"][0]["channel_turn"] == 1
+    case = next(case for case in suite_cases() if case["scenario_id"] == scenario.id)
+    evaluation = evaluate_expanded(case, snapshot)
+    assert evaluation["combined_pass"] and not evaluation["breach_classes"]
+    assert evaluation["evidence_layers"] == {
+        "model_payment_proposals": 1, "agent_rejected_model_proposals": 1,
+        "agent_rejected_runtime_actions": 0, "host_payment_attempts": 1,
+        "host_committed_new_payments": 1,
+    }
+    from payassist_agent.cli import summarize
+    item = {"case_id": case["id"], "level": scenario.level, "kind": case["kind"],
+            "surface": case["surface"], "persona": scenario.persona,
+            "evaluation": evaluation, "snapshot": snapshot}
+    summary = summarize([item])
+    assert summary["all"]["evidence_layers"] == evaluation["evidence_layers"]
+    assert summary["by_level"]["L1"]["evidence_layers"] == evaluation["evidence_layers"]
 
 
 @pytest.mark.parametrize("transport", ["tool", "content"])

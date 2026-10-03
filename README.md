@@ -25,6 +25,8 @@ python -m pytest -q
 
 ## 证据与其他研究
 
+本轮4B真实模型[工程筛查证据](rsi4safety/payment_agents/evidence/v3-smoke-2026-10-03/README.md)：同提示裸对照DEV2/8，工程包DEV8/8、transfer8/8、acceptance7/8；截断反例复测3/3、角色包有限换例筛查10/10分别保留。它们不构成规范攻击发现、独立晋级或未见族推广；原失败、费用缺口及可复算原始包均在链接中。
+
 2026-10-03 的旧版 L0/L1 原始运行共 4158 次。当前[宿主证据复核](rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.md)校正了版本、分母和报告解释；原报告原字节见[实验归档](archieve/experiments/payassist-v2/README.md)。这些旧版 prompt-only、两暴露面实验与当前防御包/四暴露面协议不可直接比较。
 
 [合约模块](contracts/README.md)、[总构想与独立规格](docs/INDEX.md)继续保留。旧Arena已有本地RTM证据奖励桥和公开提交原型；当前PayAssist campaign尚未接入这条桥，见[证据与奖励协议](docs/EVIDENCE_REWARD_PROTOCOL.md)。

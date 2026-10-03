@@ -1,0 +1,356 @@
+{
+  "schema_version": "payassist.smoke-byte-manifest.v1",
+  "date": "2026-10-03",
+  "root_in_bundle": "state-dir relative paths; no machine credentials or access files",
+  "canonical_hash_format": "SHA256(JSON UTF-8, ensure_ascii=False, sort_keys=True, separators=(comma,colon)); used by original report trial/source/package receipts",
+  "byte_hash_format": "SHA256 exact file bytes; used by this manifest",
+  "bundle": {
+    "path": "raw-evidence.tar.gz",
+    "sha256": "e12e12b304358d383af28995856f8b15bee41e7355bad2e17bd4f50ac34e1ee5",
+    "bytes": 331391,
+    "members": 65,
+    "compression": "deterministic tar/gzip; uid/gid/mtime zero, no paths outside bundle"
+  },
+  "summary": {
+    "path": "summary.json",
+    "sha256": "f9163b3b406b51a6ee8b5ba5015018cdd74d1b89512666b29ad7a911d5da104c",
+    "bytes": 19036
+  },
+  "members": [
+    {
+      "path": "post-fix-sellbuy-20261003.json",
+      "sha256": "27937bca07276d3b3f44d0478ac7ebf733f998907241ade87af16ac7980cac2c",
+      "bytes": 152038
+    },
+    {
+      "path": "repair-smoke-20261003/original-role-validation.json",
+      "sha256": "69e023bb3e0f475f196fdbca8aedf293ede7bacfed36f205333446bce7872c6a",
+      "bytes": 634
+    },
+    {
+      "path": "repair-smoke-20261003/report.json",
+      "sha256": "c6c0119dd5a1fbef0ad815732e85c8cdf251c24d18c3f36b984bc83895ff7d16",
+      "bytes": 1418
+    },
+    {
+      "path": "repair-smoke-20261003/roles.jsonl",
+      "sha256": "1d3513ff8bf8bfafd1d2a3c4c950d67b1eed265eb63b9993203cfa759316a2c1",
+      "bytes": 247545
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/defense.json",
+      "sha256": "e1a64932936f4b0a3d56cc50b2e26eada9fdfd33b504397f6fe6e1855187ae76",
+      "bytes": 4642
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/original-role-validation.json",
+      "sha256": "c6c0119dd5a1fbef0ad815732e85c8cdf251c24d18c3f36b984bc83895ff7d16",
+      "bytes": 1418
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/plan.json",
+      "sha256": "b95d44e7aca3fff88bf2579917b87e7508fdb720252eac86f38ed942a0aa366a",
+      "bytes": 44884
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/proposal.json",
+      "sha256": "7b1b51ad453361e72aab5af4daee883dd328445e566220ecd3eb61e49506b6e9",
+      "bytes": 6141
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/report.json",
+      "sha256": "234b87d0f0e9c07c59a937592f86e52fe0d4a99c4f18a9917b039011d00efa84",
+      "bytes": 28656
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/roles.jsonl",
+      "sha256": "08ddf1526f7849178a42bb83c4583a64f59b221baa5c26425c4c0fa68b86524c",
+      "bytes": 254978
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/sut-usage.json",
+      "sha256": "17ffb2605bee64f5f7983eed6ddee291f80575c6600080d5d8cb8bbd01cbd69f",
+      "bytes": 139
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/ACC-N06.json",
+      "sha256": "cffa8c51d6b2a46fed3b30c7b2e50a86364f7d762737f694680ea086ee5baf90",
+      "bytes": 54326
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/ACC-N08.json",
+      "sha256": "5f1da732deb2f1cbbb14f2616af52035bdd1e39d61010c1bd7a980f1baae72b6",
+      "bytes": 54389
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N01.json",
+      "sha256": "bdd23db68db6888924e2f6c246880f61d9dafc489e2e227648681deec2bf5d51",
+      "bytes": 25170
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N02.json",
+      "sha256": "610cbbbb2ebd15811ead77fba8eb1b8d5e47879fc65638f56991705d205ea12f",
+      "bytes": 31234
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N03.json",
+      "sha256": "a74beb39f51d853c9dc10547c8ebaad26e0accf94ca40a56a65c84189a419674",
+      "bytes": 34916
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N04.json",
+      "sha256": "97e371201d711d1c43ebe08553b42b44ed47e81a925d444a5022e260dbb6a84d",
+      "bytes": 38344
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N05.json",
+      "sha256": "a78309499ddaddef97619583c7ff4d2cd586cf082ce8694cdef30f9b7ed3018b",
+      "bytes": 37168
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N06.json",
+      "sha256": "7571b19aa8d7df3f78c84bec2bad106c31b6ebffef8e194553e8014e778ef961",
+      "bytes": 32566
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N07.json",
+      "sha256": "6b8f88dcf041f5f44b4df8d89ecdb3c8fd1a699f2c2089247e2b43c36b5e7fe1",
+      "bytes": 38869
+    },
+    {
+      "path": "repair-smoke-20261003-retry1/trials/TRN-N08.json",
+      "sha256": "3fdc6258afb00788c0269a752b3885368d2ef6783ba4fe08d66c6215e828daf6",
+      "bytes": 44088
+    },
+    {
+      "path": "smoke-20261003/plan.json",
+      "sha256": "a98b3255e144285d047084b66147797fefdd21525d01f3bbd3c55c52fffef528",
+      "bytes": 192539
+    },
+    {
+      "path": "smoke-20261003/report.json",
+      "sha256": "5c55dc66b001e93ec7f2b91c15ea2ef729d16bf31e5982db3350425626efa777",
+      "bytes": 125878
+    },
+    {
+      "path": "smoke-20261003/sources.json",
+      "sha256": "46046738801e2a1c5ecda7cd576c7beff8de24f4e39124aeff92214d83afe923",
+      "bytes": 278371
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N01.json",
+      "sha256": "7e85a5ec956f92cef8c99b01a2df530893d5b132ae58d7a239fd3c57c833367d",
+      "bytes": 18896
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N02.json",
+      "sha256": "810525cfddee0aa5805a67138fae7ecd00128af43492d6c722037a84cf1b9e10",
+      "bytes": 22420
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N03.json",
+      "sha256": "63edfa7edf95b3045e12839cad33e53072c9faa8f9e1f2da72ef0cc2749faa23",
+      "bytes": 25144
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N04.json",
+      "sha256": "0cbc80050fb18a5810bc6e4632f5f1418612d1cfb034ee0203f259e87a3d9e36",
+      "bytes": 29913
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N05.json",
+      "sha256": "1e36ade1bedb584e95e0eb11588e5c19dea24d0ccf97ec0471bcbb42c5dc74c4",
+      "bytes": 29299
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N06.json",
+      "sha256": "467e4bb7bab77c88316ad3773b8bead6a2d664bf7c5edfd41ea953568a89e1e1",
+      "bytes": 20650
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N07.json",
+      "sha256": "96f9eea70c0be0864ab48c5fa7b7df2e4ca276dc2f6b9f7c198547533ff27a4a",
+      "bytes": 28089
+    },
+    {
+      "path": "smoke-20261003/trials/baseline-DEV-N08.json",
+      "sha256": "42d0d5d1a6e15b36fb3d4935adea0e51ed0c7d52468d0a8cea469573ab6bb30d",
+      "bytes": 28291
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N01.json",
+      "sha256": "9d59021cf24f047776359e0a55b76e086c69551f289a03b56b7d765f75e781ef",
+      "bytes": 30940
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N02.json",
+      "sha256": "a7e76e2f618daa4c837c9afc16b07fe9aacf9a7a47a3c461fb8378008fa24e72",
+      "bytes": 38495
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N03.json",
+      "sha256": "7404459fb641d0f577b503ad6b5b45fd51fe8fdd216190f28cbad679d1972423",
+      "bytes": 52022
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N04.json",
+      "sha256": "bbc0e0470390c88b29f3265f8c6ae6061944e4d39e715df4217ee708147c4258",
+      "bytes": 46108
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N05.json",
+      "sha256": "cf04c1c50bb76962fccf6cf085588f3e37860f00bfe3d92b53cda1512e13719f",
+      "bytes": 48280
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N06.json",
+      "sha256": "36f5e452e5204d6f55d79ad9ccf2006733933ff90dc9c0f7cf1b07c8e5d7b068",
+      "bytes": 43211
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N07.json",
+      "sha256": "f1938241762d14f741bf417b16d11eeccfc26414ed40d7f2c22c569cbbbf0757",
+      "bytes": 50395
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-ACC-N08.json",
+      "sha256": "758e0657c84fa499213e0f7aad368d271e9d35bd0f6a33dd55bb015ebbe26e59",
+      "bytes": 24491
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N01.json",
+      "sha256": "5c7e9d2e6181f772a1e8d6a70472a3a3ace8962550b691d5a214ed60ee81ad0c",
+      "bytes": 18486
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N02.json",
+      "sha256": "f35baace723c5bda1cd5661e1d0b686d062affedc3dc207b91142813ddc0dfb0",
+      "bytes": 22993
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N03.json",
+      "sha256": "55c429ab42c5f168890f479ab1a5c469288f1b79c4fd1bb8033381c5fc11a911",
+      "bytes": 28093
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N04.json",
+      "sha256": "4e9a86b22bb75795da580a8bac12a7d51eaf710ba8c4bb0c0c8b0a3789ff1545",
+      "bytes": 29869
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N05.json",
+      "sha256": "7374bd1bd8782b3ac4f1c9514b7ce325bbc4e3102f76a99930793998e90e1594",
+      "bytes": 29375
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N06.json",
+      "sha256": "595b4f408290576d5a882c687f9d088edd2fd8b8f958a56970e90873708b0621",
+      "bytes": 22675
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N07.json",
+      "sha256": "9e2fab55a57501d09a54cc09460f0bfbaae51090abc012decb1cf46b73e81d40",
+      "bytes": 31946
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-DEV-N08.json",
+      "sha256": "ac89b072d251fdba1c0a323523901a98374a4509100ff928310f9933224a344e",
+      "bytes": 32391
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A01.json",
+      "sha256": "e08642fd17a7f515e70457debeeaee17324ec94c6a1d807d668f06d28c72d83c",
+      "bytes": 25487
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A02.json",
+      "sha256": "f53423a2ace839f1207368c1d063a7bf5ba1fc298dcd910d3dfe8820016b7bac",
+      "bytes": 19968
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A03.json",
+      "sha256": "9875581bb03f9e86dfa1b47656035cf13d74f1e6e43772ab4532ea9e34a0ddd1",
+      "bytes": 20174
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A04.json",
+      "sha256": "59c73acfa38368d50f31b652948bfb1d0f0f92497f1a9a06957302ce5a9e046d",
+      "bytes": 20289
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A13.json",
+      "sha256": "81da6815d388780a22e0a248197138a1c4e5456835af7b5ccdabf9c4cc7d1fbb",
+      "bytes": 45880
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A14.json",
+      "sha256": "00a9b7d2de1dfaa09a6e0a49eb76474f5a154aaffb166a038442271629d2983a",
+      "bytes": 31482
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A15.json",
+      "sha256": "a4a7f0ad1197895a5cef7463100b15594b487397f1b01baba777dea5e44177f0",
+      "bytes": 31437
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-A16.json",
+      "sha256": "5e1e596c86e27e67c31a8b1b5ba54e400be5c37bc5405f59e38f936e71955a64",
+      "bytes": 31992
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N01.json",
+      "sha256": "ccc0a535d5c6c4e4f30c242821d7c2d1ad4b0077881cf88c79e205c09175e25a",
+      "bytes": 19067
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N02.json",
+      "sha256": "39b446de8b50460539be0a5c6eab079181d40d5255419c9becabf11a777e919b",
+      "bytes": 22742
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N03.json",
+      "sha256": "06f2069b67cdaaebbfd3080d0fef67719f468807c643eb0c20d9534917a33443",
+      "bytes": 28591
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N04.json",
+      "sha256": "e6c214ae07abc8787ab100bd17d2265b4d4a59a93247d3b8a1ad7f5a5c497f42",
+      "bytes": 30618
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N05.json",
+      "sha256": "88afebbae5570f3cc37897240e611f6791b405c7291df2f99fcad21246aeedc0",
+      "bytes": 28577
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N06.json",
+      "sha256": "9eb50222141c5a880446738e92f26215118bc7ed31119401ba81ccc26144c39d",
+      "bytes": 23256
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N07.json",
+      "sha256": "62654304b41086a521229f5dfe806921b76e22d4428586be0eaf6690c6f33fea",
+      "bytes": 32906
+    },
+    {
+      "path": "smoke-20261003/trials/engineering_control-TRN-N08.json",
+      "sha256": "204e36a6b18690aba9b40f2683723c958d991149050a7da46e72ef4dddf9b504",
+      "bytes": 33346
+    },
+    {
+      "path": "smoke-20261003/usage.json",
+      "sha256": "c649eab48234dce3c75f7df0254758b4aea497499c3b6eacca0742f912da5c5d",
+      "bytes": 141
+    }
+  ],
+  "credential_review": {
+    "files_reviewed": 65,
+    "nonempty_credential_fields_or_common_secret_literals_found": 0,
+    "method": "Recursive JSON/JSONL sensitive-key scan and common key/bearer/JWT/URL-credential literal scan; source-variable names are not credentials. Only enumerated evidence JSON/JSONL files included; no env/access/log/config credential files."
+  },
+  "readme": {
+    "path": "README.md",
+    "sha256": "e3b47eb69d4a5935b1aea8bade1245f46eb48f107f684e54b5a7b8c85ce60ba3",
+    "bytes": 5181
+  }
+}

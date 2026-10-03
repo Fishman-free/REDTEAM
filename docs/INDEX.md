@@ -13,6 +13,7 @@
 | [跨模块实验协议](references/research/EXPERIMENT_PROTOCOL.md)、[开发路线](references/research/DEVELOPMENT_ROADMAP.md) | 独立后端、证据和整合研究，保留 |
 | [整合记录](references/research/INTEGRATION.md)、[2026-09-18 审查](references/research/SECURITY_REVIEW_2026-09-18.md)、[2026-09-23 验收](references/research/VALIDATION_2026-09-23.md)、[2026-09-27 合约审计](references/research/SECURITY_AUDIT_2026-09-27.md) | 跨模块/合约的来源记录，结果只对应当时版本 |
 | [支付系统原始 PDF](../rsi4safety/docs/references/智能体支付系统和方案的设计.pdf)、[RSI 独立规格索引](../rsi4safety/docs/INDEX.md) | 三环、身份和修复能力研究依据 |
+| [当前真实模型筛查包](../rsi4safety/payment_agents/evidence/v3-smoke-2026-10-03/README.md) | 同提示工程对照、截断反例复测与角色包有限筛查分列；原字节包、hash、成本缺口和确认边界 |
 | [宿主证据复核](../rsi4safety/payment_agents/evidence/HOST_EVIDENCE_REVIEW_2026-10-03.md)、[原始模型实验](../archieve/experiments/payassist-v2/README.md) | 当前解读与未改原件分开保存 |
 | [远端历史评估原件](../archieve/docs/2026-10-03-origin-main/docs/RESEARCH_PLAN.md)、[远端日期验证原件](../archieve/docs/2026-10-03-origin-main/README.md) | origin/main合入前原字节保留，旧操作/统计不作为当前运行说明 |
 | [归档清单](../archieve/manifest.json) | 去向、替代关系、字节 hash |

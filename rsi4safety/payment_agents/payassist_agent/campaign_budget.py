@@ -100,8 +100,14 @@ class BudgetedSUT:
                 self.usage["accounted_tokens"] += reservation
             self.usage["calls"] += 1
             write_json(self.path, self.usage)
-        result = self.client.complete(messages, tools, timeout=timeout)
+        failure = None
+        try:
+            result = self.client.complete(messages, tools, timeout=timeout)
+        except ModelError as exc:
+            failure, result = exc, {"usage": exc.usage}
         usage = result.get("usage") or {}
+        if not isinstance(usage, dict):
+            usage = {}
         with self._lock:
             if result.get("status") == "cache_hit" or result.get("cached") is True:
                 raise ModelError("cached response cannot serve as independent confirmation")
@@ -113,4 +119,6 @@ class BudgetedSUT:
                 if type(usage.get(key)) is int and usage[key] >= 0:
                     self.usage[key] += usage[key]
             write_json(self.path, self.usage)
+        if failure is not None:
+            raise failure
         return result

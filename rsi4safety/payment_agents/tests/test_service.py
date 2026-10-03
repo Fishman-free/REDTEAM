@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from payassist_agent import cli
 from payassist_agent.model_client import ModelConfig, PAYMENT_MODEL
 from payassist_agent.service import create_app
+from payassist_agent.defense import default_package, hardened_package
 
 
 CONTROL = "controller-test-capability-0123456789abcdef"
@@ -48,7 +49,7 @@ class ScriptedClient:
 @pytest.fixture
 def api():
     model = ScriptedClient()
-    with TestClient(create_app(CONTROL, model)) as http:
+    with TestClient(create_app(CONTROL, model, defense_package=default_package())) as http:
         yield http, model
 
 
@@ -280,4 +281,24 @@ def test_serve_binds_loopback_and_writes_private_access_file(tmp_path, monkeypat
     assert CONTROL not in output.out + output.err
     assert str(access) in output.out
     assert len(runs) == 1 and runs[0][1] == {"host": "127.0.0.1", "port": 18011}
+    with TestClient(runs[0][0]) as http:
+        from payassist_agent.models import canonical_hash
+        session = create_session(http)
+        assert snapshot(http, session)["defense_package_sha256"] == canonical_hash(hardened_package())
     assert model.calls == []
+
+
+def test_public_service_defaults_to_hardened_package_with_authenticated_override():
+    from payassist_agent.models import canonical_hash
+    model = ScriptedClient()
+    with TestClient(create_app(CONTROL, model)) as http:
+        session = create_session(http)
+        assert snapshot(http, session)['defense_package_sha256'] == canonical_hash(hardened_package())
+        external = authorization(session['attacker_token'])
+        assert http.post('/sessions', headers=external,
+                         json={'scenario_id': SCENARIO, 'defense_package': default_package()}).status_code == 401
+        overridden = http.post('/sessions', headers=authorization(),
+                         json={'scenario_id': SCENARIO, 'defense_package': default_package()})
+        assert overridden.status_code == 201
+        assert snapshot(http, overridden.json())['defense_package_sha256'] == canonical_hash(default_package())
+        assert model.calls == []

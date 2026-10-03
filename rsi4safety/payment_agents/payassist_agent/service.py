@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .model_client import ModelConfig, OpenAICompatibleClient
 from .models import load_scenario
 from .runtime import PaymentAgent
-from .defense import DefensePackage
+from .defense import DefensePackage, hardened_package
 
 
 class CreateSession(BaseModel):
@@ -52,8 +52,7 @@ def create_app(control_token: str, client=None, *, defense_package: dict | None 
     if not isinstance(control_token, str) or len(control_token) < 24:
         raise ValueError("a private controller token of at least 24 characters is required")
     model_client = client or OpenAICompatibleClient(ModelConfig.from_env())
-    if defense_package is not None:
-        DefensePackage.parse(defense_package)
+    defense_package = DefensePackage.parse(defense_package if defense_package is not None else hardened_package()).to_dict()
     app = FastAPI(title="PayAssist L0/L1 three-loop lab", version="0.3.0")
     sessions: dict[str, tuple[PaymentAgent, str | None]] = {}
     lock = threading.Lock()
@@ -80,7 +79,7 @@ def create_app(control_token: str, client=None, *, defense_package: dict | None 
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "protocol": "payassist.multiturn.v1"}
+        return {"status": "ok", "protocol": "payassist.multiturn.v2"}
 
     @app.post("/sessions", status_code=201)
     def create(payload: CreateSession, authorization: str | None = Header(default=None)):

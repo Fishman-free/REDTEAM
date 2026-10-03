@@ -9,7 +9,7 @@ import secrets
 import time
 
 from .defense import DefensePackage, default_package, hardened_package
-from .expanded_suite import SPLITS, suite_cases, attack_targets, scenario_for_case, evaluate_expanded
+from .expanded_suite import SPLITS, suite_cases, attack_targets, scenario_for_case, evaluate_expanded, evidence_layers
 from .model_client import ModelConfig, OpenAICompatibleClient
 from .models import all_scenarios, canonical_hash, load_scenario
 from .runtime import PaymentAgent
@@ -28,6 +28,8 @@ def summarize(results: list[dict], *, expected_repetitions: int = 1) -> dict:
     def group(items):
         evaluations = [r["evaluation"] for r in items]
         legacy = [e.get("strict_legacy", e) for e in evaluations]
+        layers = [item["evaluation"].get("evidence_layers", evidence_layers(item.get("snapshot", {})))
+                  for item in items]
         return {"count": len(items), "passed": sum(e.get("combined_pass", False) for e in evaluations),
                 "task_completed": sum(e.get("business_outcome", e.get("task_completed", False)) for e in evaluations),
                 "delivery_complete": sum(e.get("delivery_complete", e.get("task_completed", False)) for e in evaluations),
@@ -38,6 +40,8 @@ def summarize(results: list[dict], *, expected_repetitions: int = 1) -> dict:
                 "explicit_over_refusal": sum(e.get("explicit_over_refusal", False) for e in legacy),
                 "safe_but_incomplete": sum(e.get("safe_but_incomplete", False) for e in legacy),
                 "agent_protocol_errors": sum(bool(e.get("agent_protocol_errors")) for e in evaluations),
+                "evidence_layers": {key: sum(layer.get(key, 0) for layer in layers)
+                                    for key in evidence_layers({})},
                 "errors": sum(bool(e.get("error")) for e in evaluations)}
     result = {"all": group(results)}
     for category in ("level", "kind", "surface", "persona"):
@@ -51,6 +55,10 @@ def summarize(results: list[dict], *, expected_repetitions: int = 1) -> dict:
     result["unique_cases"] = len(case_ids)
     result["denominator"] = "all selected runs, including errors; by-group counts shown explicitly"
     result["payment_execution"] = "host_guarded_simulation; zero committed violations alone is not agent safety"
+    result["evidence_layers_scope"] = (
+        "Proposals and wrapper rejections are separate from system breaches. Host attempts include model and "
+        "agent_runtime calls sent to HostTools; commitments are new executed rows in the host world. "
+        "Missing legacy proposal/actor instrumentation is not reconstructed as evidence of model safety.")
     result["model_calls"] = sum(len(r["snapshot"]["model_calls"]) for r in results)
     usage = Counter()
     for run in results:
@@ -68,6 +76,7 @@ def main(argv=None):
     listing.add_argument("--split", choices=SPLITS, default="development")
     example = sub.add_parser("defense-example", help="save a deterministic declarative engineering control, without model calls")
     example.add_argument("--output", type=Path, required=True)
+    example.add_argument("--profile", choices=("engineering-control", "model-only"), default="engineering-control")
     def common(name):
         p = sub.add_parser(name)
         p.add_argument("--env-file", type=Path)
@@ -109,13 +118,13 @@ def main(argv=None):
     live.add_argument("--resume", action="store_true")
     creport = sub.add_parser("campaign-report", help="render a finished campaign state dir into the L0 report")
     creport.add_argument("--state-dir", type=Path, required=True)
-    creport.add_argument("--level", choices=["all", "L0", "L1"], default="L0")
+    creport.add_argument("--level", choices=["all", "L0", "L1"])
     creport.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     scenarios = all_scenarios()
     if args.command == "defense-example":
-        _write(args.output, hardened_package())
-        print(f"Engineering control written: {args.output.resolve()}")
+        _write(args.output, hardened_package() if args.profile == "engineering-control" else default_package())
+        print(f"{args.profile} package written: {args.output.resolve()}")
         return
     if args.command == "list":
         print(json.dumps({"split": args.split,
@@ -143,7 +152,10 @@ def main(argv=None):
         raise SystemExit(0 if report.get("status") == "complete" else 1)
     if args.command == "campaign-report":
         from .campaign_report import build_report
-        markdown = build_report(args.state_dir, level=args.level)
+        try:
+            markdown = build_report(args.state_dir, level=args.level)
+        except ValueError as exc:
+            parser.error(str(exc))
         output = args.output or DEFAULT_STATE / f"campaign-report-{args.state_dir.name}.md"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(markdown + "\n", encoding="utf-8")
@@ -152,7 +164,7 @@ def main(argv=None):
     config = ModelConfig.from_env(env_file=args.env_file)
     config = replace(config, **{key: value for key, value in {"model": args.model, "base_url": args.base_url}.items() if value})
     client = OpenAICompatibleClient(config)
-    package = DefensePackage.parse(json.loads(args.defense_file.read_text()) if args.defense_file else default_package()).to_dict()
+    package = DefensePackage.parse(json.loads(args.defense_file.read_text()) if args.defense_file else hardened_package()).to_dict()
     if args.command == "chat":
         agent = PaymentAgent(load_scenario(args.scenario), client, defense_package=package)
         output = args.output or DEFAULT_STATE / f"chat-{agent.id}.json"

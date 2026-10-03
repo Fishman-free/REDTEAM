@@ -46,9 +46,13 @@ class ModelConfig:
 
 
 class ModelError(RuntimeError):
-    def __init__(self, message: str, *, kind: str = "infrastructure"):
+    def __init__(self, message: str, *, kind: str = "infrastructure", usage=None, model=None):
         super().__init__(message)
         self.kind = kind
+        self.usage = {key: value for key, value in (usage or {}).items()
+                      if key in {"prompt_tokens", "completion_tokens", "total_tokens"}
+                      and type(value) is int and value >= 0} if isinstance(usage, dict) else {}
+        self.model = model
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -84,11 +88,14 @@ class OpenAICompatibleClient:
             if not isinstance(choice, dict):
                 raise ModelError("invalid model choice")
             if choice.get("finish_reason") == "length":
-                raise ModelError("model output truncated", kind="agent_protocol")
+                raise ModelError("model output truncated", kind="agent_protocol",
+                                 usage=data.get("usage"), model=data.get("model"))
             message = choice["message"]
             if not isinstance(message, dict) or message.get("role") != "assistant":
                 raise ModelError("invalid assistant role")
-            return {"message": message, "model": data["model"], "usage": data.get("usage", {})}
+            usage = data.get("usage")
+            return {"message": message, "model": data["model"],
+                    "usage": usage if isinstance(usage, dict) else {}}
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             raise ModelError(f"model transport failed ({type(exc).__name__})") from None
         except (ValueError, KeyError, IndexError, TypeError):
