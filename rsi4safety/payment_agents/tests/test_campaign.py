@@ -467,7 +467,7 @@ def test_scripted_integration_promotes_real_version_and_preserves_baseline_on_re
     assert report["summary"]["confirmed_development_findings"] == 1
     assert report["summary"]["promotions"] == 1
     assert report["active_version"] == "repair-r1-c1"
-    assert report["acceptance"]["initial"]["confirmed_attack_cases"] == 0
+    assert report["acceptance"]["initial"]["confirmed_attack_cases"] == 1
     assert report["acceptance"]["initial"]["attack_screen_positive_cases"] == 1
     assert report["acceptance"]["evolved"]["confirmed_attack_cases"] == 0
     assert report["acceptance"]["publication_gate"]["passed"] is True
@@ -839,7 +839,44 @@ def test_publication_gate_discloses_unequal_screen_and_confirmation_counts():
     assert not verdict['passed']
     assert verdict['regressions'][0]['parent_repetitions'] == 1
     assert verdict['regressions'][0]['candidate_repetitions'] == 3
-    assert 'screening' in verdict['baseline_power']
+    assert 'at least 1 repetition(s)' in verdict['baseline_power']
+    assert 'candidate at least 3' in verdict['baseline_power']
+
+
+def test_final_acceptance_uses_symmetric_confirmation_power(tmp_path):
+    """Both publication arms run at confirmation repetitions, never 1-vs-3."""
+    import payassist_agent.campaign_acceptance as ca
+    runner = object.__new__(campaign.LiveCampaign)
+    runner.config = campaign.CampaignConfig(repetitions=1, confirmation_repetitions=3)
+    runner.state = {}
+    runner.chain = Mock()
+    runner.role_memory = Mock()
+    runner.role_memory.snapshot.return_value = {"attack_skills": [], "defense_lessons": []}
+    runner.versions = Mock()
+    initial = Mock(version_id="baseline-v0", package_digest="d0")
+    evolved = Mock(version_id="repair-r1-c1", package_digest="d1")
+    runner.versions.active.return_value = evolved
+    runner.initial = initial
+    runner.normal = {"acceptance": [{"id": "ACC-N01"}]}
+    runner.run_suite = Mock(return_value=[])
+    runner._paired_many = Mock(return_value=[])
+    runner.load_trial = Mock()
+    runner.root = tmp_path
+    runner.save = Mock()
+    runner.report = lambda status, stop=None: {"status": status}
+    original_gate = ca.publication_gate
+    ca.publication_gate = lambda a, b: {"passed": True, "regressions": [], "reasons": [], "baseline_power": "symmetric"}
+    ca.write_json = Mock()
+    ca.canonical_hash = lambda v: "h"
+    ca.file_sha256 = lambda p: "h"
+    try:
+        ca.run_acceptance(runner, [])
+        phases = {call.args[2] for call in runner.run_suite.call_args_list}
+        assert phases == {"acceptance-initial-normal", "acceptance-evolved-normal"}
+        for call in runner.run_suite.call_args_list + runner._paired_many.call_args_list:
+            assert call.kwargs.get("repetitions") == 3
+    finally:
+        ca.publication_gate = original_gate
 
 
 def test_public_campaign_defaults_to_engineering_control_and_can_opt_into_model_only(tmp_path, monkeypatch):

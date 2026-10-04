@@ -138,6 +138,10 @@ def publication_gate(parent_runs: list[dict], candidate_runs: list[dict]) -> dic
                 regressions.append({"case_id": case_id, "dimensions": reasons,
                                     "parent_repetitions": len(old[case_id]),
                                     "candidate_repetitions": len(new[case_id])})
+    parent_min = min((len(runs) for runs in old.values()), default=0)
+    candidate_min = min((len(runs) for runs in new.values()), default=0)
     return {"passed": coverage and not regressions, "regressions": regressions,
             "reasons": ([] if coverage else ["evaluation_coverage_mismatch"]),
-            "baseline_power": "one-run baselines are screening evidence, not stability estimates"}
+            "baseline_power": (f"parent arm ran at least {parent_min} repetition(s) per case, candidate at least "
+                               f"{candidate_min}; a regression needs parent majority pass and candidate majority "
+                               "fail, so unequal repetition counts stay visible in every reported row")}

@@ -18,7 +18,10 @@ def run_acceptance(self, final_attacks):
                               package_digest=current.package_digest)
             write_json(self.root / "acceptance.json", final)
             continue
-        repetitions = self.config.repetitions if name == "initial" else self.config.confirmation_repetitions
+        # Both arms run at confirmation repetitions: a publication decision
+        # must not compare a one-run baseline screen against a repeated
+        # candidate. Symmetric power keeps the per-case majorities comparable.
+        repetitions = self.config.confirmation_repetitions
         normals = self.run_suite(self.normal["acceptance"], version, f"acceptance-{name}-normal",
                                  repetitions=repetitions)
         attacks = self._paired_many(final_attacks, version,
