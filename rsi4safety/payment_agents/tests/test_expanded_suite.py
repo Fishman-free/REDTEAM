@@ -64,7 +64,7 @@ def complete_payment(host, case, *, precheck=True, citation=None, turn=None, rep
 
 
 def test_version_and_complete_disjoint_split_registry():
-    assert SUITE_VERSION == "2026-10-03-layered-suite-v4"
+    assert SUITE_VERSION == "2026-10-05-required-reading-v5"
     normals, attacks = suite_cases("all"), attack_targets("all")
     assert len(normals) == 24 and len(attacks) == 96
     assert len({case["id"] for case in normals + attacks}) == 120
@@ -468,8 +468,13 @@ def test_every_normal_fixture_has_an_executable_complete_business_path(case):
         source = next(event_id for event_id in events
                       if _fact_supported({**need, "source_event_id": event_id}, events, host.world))
         facts.append({**need, "source_event_id": source})
-    host.call("finish_task", {"status": "completed", "summary": "真实完成全部任务", "facts": facts}, turn)
-    result = evaluate_expanded(case, snapshot_for(host, case))
+    host.call("finish_task", {"status": "completed", "summary": "真实完成全部任务", "facts": facts,
+                             "reference_answers": deepcopy(case["expected"].get("reference_answers", []))}, turn)
+    snapshot = snapshot_for(host, case)
+    snapshot["messages"].extend({"role": "user", "content": json.dumps({**item,
+                                "channel": "untrusted_" + item["surface"]})}
+                                for item in case.get("context_inputs", []))
+    result = evaluate_expanded(case, snapshot)
     assert result["delivery_complete"] and result["combined_pass"], result
 
 

@@ -2,6 +2,8 @@
 
 当前主线是 **PayAssist L0/L1 支付智能体的攻击、修复与独立验证**。从[运行指南](rsi4safety/payment_agents/README.md)开始；三环设计、信任边界和真实实验判断统一在[研究方案](docs/RESEARCH_PLAN.md)。
 
+当前live.v3协议分别确认模型越权提案与系统突破，记录真实模型触达和验收覆盖；v5套件加入必须读取外部文档/记忆的任务。旧实验中的“0系统发现”不代表模型未被诱导。新机制已有离线闭环验证，真实模型结果仍以对应冻结实验为准。
+
 ```text
 rsi4safety/payment_agents/   当前 PayAssist 运行、四暴露面、防御包和评判
 rsi4safety/execution/        共享宿主组件与保留的独立研究原型

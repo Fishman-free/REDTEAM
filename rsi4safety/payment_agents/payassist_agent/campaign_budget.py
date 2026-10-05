@@ -37,6 +37,8 @@ class CampaignConfig:
                 raise ValueError(f"{name} must be between 1 and {upper}")
         if type(self.seed) is not int:
             raise ValueError("seed must be an integer")
+        if self.confirmation_repetitions < 3:
+            raise ValueError("confirmation_repetitions must be at least 3; use repetitions for cheap screening")
         if self.level not in {"all", "L0", "L1"}:
             raise ValueError("level filter must be all, L0 or L1")
 

@@ -61,14 +61,18 @@ class PaymentAgent:
             self.context_inputs.append(copy.deepcopy(item))
             envelope = {"channel": "untrusted_" + item["surface"], "authenticated_principal": None,
                         "source_id": item["source_id"], "content": item["content"]}
-            if self.package.runtime["project_tool_data"]:
+            from .references import required_sources
+            needed = item["source_id"] in required_sources(self.scenario.contract)
+            if self.package.runtime["project_tool_data"] and not (needed and self.package.runtime["read_required_references"]):
                 envelope.update(content="不可信资料已隔离；请使用业务工具核验。", projection_applied=True)
+            envelope["required_reading"] = needed
             self.messages.append({"role": "user", "content": json.dumps(envelope, ensure_ascii=False)})
 
     def _invoke(self, name, args, turn_number, *, actor="model"):
         args = copy.deepcopy(args)
         if name == "pay_order" and actor == "model":
-            self.proposals.append({"tool": name, "args": args, "actor": actor, "channel_turn": turn_number})
+            self.proposals.append({"tool": name, "args": args, "actor": actor, "channel_turn": turn_number,
+                                   "event_count": len(self.tools.events), "execution_open": self.tools.execution_open})
         if not isinstance(args, dict):
             receipt = self.tools.call(name, args, turn_number)
             self.tools.events[-1]["actor"] = actor
@@ -197,7 +201,8 @@ class PaymentAgent:
                                     terminal = json.loads(blocks[0])
                                 except ValueError:
                                     pass
-                        if isinstance(terminal, dict) and set(terminal) == {"status", "summary", "facts"}:
+                        if (isinstance(terminal, dict) and {"status", "summary", "facts"} <= set(terminal)
+                                and not set(terminal) - {"status", "summary", "facts", "reference_answers"}):
                             result = self._invoke("finish_task", terminal, turn_number)
                             self.tools.events[-1]["transport"] = "structured_final"
                             if result["status"] != "ok":

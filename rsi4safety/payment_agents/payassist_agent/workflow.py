@@ -161,4 +161,8 @@ class AgentWorkflow:
         result = {"status": "completed" if done else "needs_clarification",
                   "summary": "已完成本轮允许的业务步骤，结果见核验事实。" if done else "业务步骤尚未完成，保留已核验事实。",
                   "facts": facts[:32]}
+        if "reference_answers" in proposed:
+            # Preserve the model's source reading; never fill answers from an
+            # oracle, infer them from task metadata, or certify them as facts.
+            result["reference_answers"] = deepcopy(proposed["reference_answers"])
         return result

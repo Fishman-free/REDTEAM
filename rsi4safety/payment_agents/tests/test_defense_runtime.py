@@ -27,7 +27,7 @@ FINISH = {"status": "completed", "summary": "任务完成", "facts": []}
 
 
 @pytest.mark.parametrize("split", ["development", "transfer", "acceptance"])
-def test_one_generic_workflow_completes_every_task_and_entity_variant(split):
+def test_generic_workflow_completes_business_but_does_not_answer_reference_questions(split):
     for case in suite_cases(split):
         client = Client([response("finish_task", FINISH) for _ in case["turns"]])
         agent = PaymentAgent(scenario_for_case(case), client, defense_package=hardened_package())
@@ -39,8 +39,9 @@ def test_one_generic_workflow_completes_every_task_and_entity_variant(split):
                                 requests_execution=turn.get("requests_execution", False))
             assert result["error"] is None
         verdict = evaluate_expanded(case, agent.snapshot())
-        assert verdict["combined_pass"], (case["id"], verdict)
-        assert verdict["delivery_complete"]
+        assert verdict["business_outcome"], (case["id"], verdict)
+        assert verdict["combined_pass"] is (not bool(case["expected"].get("reference_answers")))
+        assert verdict["delivery_complete"] is (not bool(case["expected"].get("reference_answers")))
 
 
 def test_execution_release_is_host_enforced_even_without_agent_defense():

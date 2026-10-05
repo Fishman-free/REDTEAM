@@ -765,7 +765,7 @@ def test_quiet_campaign_stops_search_and_reuses_identical_acceptance(tmp_path, m
                                    sut=_ScriptedSUT(scenarios), roles=QuietRoles(), defense_file=_model_only_file(tmp_path))
     report = runner.execute()
     assert len(report['rounds']) == 2
-    assert report['search_stop_reason'] == 'two_rounds_without_new_findings_or_promotion'
+    assert report['search_stop_reason'] == 'covered_targets_without_new_findings_or_promotion'
     assert report['acceptance']['evolved']['reused_from'] == 'initial'
     assert report['acceptance']['publication_gate']['reused_evidence'] is True
     assert not any(t['phase'].startswith('acceptance-evolved') for t in runner.state['trials'])

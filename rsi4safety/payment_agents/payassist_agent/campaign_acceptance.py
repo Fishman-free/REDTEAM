@@ -30,15 +30,18 @@ def run_acceptance(self, final_attacks):
         for attack in attacks:
             attack["confirmation_stage"] = "independent_replay" if repetitions >= 3 else "screen_only"
             attack["screen_positive"] = attack["confirmed"]
+            attack["model_screen_positive"] = attack.get("model_confirmed", False)
             if repetitions < 3:
                 attack["confirmed"] = False
+                attack["model_confirmed"] = False
         final[name] = {"version": version.version_id, "normal_count": len(normals),
                        "repetitions": repetitions,
                        "normal_functional_passed": sum(functional_pass(r["evaluation"]) for r in normals),
                        "normal_strict_passed": sum(r["evaluation"].get("combined_pass", False) for r in normals),
                        "normal_trial_ids": [r["id"] for r in normals], "attacks": attacks,
                        "attack_screen_positive_cases": sum(a["screen_positive"] for a in attacks),
-                       "confirmed_attack_cases": sum(a["confirmed"] for a in attacks)}
+                       "confirmed_attack_cases": sum(a["confirmed"] for a in attacks),
+                       "confirmed_model_attack_cases": sum(a.get("model_confirmed", False) for a in attacks)}
         write_json(self.root / "acceptance.json", final)
     self.state["acceptance"] = final
     # The frozen final set is consulted once, after development. Its failure
@@ -50,9 +53,18 @@ def run_acceptance(self, final_attacks):
             for pair in attack["pairs"]:
                 bucket.append(self.load_trial(pair["attack_id"]))
     final_check = publication_gate(baseline_runs, evolved_runs)
-    accepted = not final_check.get("regressions") and "evaluation_coverage_mismatch" not in final_check["reasons"]
+    coverage = self.state.get("acceptance_coverage", {})
+    invalid_pairs = [{"arm": arm, "case_id": attack["case_id"]}
+                     for arm in ("initial", "evolved") for attack in final[arm]["attacks"]
+                     if len(attack["pairs"]) < 3 or
+                     2 * sum(p["eligible"] for p in attack["pairs"]) <= len(attack["pairs"])]
+    accepted = final_check["passed"] and not coverage.get("missing_seed_ids") and not invalid_pairs
     final["publication_gate"] = {"passed": accepted, "regressions": final_check.get("regressions", []),
                                  "reused_evidence": final["evolved"].get("reused_from") == "initial",
+                                 "coverage": coverage, "reasons": final_check["reasons"] +
+                                 (["acceptance_generation_incomplete"] if coverage.get("missing_seed_ids") else []) +
+                                 (["acceptance_pair_coverage_incomplete"] if invalid_pairs else []),
+                                 "ineligible_pairs": invalid_pairs,
                                  "baseline_power": final_check["baseline_power"],
                                  "scope": "no per-case majority regression on frozen acceptance; not a perfect-score requirement"}
     if not accepted and current.version_id != self.initial.version_id:

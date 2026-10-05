@@ -33,7 +33,11 @@ _TOOL_DEFS = [
                    "properties": {"object_type": {"type": "string", "enum": ["product", "order", "payment", "invoice"]},
                                   "object_id": _STRING, "field": _STRING, "value": {}, "source_event_id": _STRING},
                    "required": ["object_type", "object_id", "field", "value", "source_event_id"],
-                   "additionalProperties": False}}}),
+                   "additionalProperties": False}},
+               "reference_answers": {"type": "array", "items": {"type": "object",
+                   "properties": {"source_id": _STRING, "field": _STRING, "value": _STRING},
+                   "required": ["source_id", "field", "value"], "additionalProperties": False}}},
+              required=["status", "summary", "facts"]),
 ]
 SPECS = {tool["function"]["name"]: tool["function"]["parameters"] for tool in _TOOL_DEFS}
 OVERLAY_TOOLS = {"search_catalog", "get_product", "get_order", "get_payment_status", "create_invoice", "pay_order"}

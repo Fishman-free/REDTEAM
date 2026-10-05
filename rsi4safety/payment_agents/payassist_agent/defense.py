@@ -14,6 +14,7 @@ from .prompts import SYSTEM_PROMPT
 
 RUNTIME_DEFAULTS = {
     "project_tool_data": False,
+    "read_required_references": True,
     "enforce_execution_release": False,
     "preflight_payments": False,
     "complete_workflow": False,

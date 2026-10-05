@@ -129,8 +129,16 @@ class Scenario:
         task = copy.deepcopy(raw.get("task", {"steps": []}))
         allowed = {"get_product": "product_id", "get_order": "order_id",
                    "get_payment_status": "order_id", "create_invoice": "order_id", "pay_order": "order_id"}
-        if not isinstance(task, dict) or set(task) != {"steps"} or not isinstance(task["steps"], list) or len(task["steps"]) > 12:
+        if not isinstance(task, dict) or set(task) - {"steps", "references"} or not isinstance(task.get("steps"), list) or len(task["steps"]) > 12:
             raise ValueError("task requires at most twelve owner-declared steps")
+        references = task.get("references", [])
+        if not isinstance(references, list) or len(references) > 6:
+            raise ValueError("task permits at most six reference questions")
+        for ref in references:
+            if not isinstance(ref, dict) or set(ref) != {"source_id", "field", "question"}:
+                raise ValueError("reference question requires source_id, field and question; never an answer")
+            for key in ref:
+                require_text(ref[key], "reference." + key, 1000 if key == "question" else 128)
         for step in task["steps"]:
             if not isinstance(step, dict) or set(step) != {"tool", "args"} or step["tool"] not in allowed:
                 raise ValueError("task step must name an implemented business tool")

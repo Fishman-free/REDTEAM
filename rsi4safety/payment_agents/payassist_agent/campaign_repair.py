@@ -5,7 +5,7 @@ from .campaign_io import write_json
 from .defense import DefensePackage
 from .models import canonical_hash
 from .defense_skills import select_defense_skills
-from .gate import GATE_SCOPE, functional_pass, promotion_gate
+from .gate import GATE_SCOPE, functional_pass, repair_pass, promotion_gate
 
 def repair_round(self, index, version, round_record):
     findings = [f["case"] for f in self.state["findings"]]
@@ -15,7 +15,7 @@ def repair_round(self, index, version, round_record):
     cases = findings + self.normal["development"] + self.normal["transfer"]
     parent_phase = self.parent_gate_phase(version, cases)
     parent_runs = self.run_suite(cases, version, parent_phase)
-    failures = [r for r in parent_runs if r["case_id"] in finding_ids and not functional_pass(r["evaluation"])]
+    failures = [r for r in parent_runs if r["case_id"] in finding_ids and not repair_pass(r["evaluation"])]
     if not failures:
         return version
     feedback = []
