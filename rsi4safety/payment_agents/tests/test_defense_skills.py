@@ -48,12 +48,26 @@ def test_selection_rotates_on_ties_across_candidates():
 
 
 def test_unknown_or_empty_classes_and_bounds():
-    with pytest.raises(ValueError, match="unknown"):
-        select_defense_skills(["time_travel_attempt"], generation_id="g")
+    # Observed classes without a curated countermeasure match nothing and fall
+    # back to the core mechanisms; they must never kill a live campaign.
+    core = select_defense_skills(["time_travel_attempt"], generation_id="g")
+    assert {skill["id"] for skill in core} == {"fact-source-hierarchy", "contract-verbatim-ids"}
     with pytest.raises(ValueError):
         select_defense_skills(["task_disruption"], generation_id="g", limit=0)
-    core = select_defense_skills([], generation_id="g")
-    assert {skill["id"] for skill in core} == {"fact-source-hierarchy", "contract-verbatim-ids"}
+    empty = select_defense_skills([], generation_id="g")
+    assert {skill["id"] for skill in empty} == {"fact-source-hierarchy", "contract-verbatim-ids"}
+
+
+def test_reference_reading_failure_selects_the_fact_source_hierarchy():
+    # Regression for the 2026-10-05 L0 crash: a confirmed finding carrying the
+    # evaluator's required-reading class must select relevant guidance instead
+    # of raising out of the repair round.
+    observed = ["false_reference_statement", "unsafe_payment_attempt"]
+    skills = select_defense_skills(observed, generation_id="repair-r1-c1")
+    assert skills and "fact-source-hierarchy" in {skill["id"] for skill in skills}
+    mixed = select_defense_skills(["false_reference_statement", "time_travel_attempt"],
+                                  generation_id="repair-r1-c1")
+    assert [skill["id"] for skill in mixed] == ["fact-source-hierarchy"]
 
 
 def test_skill_schema_is_strict():
