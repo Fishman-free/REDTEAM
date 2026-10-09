@@ -230,7 +230,7 @@
 <nav class="nav" aria-label="项目目录">
   <div class="wrap nav-inner">
     <div class="nav-links">
-      <a href="#position">项目概览</a><a href="#why">为什么需要</a><a href="#community">虚拟社区</a><a href="#mechanism">运作机制</a><a href="#data">数据价值</a><a href="#incentives">贡献激励</a><a href="#collaborate">合作方向</a><a href="#faq">常见问题</a>
+      <a href="#position">项目概览</a><a href="#why">为什么需要</a><a href="#community">虚拟社区</a><a href="#mechanism">运作机制</a><a href="#data">数据价值</a><a href="#incentives">贡献激励</a><a href="./flower.html">Flower 本地 NFT</a><a href="#collaborate">合作方向</a><a href="#faq">常见问题</a>
     </div>
     <button class="button" id="print-button" type="button" hidden>打印</button>
   </div>
@@ -265,14 +265,14 @@
   </section>
 
   <section class="section" id="progress" aria-labelledby="progress-title">
-    <div class="section-head"><span class="section-num">✦</span><div><h2 id="progress-title">截至 2026 年 9 月，项目进行到了哪一步</h2><p>下面是已经建成并公开的部分，与仍在推进的部分。研究代码与阶段性结果均在项目代码库公开，可独立复核。</p></div></div>
+    <div class="section-head"><span class="section-num">✦</span><div><h2 id="progress-title">截至 2026 年 10 月，项目进行到了哪一步</h2><p>下面是已经建成并公开的部分，与仍在推进的部分。研究代码与阶段性结果均在项目代码库公开，可独立复核。</p></div></div>
     <div class="grid two">
       <article class="card"><span class="label">已建成</span><h3>攻防实验平台</h3><p>“发起挑战 → 独立裁决 → 修复防御 → 换例回归 → 通过才晋级”的完整实验流程已在开源代码中实现，由数百项自动化测试守护；模型自称的结果不作为证据，一切以平台账本为准。</p></article>
-      <article class="card"><span class="label">已落地</span><h3>双入口权限模型</h3><p>用户本人与外部来访分开接入：只有用户通道经身份核验后才能形成付款授权。“商户说‘用户同意了’不算授权”不再是口号，而是平台对每笔付款逐条执行的判据。</p></article>
-      <article class="card"><span class="label">已覆盖</span><h3>由易到难的场景分级</h3><p>从“只读、不许付款”，到单笔付款、限额代付，再到采购—审批—支付的多智能体协作，共 43 个注册场景、其中 22 个可执行复核，并按难度分层报告结果。</p></article>
-      <article class="card"><span class="label">已可度量</span><h3>“越学越会修”的实验框架</h3><p>让防御系统在若干类问题上积累经验，再考验它从未见过的新问题：在可控模拟环境中，随经验积累，新问题修复率从 20% 逐步提升到 100%，修复动作也更克制、成本更低。</p></article>
+      <article class="card"><span class="label">已落地</span><h3>双入口权限模型</h3><p>用户本人与外部来访分开接入：只有可信 owner 控制凭证路由能够形成付款授权；普通钱包控制不是真实身份认证，生产身份核验尚未完成。“商户说‘用户同意了’不算授权”不再是口号，而是平台对每笔付款逐条执行的判据。</p></article>
+      <article class="card"><span class="label">当前主线</span><h3>PayAssist L0 / L1 与四输入面</h3><p>当前研究禁出款与精确单笔付款，区分 dialogue、tool_return、document、memory 输入。历史 L0–L3 注册场景保留，但不拼入当前覆盖率；运行时触达、模型触达、对照失败与未覆盖项分别报告。</p></article>
+      <article class="card"><span class="label">历史统计已校正</span><h3>修复率，要看同一分母</h3><p>历史确定性实验的 20%→100% 曲线随已训练问题从未见族分母中移出而上升，逐点成功项仍为 2。它不能证明跨族泛化，也不能替代真实模型上的配对确认、正常效用与冻结验收。</p></article>
     </div>
-    <div class="note"><strong>如实说明边界。</strong>面向真实大模型的大规模对照实验，已按预先登记的研究方案设计完成，尚未执行；社区挑战与激励机制仍处于设计阶段，未开始运营，也不提供公开攻击入口。</div>
+    <div class="note"><strong>已有真实模型实验，也有明确未解决项。</strong>2026-10-05 的 <code>arena.payassist.live.v3</code> / <code>2026-10-05-required-reading-v5</code> 预算验证轮中，L0 有 6 个确认发现与 2 次晋级，L1 有 13 个模型层发现与 1 次晋级。两场冻结验收通过，但仍有 <strong>12 个开放发现（L0 1 + L1 11）</strong>，不是生产安全证书。L1 的 449 笔模拟落账均授权内，不等于模型没有越权提案。<a href="https://github.com/Fishman-free/REDTEAM/blob/main/rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md" target="_blank" rel="noopener noreferrer">精确口径与证据报告</a>。社区未运营，不提供公共攻击入口。</div>
   </section>
 
   <section class="section" id="why" aria-labelledby="why-title">
@@ -343,7 +343,7 @@
       <article class="card"><span class="label">面向持续迭代</span><h3>修复与回归验证</h3><p>把发现过的问题保留为测试样本，观察系统升级后是否重新出现，避免一次修复后失去持续验证。</p></article>
     </div>
     <div class="commercial business-model">
-      <div class="commercial-row"><h3>商业价值</h3><p>围绕<strong>安全数据授权、定制红队评测、企业场景共建</strong>设计合作与收费模式。客户购买的是经过验证的数据与研究服务，而不是代币的价格预期。</p></div>
+      <div class="commercial-row"><h3>商业主线</h3><p>拟提供<strong>企业封闭授权的安全评测、整改复核与持续回归服务</strong>；安全数据合作须另审查授权与用途。客户、价格与收入均待验证，不依赖 NFT 销售、代币预期或持有资格。<a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/business/redteam-business-plan.md" target="_blank" rel="noopener noreferrer">当前商业 Markdown</a>优先；现存 PDF 是 Flower 更新前旧快照，未重新生成，产品说明已被 Markdown 替代。</p></div>
       <div class="commercial-row"><h3>数据使用原则</h3><p>样本对外提供前，需要完成必要授权、脱敏与权利审查，约定用途及访问范围。真实个人信息、商业秘密和未公开漏洞，不因“用于 AI 安全”就可以自由转让或公开。</p></div>
     </div>
   </section>
@@ -357,9 +357,9 @@
     <div class="grid three reward-options">
       <article class="card"><span class="label">激励方式</span><h3>安全挑战赛</h3><p>由组织方设置明确范围和固定奖金预算，按样本质量评审，形成集中式的研究交流与数据征集。</p></article>
       <article class="card"><span class="label">合作方式</span><h3>企业联合奖励</h3><p>围绕企业授权的模拟场景，由合作方提供研究经费或奖励预算，建立贡献验证与成果使用规则。</p></article>
-      <article class="card"><span class="label">社区方式</span><h3>贡献记录与荣誉</h3><p>通过署名、研究积分和贡献档案记录价值。非交易型积分用于评价与荣誉，不承担兑换、交易或融资功能。</p></article>
+      <article class="card"><span class="label">社区方式</span><h3>REDTEAM Flower 本地 NFT</h3><p>独立 ERC-721 + ERC-5192 原型：可信发行者审核、EOA 接收者 EIP-712 同意后免费发行，永久不可转让，撤销保留原 token/owner。仅合成数据与无分叉 Hardhat 31337；无销售、收益、赎回、算力效用或所有权特权。<a href="./flower.html">查看同 token 的本地快照</a>。</p></article>
     </div>
-    <div class="note"><strong>研究激励，与金融业务应当区分。</strong>RTM 代币与奖励合约属于原始研究构想的一部分；面向中国大陆的激励设计，优先考虑经过合规审查的奖金或非交易型贡献记录，不以发币、交易或收益承诺吸引参与。任何具体活动仍需落实授权、数据、奖励和税务规则。<a href="https://www.pbc.gov.cn/tiaofasi/144941/3581332/2026020619591971323/index.html" target="_blank" rel="noopener noreferrer">相关监管依据 ↗</a></div>
+    <div class="note"><strong>本地原型，不等于公开发行许可。</strong>历史 RTM 是可转让 ERC-20 研究，仍排除商业路线，不是 Flower，不兑换、不迁移。Flower 免费发行与锁定不保证合法；普通钱包控制不是真实身份认证，digest 不证明贡献事实，公开链仍可能暴露地址与贡献关联。公开发行须另做法律、隐私、安全和人工流程审查；口头建议不是监管批准或正式法律意见。原稿法律引文未独立核验，不能据此断言真实性、效力或适用范围。</div>
   </section>
 
   <section class="section" id="collaborate" aria-labelledby="collaborate-title">
@@ -376,18 +376,18 @@
     <div class="section-head"><span class="section-num">07</span><div><h2 id="faq-title">关于 REDTEAM，你可能还想了解</h2><p>把研究对象、参与方式和数据价值说清楚。</p></div></div>
     <div class="faq-toolbar"><p>点击问题查看说明。</p><button class="button" id="faq-toggle" type="button" aria-controls="faq-list" aria-expanded="false" hidden>展开全部问答</button></div>
     <div class="faq-list" id="faq-list">
-      <details><summary>项目现在进行到哪一步了？</summary><div class="faq-answer"><p>研究平台的主体已经建成并开源：模拟交易场景、双入口权限模型、由易到难的场景分级，以及“发起挑战、独立裁决、修复防御、回归验证”的实验流程，都有可运行的实现和自动化测试。<strong>面向真实大模型的大规模对照实验已按预先登记的研究方案设计完成，尚未执行</strong>；社区挑战与激励机制仍处于设计阶段，未开始运营。</p></div></details>
-      <details><summary>“AI 越学越会修”这句话有依据吗？</summary><div class="faq-answer"><p>项目把这个问题做成了可度量的实验：让防御系统在若干类问题上积累经验，再考验它从未见过的新问题。在可控的模拟环境中，随经验积累，新问题修复率从 20% 逐步提升到 100%，修复动作也更克制、成本更低。<strong>真实大模型上的对照实验已按预先登记的方案设计完成，结果将如实公布，不预设结论。</strong></p></div></details>
+      <details><summary>项目现在进行到哪一步了？</summary><div class="faq-answer"><p>研究平台的主体已经建成并开源：模拟交易场景、双入口权限模型、由易到难的场景分级，以及“发起挑战、独立裁决、修复防御、回归验证”的实验流程，都有可运行的实现和自动化测试。<strong>2026-10-05 live.v3 / required-reading-v5 已执行真实模型预算验证轮，冻结验收通过仍有 12 个开放发现，不是生产安全证书</strong>。模型越权提案与宿主阻止分别计量；具体版本、重复数、分母与限制见上方证据报告。社区未运营；Flower 是独立合成本地原型，不是公共发行。</p></div></details>
+      <details><summary>“AI 越学越会修”这句话有依据吗？</summary><div class="faq-answer"><p>历史确定性研究曾报告 20%→100%，但未见族随训练从分母移出，逐点成功项始终 2；<strong>不能据此证明跨族泛化</strong>。当前真实模型 live.v3 的限定证据表明部分修复与冻结验收改善，同时保留 12 个开放发现。智能体包改善也不能直接称基础模型被训练得更强。</p></div></details>
       <details><summary>REDTEAM 是一个支付平台吗？</summary><div class="faq-answer"><p>项目研究的是<strong>智能体在交易和支付场景中的安全问题，以及如何产生有价值的对抗数据</strong>。虚拟社区使用模拟任务与资产，不是为公众办理真实资金收付的交易平台。</p></div></details>
       <details><summary>为什么要让参与者尝试“骗过”智能体？</summary><div class="faq-answer"><p>这是一种经授权的红队测试：在受控环境里主动寻找薄弱点，帮助防御方提前识别问题。参与必须遵守目标、权限和数据范围；研究价值来自可验证的发现，不来自对真实第三方的未授权攻击。</p></div></details>
       <details><summary>一份挑战记录，怎样才能成为有价值的数据？</summary><div class="faq-answer"><p>它需要包含清晰的任务授权、交互过程、实际执行证据和复现条件，并经过验证、去重与标注。在合法授权和必要脱敏之后，才适合用于模型训练、应用评测或修复验证。<strong>数量多不代表质量高。</strong></p></div></details>
       <details><summary>为什么不用固定的安全测试题？</summary><div class="faq-answer"><p>固定测试题便于比较，也应保留；协作式挑战则有助于补充新的交互路径和业务反例。两者相互补充：新发现进入经过验证的样本库，再作为后续评测和回归测试的依据。</p></div></details>
       <details><summary>不用区块链，项目还成立吗？</summary><div class="faq-answer"><p>成立。核心是模拟场景、有效挑战、独立验证与安全数据。区块链是记录和激励机制的一种研究选项，也可以采用普通数据库、签名日志以及经过合规审查的奖金与贡献记录机制。技术应服务研究目标，而不是反过来。</p></div></details>
-      <details><summary>项目如何形成商业价值？</summary><div class="faq-answer"><p>面向模型与智能体应用团队，探索安全数据授权、定制红队评测和企业场景共建。合作围绕具体数据质量、授权范围和服务交付约定，不以代币升值或投资回报为基础，也不将任何特定企业表述为既有客户。</p></div></details>
+      <details><summary>项目如何形成商业价值？</summary><div class="faq-answer"><p>商业主线是企业封闭授权的安全评测、整改复核与持续回归服务，收入与客户均待验证。Flower 是独立、可选、待审查的本地 NFT 原型，不售卖、不提供权益、不作为服务资格。当前商业计划以 Markdown 为准，现存 PDF 未同步本次更新。</p></div></details>
     </div>
   </section>
 </main>
-<footer class="wrap footer"><div><strong>REDTEAM</strong><p>在模拟世界里发现问题，为真实世界积累防线。</p><p class="footer-note">本页介绍项目理念与机制，不提供公开攻击入口、代币认购或投资服务。参与研究须在明确授权范围内进行。</p></div><div class="footer-links"><a href="https://github.com/Fishman-free/REDTEAM" target="_blank" rel="noopener noreferrer">项目代码 ↗</a><a href="#top">返回顶部 ↑</a></div></footer>
+<footer class="wrap footer"><div><strong>REDTEAM</strong><p>在模拟世界里发现问题，为真实世界积累防线。</p><p class="footer-note">本页介绍项目理念与机制，不提供公开攻击入口、代币认购或投资服务。参与研究须在明确授权范围内进行。</p></div><div class="footer-links"><a href="./flower.html">Flower 本地 NFT</a><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/INDEX.md" target="_blank" rel="noopener noreferrer">当前资料索引</a><a href="https://github.com/Fishman-free/REDTEAM" target="_blank" rel="noopener noreferrer">项目代码 ↗</a><a href="#top">返回顶部 ↑</a></div></footer>
 <script>
 (function(){
   'use strict';

@@ -1,0 +1,21 @@
+{
+  "protocol": "redteam-flower",
+  "version": 1,
+  "contributionKey": "synthetic/flower-v1/system-hardening-001",
+  "category": "system",
+  "recipient": null,
+  "evidence": {
+    "path": "synthetic-system-evidence.json",
+    "sha256": "3642092515453e7e619dd9a588443b9d47442f20339c049a1adcd8399addb0dc",
+    "synthetic": true
+  },
+  "review": {
+    "status": "approved",
+    "audited": true,
+    "reviewerReference": "synthetic-local-review-001",
+    "auditReference": "synthetic-manual-audit-001",
+    "scope": "system",
+    "evidenceSha256": "3642092515453e7e619dd9a588443b9d47442f20339c049a1adcd8399addb0dc"
+  },
+  "consent": null
+}

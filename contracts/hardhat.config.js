@@ -1,2 +1,6 @@
 require('@nomicfoundation/hardhat-toolbox');
-module.exports = { solidity: '0.8.24', paths: { sources: './src' }, networks: { hardhat: {} } };
+module.exports = {
+  solidity: { version: '0.8.24', settings: { evmVersion: 'cancun' } },
+  paths: { sources: './src' },
+  networks: { hardhat: {} }
+};

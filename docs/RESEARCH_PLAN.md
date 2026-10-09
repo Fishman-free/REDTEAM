@@ -114,7 +114,8 @@ L0两次开发晋级被最终验收推翻；L1没有晋级，initial/evolved都�
 | [外部HTTP会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound](../contracts/src/BountyRound.sol) | 会话配额/TTL/有限反馈与commit–reveal/pull领奖分别实现；外部身份/钱包证明以及会话提交→复现→链上判奖端到端仍未接线 |
 | [旧Arena编排器](../rsi4safety/execution/src/rsi4safety/arena/orchestrator.py) | 拆分为fixture、执行缓存、裁决和晋级模块；保留独立运行与测试，不能把其接口协议混入当前PayAssist协议 |
 | [研究论文](paper/payment-agent-security-rsi.md)（[PDF](paper/payment-agent-security-rsi.pdf)） | 历史确定性研究稿；未见族训练后从分母移出使20%→100%曲线不能证明跨族进步，逐点成功项始终2个；原稿保留，当前解释据此校正 |
-| [商业计划](business/redteam-business-plan.md)（[PDF](business/redteam-business-plan.pdf)） | 保留讨论稿，市场/客户/收入均待验证；不作为已发生业务或合规认证 |
+| [当前商业计划 Markdown](business/redteam-business-plan.md)（[历史 PDF](business/redteam-business-plan.pdf)） | 商业主线为安全服务；客户收入待验证，法律引文未独立核验；PDF未重新生成，是Flower更新前旧快照，产品说明已被当前Markdown替代 |
+| [REDTEAM Flower 协议](FLOWER_RECOGNITION.md)、[本地展示页](site/flower.html) | 独立ERC-721 + ERC-5192 NFT原型；无分叉Hardhat 31337、可信贡献审核 + EOA EIP-712接收同意、免费且不可转让、撤销保留原token/owner；不是RTM ERC-20，不接入当前PayAssist，不保证合法 |
 
 远端旧实现评估和日期化验证[原文](../archieve/docs/2026-10-03-origin-main/docs/RESEARCH_PLAN.md)按原字节保存，本次合并测试由当前运行结果单独报告，不重复采用历史通过数。链上PaymentAgent、RTMToken/BountyVault、策略级RSI、rsi_eval、engineering的源码、测试、独立契约、预注册和原始结果均保留。生产身份、真实支付和修复者能力提升对照尚未完成。
 
@@ -124,4 +125,10 @@ L0两次开发晋级被最终验收推翻；L1没有晋级，initial/evolved都�
 
 2026-10-05复核发现，旧r2的0系统发现掩盖了两场验收中各一个3/3重复的模型越权提案，且L1验收因格式失败丢失document/memory面。当前`arena.payassist.live.v3`独立确认模型提案、补齐反馈与覆盖门禁，并采用`2026-10-05-required-reading-v5`；细节及历史分母见[运行指南](../rsi4safety/payment_agents/README.md)。旧证据不重写、不与新发现率直接比较。
 
-同日晚间的10小时预算验证轮给出live.v3首个真实模型闭环：冻结`48379b8`（+运行中缺陷修复`4eea371`，v5新类`false_reference_statement`曾杀死修复环，第一次L0尝试封存于`L0-crash1`）。L0得6个多数确认发现（2系统+4模型层）两次晋级，L1得13个模型层发现一次晋级；两场对称验收中演进臂模型层确认1→0、正常效用满格、零回归、发布通过；L1的449笔落账全部授权内、全场零真实违规；1009份试验收据字节匹配、双哈希链验证通过。修复环容量边界被证据定位（improver长输出在1665-2517 tokens随机中途截断，低于4096上限）。详见[PayAssist指南2026-10-05节](../rsi4safety/payment_agents/README.md)与[对照报告](../rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md)。下一步最有验证价值的假设：给improver增量/分段输出契约，检验L1开放发现属修复容量而非4B不可修复。
+同日晚间的10小时预算验证轮给出live.v3首个真实模型闭环：冻结`48379b8`（+运行中缺陷修复`4eea371`，v5新类`false_reference_statement`曾杀死修复环，第一次L0尝试封存于`L0-crash1`）。L0得6个多数确认发现（2系统+4模型层）两次晋级，L1得13个模型层发现一次晋级；两场对称验收中演进臂模型层确认1→0、正常效用满格、零回归、发布通过；L1的449笔落账全部授权内、全场零真实违规；1009份试验收据字节匹配、双哈希链验证通过。修复环容量边界被证据定位（improver长输出在1665-2517 tokens随机中途截断，低于4096上限）。详见[PayAssist指南2026-10-05节](../rsi4safety/payment_agents/README.md)与[对照报告](../rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md)。下一步最有验证价值的假设：给improver增量/分段输出契约，检验L1开放发现属修复容量而非4B不可修复。**仍有12个开放发现（L0 1个、L1 11个）；冻结发布门禁通过不是生产安全证书。**
+
+## 5. Flower 独立本地研究旁路
+
+[REDTEAM Flower](FLOWER_RECOGNITION.md)只记录受信任发行者审核与普通EOA接收者同意的贡献认可，不改变上面的PayAssist模型/宿主语义，不证明基础模型已训练改善。钱包签名只证明密钥控制，不是真实身份认证；digest只校验材料字节，不证明贡献事实。合约永久锁定、无销售/转让/授权/赎回/收益/算力效用或所有权特权，撤销仅改标志并保留原token/owner；不设代理接收或管理员重分配。
+
+仅用无分叉Hardhat 31337与合成材料。链上owner/events仍可公开recipient和contributionId，hash不保证匿名，撤销不擦除历史。任何真实公开发行须另作法律、隐私、安全与人工审核流程审查，“NFT”“免费”“不可转让”不保证合法；口头建议不是监管批准或正式法律意见。历史RTM ERC-20仍是独立研究并排除商业版，不与Flower兑换或接线。复现从contracts执行`npm test`和`npm run flower:demo`；页面只读取同token的有效/撤销静态快照，不宣称实时链状态。

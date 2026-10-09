@@ -30,10 +30,16 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
       - uses: actions/configure-pages@v5
-      - name: Stage project landing page
+      - name: Stage allow-listed static project pages
         run: |
           mkdir -p _site
           cp docs/site/index.html _site/index.html
+          cp docs/site/flower.html _site/flower.html
+          # Only the sanitized, synthetic local snapshot may accompany the pages.
+          # Never copy raw evidence, audit records, contracts, or the entire docs tree.
+          if [ -f docs/site/flower-demo.json ]; then
+            cp docs/site/flower-demo.json _site/flower-demo.json
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
