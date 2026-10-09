@@ -1,0 +1,2 @@
+# Evidence digests bind exact bytes across Windows and Linux checkouts.
+contracts/scenarios/flower-v1/*.json text eol=lf
