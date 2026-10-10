@@ -1,5 +1,9 @@
 # REDTEAM
 
+**统一项目网站：[fishman-free.github.io/REDTEAM](https://fishman-free.github.io/REDTEAM/)**。一个入口、五个菜单：项目概览、Flower 本地原型、研究与商业资料、历史项目简述、历史完整介绍。完整 HTML 内容保留在对应菜单中；历史材料明确标注，不把本地靶场或原始研究数据当作公开交互服务。页面来源与范围见[站点清单](docs/SITE_CONTENT_MANIFEST.md)。
+
+站点维护：`python scripts/build_site.py` 更新根入口和 Pages 排除配置；`python scripts/build_site.py --check` 与 `python -m unittest discover -s tests -p test_site_build.py -v` 校验五个菜单及发布文件。现有 Pages 使用 `main` 根目录发布，根 `index.html` 是统一入口。
+
 当前主线是 **PayAssist L0/L1 支付智能体的攻击、修复与独立验证**。从[运行指南](rsi4safety/payment_agents/README.md)开始；三环设计、信任边界和真实实验判断统一在[研究方案](docs/RESEARCH_PLAN.md)。
 
 当前live.v3协议分别确认模型越权提案与系统突破，记录真实模型触达和验收覆盖；v5套件加入必须读取外部文档/记忆的任务。旧实验中的“0系统发现”不代表模型未被诱导。新机制已有离线闭环验证，真实模型结果仍以对应冻结实验为准。

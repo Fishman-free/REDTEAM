@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="REDTEAM 当前研究与商业资料：Markdown 产品说明、Flower 技术协议与验证、PayAssist live.v3 证据和代码入口。历史材料单独标注。">
+  <title>研究与商业资料｜REDTEAM</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body class="resources-body">
+  <a class="skip-link" href="#resources-main">跳到资料</a>
+  <main class="resource-wrap" id="resources-main">
+    <header class="resource-header">
+      <a class="resource-home" href="./index.html">返回 REDTEAM 统一目录</a>
+      <p class="eyebrow">REDTEAM / DOCUMENTS &amp; EVIDENCE</p>
+      <h1>研究与商业资料</h1>
+      <p>先看当前 Markdown，再核对版本与证据。这里的链接指向公开代码库的 <strong>main</strong>，文件路径已与项目源文件核对；新增资料以合并后的 main 为准。每项报告只支持它注明的版本、范围与分母，不为生产安全或公开发行背书。</p>
+    </header>
+    <section class="resource-section" aria-labelledby="current-title">
+      <h2 id="current-title">当前说明与商业主线</h2>
+      <p>企业封闭授权的安全评测、整改复核与持续回归服务是商业主线；客户、定价与收入待验证，不依赖 NFT 售卖、代币预期或持有资格。</p>
+      <div class="resource-grid">
+        <article class="resource-card"><h3>完整资料索引</h3><p>区分当前产品说明、独立研究、历史实验与归档原件，查看各自替代关系。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/INDEX.md" target="_blank" rel="noopener noreferrer">阅读当前资料索引（新窗口）</a><code class="resource-path">docs/INDEX.md</code></article>
+        <article class="resource-card"><h3>商业计划 · 当前 Markdown</h3><p>2026-10-10 讨论稿；安全服务与 Flower 本地旁路分开。法律引文未独立核验，不构成法律意见。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/business/redteam-business-plan.md" target="_blank" rel="noopener noreferrer">阅读当前商业计划（新窗口）</a><code class="resource-path">docs/business/redteam-business-plan.md</code></article>
+        <article class="resource-card"><h3>PayAssist 研究方案</h3><p>当前 L0/L1 主线、四输入面、授权边界与验证口径；历史场景不拼入当前覆盖率。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/RESEARCH_PLAN.md" target="_blank" rel="noopener noreferrer">阅读研究方案（新窗口）</a><code class="resource-path">docs/RESEARCH_PLAN.md</code></article>
+        <article class="resource-card"><h3>PayAssist 运行与证据入口</h3><p>从运行指南核对场景、版本和复现实验，不把模型自称的成功当作执行证据。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/rsi4safety/payment_agents/README.md" target="_blank" rel="noopener noreferrer">阅读 PayAssist 指南（新窗口）</a><code class="resource-path">rsi4safety/payment_agents/README.md</code></article>
+      </div>
+    </section>
+    <section class="resource-section" aria-labelledby="flower-title">
+      <h2 id="flower-title">Flower · 独立本地原型</h2>
+      <p>仅合成材料、无分叉 Hardhat 31337。ERC-721 + ERC-5192 的不可转让 NFT 技术结构，不创造金融权益；免费与锁定均不保证合法。</p>
+      <div class="resource-grid">
+        <article class="resource-card"><h3>技术协议与人工审核边界</h3><p>可信审核、EOA 接收同意、免费发行、永久锁定、撤销留原 token/owner。钱包控制不是真实身份认证；digest 不证明贡献事实。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/FLOWER_RECOGNITION.md" target="_blank" rel="noopener noreferrer">阅读 Flower 协议（新窗口）</a><code class="resource-path">docs/FLOWER_RECOGNITION.md</code></article>
+        <article class="resource-card"><h3>本地实现与验证记录</h3><p>实现范围、测试记录、失败关闭与未完成审查。结果对应本地原型，不代表主网部署、全面审计或公开发行许可。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/FLOWER_IMPLEMENTATION_VERIFICATION.md" target="_blank" rel="noopener noreferrer">阅读实现验证记录（新窗口）</a><code class="resource-path">docs/FLOWER_IMPLEMENTATION_VERIFICATION.md</code></article>
+        <article class="resource-card"><h3>同一 token 的前后快照</h3><p>本站静态演示展示发行后与撤销后的同一个 token；不是两枚 NFT，不是实时链状态，没有钱包或交易按钮。</p><a href="./flower.html">在本站查看 Flower 演示</a><code class="resource-path">docs/site/flower.html</code></article>
+        <article class="resource-card"><h3>合约与本地复现入口</h3><p>核对编译、测试和生成演示的步骤；历史 RTM 与 Flower 是独立研究，不兑换、不迁移。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/contracts/README.md" target="_blank" rel="noopener noreferrer">阅读合约指南（新窗口）</a><code class="resource-path">contracts/README.md</code></article>
+      </div>
+    </section>
+    <section class="resource-section" aria-labelledby="evidence-title">
+      <h2 id="evidence-title">真实模型验证与源码</h2>
+      <p>保留开放问题与限定结论，区分模型层提案、宿主阻止和模拟落账。</p>
+      <div class="resource-grid">
+        <article class="resource-card"><h3>2026-10-05 live.v3 对照报告</h3><p>真实模型预算验证轮；L0/L1 分列。冻结验收通过仍有 <strong>12 个开放发现</strong>，不是生产安全证书；模拟落账在授权内，不等于模型没有越权提案。</p><a href="https://github.com/Fishman-free/REDTEAM/blob/main/rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md" target="_blank" rel="noopener noreferrer">核对 live.v3 原始口径（新窗口）</a><code class="resource-path">rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md</code></article>
+        <article class="resource-card"><h3>REDTEAM 项目源码</h3><p>查看 README、文件版本与实现。社区未运营，不提供公共攻击入口；所有挑战须在明确授权的模拟范围内进行。</p><a href="https://github.com/Fishman-free/REDTEAM" target="_blank" rel="noopener noreferrer">打开项目代码库（新窗口）</a><code class="resource-path">Fishman-free/REDTEAM · main</code></article>
+      </div>
+    </section>
+    <section class="resource-section" aria-labelledby="history-title">
+      <h2 id="history-title">历史材料 · 供追溯，不作当前承诺</h2>
+      <p>原 HTML 纳入站点目录以便阅读，历史资产、奖励与实验表达仍按归档理解。</p>
+      <div class="resource-grid">
+        <article class="resource-card"><h3>历史项目简述</h3><p>早期项目介绍，保留原稿历史内容。与当前研究、商业说明分开，不能单独作为现行产品依据。</p><a href="./archive-brief.html">阅读历史项目简述</a></article>
+        <article class="resource-card"><h3>历史完整介绍</h3><p>早期完整介绍，可能包含已被当前方案替代的口径；请同时阅读项目概览及当前 Markdown。</p><a href="./archive-introduction.html">阅读历史完整介绍</a></article>
+      </div>
+      <aside class="resource-note"><strong>版本与法律提示。</strong>商业 PDF 是 Flower 更新前旧快照，未重新生成，产品说明已由当前 Markdown 替代；历史论文不含当前 live.v3 结果，20%→100% 曲线受未见族分母缩小影响，不能证明跨族泛化。原稿法律引文未独立核验，不能据此断言真实性、效力或适用范围。新增协议与商业更新在合并到 main 后可按上述链接查阅；本页不宣称已经完成法律、隐私、安全或公开发行审查。</aside>
+    </section>
+    <footer class="resource-footer">资料是可复核研究的入口，不是投资、真实支付或生产安全服务的授权。</footer>
+  </main>
+</body>
+</html>

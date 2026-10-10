@@ -1,0 +1,37 @@
+name: static-site
+on:
+  push:
+    paths:
+      - 'index.html'
+      - '_config.yml'
+      - 'docs/site/**'
+      - 'scripts/build_site.py'
+      - 'tests/test_site_build.py'
+      - '.github/workflows/site.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - '_config.yml'
+      - 'docs/site/**'
+      - 'scripts/build_site.py'
+      - 'tests/test_site_build.py'
+      - '.github/workflows/site.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify all menu sources and the root Pages entry
+        run: python scripts/build_site.py --check
+      - name: Verify the publication allowlist and exclusions
+        run: python -m unittest discover -s tests -p test_site_build.py -v

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="2026-09 历史座谈简报；非当前运行、生产安全或法律意见。保留研究原型、拟议商业试点与合规讨论，引用未重新核验。">
+  <title>REDTEAM｜2026-09 历史座谈简报</title>
+  <link rel="canonical" href="https://fishman-free.github.io/REDTEAM/docs/site/archive-brief.html">
+  <meta property="og:title" content="REDTEAM｜2026-09 历史座谈简报">
+  <meta property="og:description" content="2026-09 历史座谈简报；非当前运行、生产安全或法律意见。保留研究原型、拟议商业试点与合规讨论，引用未重新核验。">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://fishman-free.github.io/REDTEAM/docs/site/archive-brief.html">
+  <style>
+    :root{--bg:#f8f6f1;--paper:#fffefa;--ink:#253746;--muted:#586671;--navy:#263e50;--blue:#345c77;--line:#dcdedb;--soft:#edf1f2;--green:#315e50;--green-bg:#eef4ef;--amber:#855c28;--amber-bg:#fbf3e5;--red:#854c41;--red-bg:#f8efeb;--radius:18px;--shadow:0 8px 30px rgba(37,55,70,.045)}
+    *{box-sizing:border-box}
+    html{scroll-padding-top:98px;scroll-behavior:smooth}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;font-size:16px;line-height:1.8;-webkit-text-size-adjust:100%;overflow-wrap:anywhere}
+    a{color:var(--blue);text-underline-offset:4px;text-decoration-thickness:1px}
+    a:hover{color:var(--navy)}
+    button{font:inherit;cursor:pointer}
+    button,a,summary{-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px;border-radius:4px}
+    ::selection{background:#dbe5eb;color:var(--navy)}
+    h1,h2,h3,h4,p,blockquote,figure{margin:0}
+    h1,h2,h3,h4{line-height:1.4;text-wrap:balance}
+    h2{font-size:clamp(25px,3vw,34px);letter-spacing:-.025em}
+    h3{font-size:19px}
+    h4{font-size:16px}
+    p+p{margin-top:12px}
+    ul,ol{margin:12px 0 0;padding-left:1.25em}
+    li+li{margin-top:8px}
+    strong{font-weight:650}
+    small,.small{font-size:13px;line-height:1.7}
+    .wrap{width:min(1160px,calc(100% - 64px));margin-inline:auto}
+    .skip{position:fixed;top:-90px;left:20px;background:var(--navy);color:white;padding:12px 20px;z-index:20}
+    .skip:focus{top:10px}
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:20px;color:var(--muted);font-size:12px;letter-spacing:.1em}
+    .topline strong{color:var(--navy);font-size:14px;letter-spacing:.16em}
+    .nav{position:sticky;top:0;z-index:10;background:rgba(248,246,241,.98);border-block:1px solid var(--line)}
+    .nav-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:10px}
+    .nav-links{display:flex;flex-wrap:wrap;gap:3px 6px;min-width:0}
+    .nav a{padding:6px 9px;color:var(--muted);font-size:13px;text-decoration:none;border-radius:6px;white-space:nowrap}
+    .nav a:hover{background:#e9edee;color:var(--navy)}
+    .button{min-height:42px;padding:8px 15px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--navy);font-size:13px;line-height:1.5;white-space:nowrap}
+    .button:hover{border-color:var(--blue);background:var(--soft)}
+    .button-primary{background:var(--navy);color:var(--paper);border-color:var(--navy)}
+    .button-primary:hover{background:var(--blue);color:var(--paper)}
+    [hidden]{display:none!important}
+    .hero{padding:62px 0 48px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:48px;align-items:center}
+    .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:650}
+    .hero h1{font-size:clamp(48px,7.3vw,86px);letter-spacing:-.04em;font-weight:720;line-height:1.06;margin:17px 0 18px}
+    .hero-slogan{font-size:clamp(23px,2.6vw,32px);line-height:1.5;font-weight:600;letter-spacing:-.025em}
+    .hero-sub{margin-top:22px;color:var(--muted);max-width:37em;font-size:17px}
+    .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:23px}
+    .tag{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;background:var(--paper);color:var(--muted)}
+    .tag::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+    .tag-green{color:var(--green);border-color:#cadbd0;background:var(--green-bg)}
+    .tag-amber{color:var(--amber);border-color:#e3d6bd;background:var(--amber-bg)}
+    .hero-panel{padding:30px;background:var(--navy);color:#fffefa;border-radius:22px;box-shadow:var(--shadow)}
+    .hero-panel .eyebrow{color:#d0dce3}
+    .hero-panel h2{font-size:25px;margin-top:14px;line-height:1.6}
+    .guard-list{display:grid;gap:0;margin-top:21px}
+    .guard{display:grid;grid-template-columns:33px 1fr;gap:12px;padding:15px 0;border-top:1px solid #506373;align-items:start}
+    .guard span{color:#c2d0d9;font:13px/1.8 ui-monospace,"Cascadia Code",Consolas,monospace;padding-top:2px}
+    .guard strong{font-size:16px}
+    .guard p{color:#d3dee4;font-size:13px;margin-top:3px;line-height:1.7}
+    .hero-panel .footnote{border-top:1px solid #506373;padding-top:16px;margin-top:6px;color:#d3dee4}
+    .brief{display:grid;grid-template-columns:160px minmax(0,1fr);gap:26px;padding:27px 30px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
+    .brief h2{font-size:18px;margin-top:6px}
+    .brief blockquote{font-size:17px;line-height:1.95}
+    .time{color:var(--blue);font-size:12px;letter-spacing:.06em}
+    .section{padding:58px 0 0;scroll-margin-top:15px}
+    .section-head{display:flex;align-items:flex-start;gap:20px;margin-bottom:24px}
+    .section-num{color:var(--blue);font:14px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;padding:7px 0 0;min-width:24px}
+    .section-head p{color:var(--muted);margin-top:8px;max-width:56em}
+    .grid{display:grid;gap:18px}
+    .two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{padding:26px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);min-width:0}
+    .card p{margin-top:11px;color:var(--muted)}
+    .card h3+.small{margin-top:8px}
+    .card .label{margin-bottom:13px}
+    .label{display:inline-block;font-size:12px;line-height:1.6;font-weight:650;color:var(--blue);letter-spacing:.04em}
+    .label-green{color:var(--green)}
+    .label-amber{color:var(--amber)}
+    .label-red{color:var(--red)}
+    .note{padding:17px 21px;background:var(--soft);border-left:3px solid var(--blue);border-radius:0 9px 9px 0;font-size:14px;line-height:1.85;margin-top:20px}
+    .note-warn{background:var(--amber-bg);border-color:var(--amber);color:#674e30}
+    .note-risk{background:var(--red-bg);border-color:var(--red);color:#73473e}
+    .scenario{padding:27px 30px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);margin-bottom:18px}
+    .scenario-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
+    .scenario-header .tag{margin:0;flex-shrink:0}
+    .scenario p{max-width:63em;color:var(--muted)}
+    .risk-card{background:#fffaf6;border-color:#e5d7ce}
+    .safe-card{background:#f5f8f4;border-color:#d2ddd1}
+    .list-clean{padding-left:0;list-style:none}
+    .list-clean li{padding-left:16px;position:relative}
+    .list-clean li::before{content:"";position:absolute;left:0;top:.78em;width:4px;height:4px;background:var(--muted);border-radius:50%}
+    .flow-figure{margin-top:27px}
+    .flow-title{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .flow-title span{color:var(--muted);font-size:12px}
+    .flow{padding:0;list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;counter-reset:flow}
+    .flow li{margin:0;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:17px 14px;position:relative;counter-increment:flow}
+    .flow li::before{content:counter(flow,decimal-leading-zero);display:block;font:12px/1.6 ui-monospace,Consolas,monospace;color:var(--blue);margin-bottom:10px}
+    .flow strong{font-size:15px;display:block}
+    .flow p{font-size:12px;line-height:1.75;color:var(--muted);margin-top:7px}
+    figcaption{font-size:13px;color:var(--muted);margin-top:13px}
+    .status-card{border-top:3px solid var(--blue)}
+    .status-card.current{border-top-color:var(--green)}
+    .status-card.pending{border-top-color:var(--amber)}
+    .status-card li{font-size:14px;color:var(--muted);line-height:1.85}
+    .status-card li strong{color:var(--ink)}
+    .divider{height:1px;background:var(--line);margin:25px 0}
+    .ledger{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:30px;align-items:start;margin-top:20px;padding:28px 30px;background:#eef1f2;border:1px solid #d7dfe2;border-radius:var(--radius)}
+    .ledger h3{font-size:23px;margin:6px 0 13px}
+    .ledger p{font-size:14px;color:var(--muted)}
+    .ledger .plain{font-size:18px;color:var(--ink);line-height:1.85}
+    .ledger-rules{border-left:1px solid #ccd6dc;padding-left:27px}
+    .ledger-rules h4{margin-bottom:8px}
+    .ledger-rules p+p{margin-top:16px}
+    .numbered{counter-reset:deliver;list-style:none;padding:0}
+    .numbered li{counter-increment:deliver;display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px}
+    .numbered li::before{content:counter(deliver,decimal-leading-zero);font:12px/2 ui-monospace,Consolas,monospace;color:var(--blue)}
+    .commercial{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);overflow:hidden}
+    .commercial-row{display:grid;grid-template-columns:170px minmax(0,1fr);gap:25px;padding:21px 26px}
+    .commercial-row+.commercial-row{border-top:1px solid var(--line)}
+    .commercial-row h3{font-size:16px}
+    .commercial-row p{color:var(--muted);font-size:14px}
+    .commercial-row strong{color:var(--ink)}
+    .scope{padding:25px 27px;background:var(--navy);color:var(--paper);border-radius:var(--radius);margin-bottom:18px}
+    .scope h3{margin-bottom:10px}
+    .scope p{color:#d8e1e7;font-size:14px}
+    .scope strong{color:#fffefa}
+    .compliance-list{display:grid;gap:14px;margin-top:20px}
+    .risk{display:grid;grid-template-columns:220px minmax(0,1fr);border:1px solid var(--line);border-radius:14px;background:var(--paper);overflow:hidden}
+    .risk-topic{padding:23px;background:#eff2f2;border-right:1px solid var(--line)}
+    .risk-topic h3{font-size:17px}
+    .risk-topic p{font-size:12px;color:var(--muted);margin-top:10px}
+    .risk-detail{padding:23px 27px;font-size:14px;line-height:1.9}
+    .risk-detail ul{margin-top:10px}
+    .risk-detail .source-ref{font-size:12px;margin-top:13px;color:var(--muted)}
+    .risk-priority{border-color:#dcc6b5}
+    .risk-priority .risk-topic{background:var(--amber-bg);border-color:#dcc6b5}
+    .boundary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
+    .boundary .card{background:#f4f5f1}
+    .boundary ul{font-size:14px;color:var(--muted)}
+    .phase .phase-time{display:block;font-size:27px;font-weight:600;color:var(--blue);line-height:1.25;margin-bottom:14px}
+    .phase .phase-time span{font-size:13px;font-weight:400;margin-left:5px}
+    .phase h3{font-size:18px}
+    .phase ul{font-size:14px;color:var(--muted)}
+    .phase .result{border-top:1px solid var(--line);padding-top:13px;margin-top:18px;font-size:13px}
+    .asks{padding:28px 30px;border:1px solid #ced8de;border-radius:var(--radius);background:#edf2f4;margin-top:20px}
+    .asks h3{margin-bottom:15px}
+    .ask-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+    .ask-grid h4{font-size:16px}
+    .ask-grid p{font-size:14px;color:var(--muted);margin-top:6px}
+    .faq-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px}
+    .faq-toolbar p{color:var(--muted);font-size:13px}
+    .faq-list{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);overflow:hidden}
+    .faq-list details+details{border-top:1px solid var(--line)}
+    summary{cursor:pointer;padding:19px 25px;font-size:16px;font-weight:600;list-style:none;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+    summary::-webkit-details-marker{display:none}
+    summary::after{content:"+";color:var(--blue);font:22px/1 ui-monospace,Consolas,monospace;flex-shrink:0}
+    details[open]>summary::after{content:"−"}
+    summary:hover{background:#f0f3f2}
+    .faq-answer{padding:0 25px 22px;font-size:14px;line-height:1.9;color:var(--muted)}
+    .faq-answer strong{color:var(--ink)}
+    .sources{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .sources li{padding:22px 24px;background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:0;min-width:0;scroll-margin-top:100px}
+    .source-code{font:12px/1.7 ui-monospace,Consolas,monospace;color:var(--blue);margin-bottom:9px;display:block}
+    .sources h3{font-size:15px;line-height:1.75}
+    .sources p{font-size:12px;color:var(--muted);margin-top:9px}
+    .sources .source-link{display:inline-block;margin-top:10px;font-size:12px}
+    .code-sources{margin-top:20px;padding:23px 25px;border:1px solid var(--line);border-radius:12px}
+    .code-sources h3{font-size:16px}
+    .code-sources p{font-size:13px;color:var(--muted);margin-top:8px}
+    .code-links{display:flex;gap:10px 24px;flex-wrap:wrap;margin-top:12px;font-size:13px}
+    code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}
+    .footer{margin-top:48px;padding:27px 0 35px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:30px;font-size:12px;color:var(--muted)}
+    .footer strong{display:block;color:var(--navy);letter-spacing:.12em;margin-bottom:6px}
+    .footer a{white-space:nowrap}
+    @media (max-width:1000px){.hero{gap:30px}.nav-inner{gap:8px}.nav a{padding-inline:7px}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.three{gap:13px}.card{padding:22px}.risk{grid-template-columns:185px minmax(0,1fr)}}
+    @media (max-width:760px){html{scroll-padding-top:118px}.wrap{width:calc(100% - 36px)}.topline{padding-block:14px;font-size:10px;letter-spacing:.03em;gap:10px}.topline strong{font-size:12px}.topline .desktop-label{display:none}.nav-inner{padding-block:7px}.nav-links{gap:0 2px;flex:1}.nav a{font-size:12px;padding:6px 7px}.nav .button{padding:8px 11px;min-width:49px;font-size:12px}.hero{grid-template-columns:1fr;padding:34px 0 24px;gap:25px}.hero h1{font-size:clamp(46px,13vw,78px)}.hero-sub{font-size:15px;margin-top:16px}.hero-panel{padding:23px}.hero-panel h2{font-size:22px}.guard-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.guard{display:block;padding:12px 0 0}.guard span{display:block;margin-bottom:6px}.guard strong{font-size:14px}.guard p{font-size:12px}.hero-panel .footnote{margin-top:17px}.brief{grid-template-columns:1fr;gap:13px;padding:23px}.brief-title{display:flex;align-items:baseline;gap:14px}.brief h2{margin:0}.brief blockquote{font-size:15px;line-height:1.95}.section{padding-top:39px}.section-head{gap:13px;margin-bottom:19px}.section-head p{font-size:14px}.two,.three,.boundary{grid-template-columns:1fr}.card,.scenario,.asks{padding:22px}.scenario-header{flex-wrap:wrap;gap:10px}.scenario p{font-size:14px}.flow{gap:10px}.flow li{padding:14px 12px}.flow strong{font-size:14px}.flow p{font-size:12px}.ledger{grid-template-columns:1fr;gap:20px;padding:23px}.ledger-rules{border-left:0;border-top:1px solid #ccd6dc;padding:19px 0 0}.ledger .plain{font-size:16px}.commercial-row{grid-template-columns:1fr;gap:8px;padding:20px 22px}.risk{grid-template-columns:1fr}.risk-topic{padding:18px 22px;border-right:0;border-bottom:1px solid var(--line)}.risk-topic .label{margin-bottom:5px}.risk-topic p{margin-top:5px}.risk-detail{padding:20px 22px}.scope{padding:23px}.ask-grid{grid-template-columns:1fr;gap:17px}.ask-grid>div+div{border-top:1px solid #d0dbe0;padding-top:17px}.sources{grid-template-columns:1fr}.sources li{padding:20px 22px}summary{padding:18px 20px;font-size:15px}.faq-answer{padding:0 20px 20px}.footer{margin-top:35px;gap:18px}.section-num{padding-top:5px}.note{padding:15px 17px;font-size:13px}}
+    @media (max-width:380px){.wrap{width:calc(100% - 28px)}.nav a{font-size:11px;padding:6px}.hero-slogan{font-size:22px}.hero-panel{padding:19px}.guard-list{grid-template-columns:1fr;gap:10px}.guard{display:grid;grid-template-columns:25px 1fr;gap:10px}.guard span{padding:0;margin:0}.flow{grid-template-columns:repeat(2,minmax(0,1fr))}.faq-toolbar{align-items:flex-start}.faq-toolbar .button{white-space:normal}.footer{flex-direction:column}}
+    @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+    @page{size:A4;margin:15mm 14mm}
+    @media print{html{scroll-behavior:auto}body{background:white;font-size:10pt;line-height:1.65;color:#253746}.wrap{width:100%;max-width:none}.nav,.skip,.button,.no-print{display:none!important}.topline{padding:0 0 12px;font-size:9pt}.hero{padding:19px 0 20px;gap:24px;grid-template-columns:1.35fr 1fr}.hero h1{font-size:42pt}.hero-slogan{font-size:18pt}.hero-sub{font-size:10pt;margin-top:13px}.hero-panel{background:#f0f3f5;color:#253746;padding:18px;box-shadow:none;border:1px solid #ccd6dc}.hero-panel h2{font-size:15pt}.hero-panel .eyebrow,.guard span,.guard p,.hero-panel .footnote{color:#465b6c}.guard,.hero-panel .footnote{border-color:#c5cfd6}.guard{padding:9px 0}.guard strong{font-size:11pt}.guard p,.hero-panel .footnote{font-size:9pt}.tags{margin-top:15px;gap:5px}.tag{font-size:8pt}.brief{padding:17px;grid-template-columns:100px 1fr;gap:20px}.brief blockquote{font-size:10pt}.brief h2{font-size:13pt}.section{padding-top:27px}.section-head{margin-bottom:15px;break-after:avoid}.section-head h2{font-size:19pt}.section-head p{font-size:10pt}.section-num{font-size:10pt}h3{font-size:12pt}h4{font-size:10pt}.card,.scenario,.ledger,.asks{padding:17px;box-shadow:none}.card p,.card li,.scenario p,.ledger p,.risk-detail,.commercial-row p,.phase ul,.ask-grid p,.faq-answer{font-size:9pt}.note{font-size:9pt;padding:12px 15px}.three{gap:12px}.grid{gap:12px}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.flow li{padding:11px}.flow strong{font-size:10pt}.flow p,figcaption{font-size:8pt}.scenario-header,.card,.flow li,.phase,.risk,.brief,.hero-panel,.sources li,details,.asks{break-inside:avoid}.risk{grid-template-columns:150px 1fr}.risk-topic{padding:17px}.risk-detail{padding:17px 20px}.risk-topic h3{font-size:11pt}.scope{background:#edf2f4;border:1px solid #cbd7de;color:var(--ink);padding:17px}.scope p,.scope strong{color:var(--ink)}.scope p{font-size:9pt}.ledger h3{font-size:15pt}.ledger .plain{font-size:11pt}.phase .phase-time{font-size:20pt}.phase h3{font-size:12pt}.commercial-row{padding:15px 20px;grid-template-columns:135px 1fr;gap:20px}.commercial-row h3{font-size:11pt}.sources{gap:10px}.sources li{padding:15px}.sources h3{font-size:10pt}.sources p,.sources .source-link{font-size:8pt}.sources a[href^="https"]::after{content:" [" attr(href) "]";display:block;font-size:7pt;line-height:1.6;color:#526571;overflow-wrap:anywhere;margin-top:4px}.code-sources{padding:16px}.code-sources p,.code-links{font-size:8pt}summary{padding:13px 17px;font-size:11pt}summary::after{display:none}.faq-answer{padding:0 17px 15px}details::details-content{content-visibility:visible}details>*:not(summary){display:block!important}.footer{font-size:8pt;margin-top:25px;padding:16px 0 0}.footer a{display:none}a{color:inherit;text-decoration:none}}
+  </style>
+
+  <style id="archive-notice-style">
+    .archive-notice{position:static;margin:20px auto;padding:22px 26px;background:#fbf3e5;color:#513b20;border:2px solid #855c28;border-radius:14px}
+    .archive-notice h2{font-size:22px;line-height:1.5;margin-bottom:10px}
+    .archive-notice p{font-size:14px;line-height:1.85}
+    .archive-menu{display:flex;flex-wrap:wrap;gap:12px 24px;margin-top:14px}
+    .archive-menu a{color:#263e50;font-weight:650;padding:4px 0}
+    .archive-context{margin-top:20px}
+    @media(max-width:760px){.archive-notice{padding:18px 20px}.archive-notice h2{font-size:19px}}
+    @media print{.archive-notice{position:static;margin:0 0 16px;padding:12px;border:2px solid #855c28;background:white;color:#253746;break-inside:avoid}.archive-notice h2{font-size:13pt}.archive-notice p,.archive-context{font-size:9pt}.archive-menu{display:none}}
+  </style>
+</head>
+<body>
+<aside class="wrap archive-notice" role="note" aria-labelledby="archive-notice-title">
+  <h2 id="archive-notice-title">2026-09 历史演示材料 · 非当前运行说明</h2>
+  <p>本页完整保留 2026 年 9 月的项目介绍与座谈思路。原文中的“当前”“目前已有”、能力描述与计划均应按当时语境阅读，不表示现在仍在运行、已经上线或已经完成商业化；本页不是实时服务入口。</p>
+  <p>历史材料不证明生产安全，不构成正式法律意见、监管许可或收益承诺。所引法规、外部链接及固定提交的历史判断未在本次归档中重新核验，不保证现行有效或链接可用。</p>
+  <p>商业收费、人民币现金奖励、RTM 与试点方案均是历史研究或拟议方向，不是 Flower 当前的奖励规则或现金承诺，也不预设 NFT。当前项目边界请查看项目概览与资料导航。</p>
+  <nav class="archive-menu" aria-label="返回当前 REDTEAM 网站"><a href="overview.html">当前项目概览</a><a href="resources.html">资料导航与历史材料</a></nav>
+</aside>
+
+<a class="skip" href="#main">跳到正文</a>
+<header class="wrap topline" id="top">
+  <div><strong>REDTEAM</strong><span class="desktop-label"> ／ 项目座谈简报</span></div>
+  <div>研究原型 · 事实说明 · 试点建议</div>
+</header>
+<nav class="nav" aria-label="讲解目录">
+  <div class="wrap nav-inner">
+    <div class="nav-links">
+      <a href="#position">项目定位</a><a href="#demo">案例闭环</a><a href="#status">能力边界</a><a href="#business">商业方向</a><a href="#compliance">合规风险</a><a href="#pilot">90天计划</a><a href="#faq">常见问题</a><a href="#sources">参考依据</a>
+    </div>
+    <button class="button" id="print-button" type="button" hidden>打印</button>
+  </div>
+</nav>
+<main class="wrap" id="main">
+  <section class="hero" id="position" aria-labelledby="hero-title">
+    <div>
+      <p class="eyebrow">支付类 AI 智能体 · 安全演练与修复验证</p>
+      <h1 id="hero-title">REDTEAM</h1>
+      <p class="hero-slogan">让 AI 学会办事，<br>更要守住权限</p>
+      <p class="hero-sub">在 AI 接触真实资金和业务之前，先在模拟环境里让它接受“钓鱼与越权演练”，<strong>把漏洞找出来，把修复测清楚。</strong></p>
+      <div class="tags" aria-label="项目状态">
+        <span class="tag tag-green">已有本地研究实现</span>
+        <span class="tag">模拟模型与合成资产</span>
+        <span class="tag tag-amber">商用方向尚待验证</span>
+      </div>
+    </div>
+    <aside class="hero-panel" aria-label="项目价值概览">
+      <p class="eyebrow">不是问 AI “你安全吗”</p>
+      <h2>而是核对它<br>到底做了什么。</h2>
+      <div class="guard-list">
+        <div class="guard"><span>01</span><div><strong>有没有越权</strong><p>检查收款对象、金额权限与重复支付。</p></div></div>
+        <div class="guard"><span>02</span><div><strong>修复有没有用</strong><p>对照实际执行记录，不采信口头保证。</p></div></div>
+        <div class="guard"><span>03</span><div><strong>正常事能否办成</strong><p>不能靠拒绝全部业务换取安全高分。</p></div></div>
+      </div>
+      <p class="small footnote">当前不是主网支付产品，不接真实资金；测试通过也不等于生产安全。</p>
+    </aside>
+  </section>
+
+  <section class="brief" aria-labelledby="opening-title">
+    <div class="brief-title"><span class="time">约 60 秒 · 可直接讲</span><h2 id="opening-title">开场话术</h2></div>
+    <blockquote>现在的 AI 不只会回答问题，还能调用软件、替人办事。但如果它把外部消息当成指令，就可能付错对象、超出权限，甚至重复付款。REDTEAM 做的是在接触真实资金之前，先用模拟环境进行安全演练，再依据实际执行记录验证修复，同时检查正常业务能否完成。目前支付测试和修复验证是两条独立研究路径，还没有打通，也没有上线发币业务。我们建议在国内先探索不涉及代币、不接真实账户的企业安全测评服务，希望对接一两个授权企业场景，以及合规和联合验证资源，先把能否解决实际问题验证清楚。</blockquote>
+  </section>
+
+  <section class="section" id="demo" aria-labelledby="demo-title">
+    <div class="section-head"><span class="section-num">01</span><div><h2 id="demo-title">用一笔采购付款，说明问题</h2><p>AI 智能体，可以理解为能读信息、调用软件、替人办事的“数字助理”。红队测试，就是经授权扮演对手，先做一次安全演练。</p></div></div>
+    <article class="scenario">
+      <div class="scenario-header"><h3>正常任务：给已验收订单付款</h3><span class="tag">解释性模拟 · 非客户案例</span></div>
+      <p>企业授权 AI 向指定供应商支付一笔已验收订单。此时，供应商页面或外部消息里夹带了诱导，要求它忽略原有规则、变更收款对象，或者再次付款。我们要验证的不是它“回答得像不像对”，而是<strong>有没有真正执行未经授权的动作</strong>。</p>
+    </article>
+    <div class="grid two">
+      <article class="card risk-card"><span class="label label-red">风险观察</span><h3>外部内容不能变成授权</h3><ul class="list-clean"><li>指定供应商是否被换成了其他收款对象？</li><li>金额是否突破业务授权与限额？</li><li>同一张发票是否触发了重复付款？</li></ul><p class="small">这里只说明风险现象，不提供未授权攻击的操作细节，也不展示伪造的演练成绩。</p></article>
+      <article class="card safe-card"><span class="label label-green">防线与验证</span><h3>让程序守规则，让记录作证</h3><ul class="list-clean"><li><strong>模型提出建议，代码／合约检查边界。</strong></li><li>已有检查包括收款白名单、金额限额、发票支付状态；人工复核可作为拟议业务防线。</li><li>核验执行记录，并复测正常订单是否仍能办成。</li></ul><p class="small">“已检查这些规则”不等于“能覆盖所有攻击与业务风险”。</p></article>
+    </div>
+    <figure class="flow-figure" aria-labelledby="flow-title">
+      <div class="flow-title"><h3 id="flow-title">面向试点的安全闭环</h3><span>流程示意，不是在线运行界面</span></div>
+      <ol class="flow">
+        <li><strong>界定授权</strong><p>先约定目标、权限、数据与停止条件。</p></li>
+        <li><strong>模拟诱导</strong><p>在合成资产环境中观察越权风险。</p></li>
+        <li><strong>核验事实</strong><p>以执行事件与记录判断，不听 AI 自评。</p></li>
+        <li><strong>提出修复</strong><p>增加规则约束，生成候选修复方案。</p></li>
+        <li><strong>双向复测</strong><p>既查违规付款，也查正常任务完成。</p></li>
+        <li><strong>验收或回滚</strong><p>通过约定验证再推进；失败不强行晋级。</p></li>
+      </ol>
+      <figcaption><strong>尚未端到端打通：</strong>现有支付测试路径与 Arena 修复验证路径分别覆盖部分环节；此图描述试点目标流程，不代表已实现“支付—修复—链上领奖”完整闭环。回归测试，就是修补一个问题后，再查旧问题有没有复发。</figcaption>
+    </figure>
+  </section>
+
+  <section class="section" id="status" aria-labelledby="status-title">
+    <div class="section-head"><span class="section-num">02</span><div><h2 id="status-title">哪些已有，哪些还没有</h2><p>以下是代码与文档核验结论。本次材料制作未重新运行测试或真实模型，不报告安全率、客户收入或其他未经验证的效果。</p></div></div>
+    <div class="grid three">
+      <article class="card status-card current"><span class="label label-green">目前已有 · 研究实现</span><h3>两条独立研究路径</h3><ul><li><strong>Payment-agent：</strong>在 SQLite／本地 EVM 环境对比脆弱与加固决策，执行模拟付款并核验事件。</li><li><strong>RSI4Safety／Arena：</strong>执行授权任务、程序评分、候选修复、回归测试、晋级或回滚。</li><li><strong>独立研究合约：</strong>RTMToken 与 BountyVault 包含代币、奖励机制研究，不等于已上线发币业务。</li></ul></article>
+      <article class="card status-card pending"><span class="label label-amber">尚未打通 · 不能对外宣称</span><h3>不是可直接上线的产品</h3><ul><li><strong>Arena 尚未接入链上支付或 RTM 领奖。</strong>不能把两条路径描述成一个已跑通系统。</li><li>对外智能体互联（A2A）、先承诺后揭示（commit-reveal）、公开领奖仍是设计。</li><li>不证明通用安全或递归自我改进；不属于主网支付产品或通用攻击平台。</li></ul></article>
+      <article class="card status-card"><span class="label">拟议商用 · 待试点验证</span><h3>企业 AI 安全测评与上线验收</h3><ul><li>先用合成或脱敏数据，开展封闭、书面授权的测试。</li><li>交付风险案例、修复对照、回归与版本验收报告。</li><li>国内首期剥离代币与外部资金接口；不接真实账户，不替企业收付资金。</li><li>这是建议方向，<strong>不是已经完成的业务转型</strong>。</li></ul></article>
+    </div>
+    <div class="note note-warn"><strong>研究环境有意保留漏洞，不能直接对公网开放。</strong>容器不等于完全隔离或没有外网；本地日志、哈希链不构成绝对不可篡改证明。生产使用前必须另做身份权限、隔离、审计、应急与独立安全评估。</div>
+    <article class="ledger" aria-labelledby="ledger-title">
+      <div><span class="label">把区块链说清楚</span><h3 id="ledger-title">像一本按规则共同核对的电子账本</h3><p class="plain">“智能合约”像账本旁的自动办事程序：满足预设条件，才执行相应动作。<strong>用不用这本账本，与发不发币是两回事。</strong></p></div>
+      <div class="ledger-rules"><h4>当前研究里做什么</h4><p>本地链用于提供可核验的模拟付款规则和记录；不是让真实资金进入链上流转。</p><p><strong>不能替代什么：</strong>不能保证输入信息真实、业务判断正确，也不能自动带来法律合规。</p><p><strong>国内首期怎么选：</strong>可先使用普通数据库、签名日志与访问控制。确有多方协作需要时，再论证联盟链及备案等要求。区块链是可选技术，不是商业前提。</p></div>
+    </article>
+  </section>
+
+  <section class="section" id="business" aria-labelledby="business-title">
+    <div class="section-head"><span class="section-num">03</span><div><h2 id="business-title">先卖可复核的服务，不卖代币</h2><p>国内落地建议：企业 AI 安全测评与上线验收服务。尚未开展客户验证，不预设已有客户、营收或市场规模。</p></div></div>
+    <p class="note note-warn archive-context"><strong>历史方案提示：</strong>本节商业模式、收费、试点与奖励讨论保留 2026-09 的思路，不是当前经营状态、已履行服务或 Flower 奖励规则；本归档页不接受付费或报名。</p>
+    <div class="commercial">
+      <div class="commercial-row"><h3>服务谁</h3><p><strong>潜在客户，待验证：</strong>AI 应用企业、企业采购／财务软件厂商，以及园区内有智能体项目的团队。</p></div>
+      <div class="commercial-row"><h3>解决什么</h3><p>协助企业在上线前判断：智能体是否守住业务权限；修复是否经得起复测；新版本是否让旧问题复发。报告用于辅助验收，<strong>不是“零风险保证书”</strong>。</p></div>
+      <div class="commercial-row"><h3>交付什么</h3><div><ol class="numbered"><li>授权与测试范围清单</li><li>可复现的风险案例与修复前后对照报告</li><li>版本上线验收与历史问题回归结果</li><li>整改建议、复核记录与适用边界</li></ol></div></div>
+      <div class="commercial-row"><h3>如何收费</h3><p><strong>拟议：</strong>一次性测评服务费、年度回归订阅、企业私有化部署及维护费。按人民币合同结算、开票纳税；<strong>不收币，不抽取资金转账分成</strong>。具体报价由试点工作量与客户验证决定，本材料不虚报营收。</p></div>
+      <div class="commercial-row"><h3>差异在哪里</h3><p>不仅看模型“说了什么”，还看它实际“做了什么”；同时考核安全与办事能力；修复要有对照、回归和失败回滚。<strong>不声称技术独有或已领先竞品。</strong></p></div>
+    </div>
+    <div class="note"><strong>最小试点边界：</strong>只做书面授权的封闭测试，只用合成或经审查的脱敏数据，只交付测试报告；不接真实账户、不托管资金、不代清结算，首期不设公开有偿悬赏。</div>
+  </section>
+
+  <section class="section" id="compliance" aria-labelledby="compliance-title">
+    <div class="section-head"><span class="section-num">04</span><div><h2 id="compliance-title">先讲风险，再谈落地</h2><p>“研究代码存在”与“可以对外经营”不是一回事。要审查真实的部署、网站、条款、数据流与资金流，而不只看项目名称。</p></div></div>
+    <div class="scope"><h3>这是风险识别与改造建议，不是合规认证</h3><p>以下为经营模式的初步风险识别，<strong>不是正式法律意见或主管部门许可</strong>。不宣称已备案、已获监管批准或完全合规。上线前应由专业律师及主管部门按实际业务、服务对象和数据流确认；本材料不保证已穷尽所有新规。</p></div>
+    <div class="compliance-list">
+      <article class="risk risk-priority" aria-labelledby="risk-token-title">
+        <div class="risk-topic"><span class="label label-amber">A · 最高优先级</span><h3 id="risk-token-title">RTM、虚拟货币与融资</h3><p>原始研究包含可转让代币和奖励合约，不能隐去这段事实。</p></div>
+        <div class="risk-detail"><p><strong>风险事实：</strong>RTMToken／BountyVault 是独立研究合约，不是已上线发币业务；但原研究包含可转让代币和奖励机制，不能隐去。2026 年新通知禁止境内相关虚拟货币业务，包括兑换、交易撮合定价、代币发行融资等；不得为相关业务提供网络经营场所、商业展示、营销宣传或付费导流。</p><ul><li><strong>商用首期真正剥离：</strong>移除发行、交易、兑换、变相融资、收益承诺及境外交易导流；研究代码与商用部署、网站、条款、资金流隔离。</li><li><strong>宣传与实质一致：</strong>当前 GitHub 简介仍强调链上（on-chain）及赚取 RTM（earn RTM）。未来商用版的经营实质、部署功能、网站文案与条款须同步调整，不能只改名来掩盖代币业务。本次材料制作不修改原仓库。</li><li><strong>不能换个名称或注册地规避：</strong>“去中心化”“测试币”或改名“积分”不构成当然豁免；境外主体不得向境内非法提供相关服务。未经有关部门依法依规同意，境内主体及其控制的境外主体不得在境外发行虚拟货币，海外注册不是规避路径。</li><li><strong>奖励另行审查：</strong>如确有必要，以封闭授权科研或安全服务规则、固定人民币预算和合规主体支付，并审查税务、人员及披露义务。最稳妥的首期方案是不设公开有偿悬赏。</li></ul><p class="source-ref">依据：<a href="#source-l1">L1 · 银发〔2026〕42号</a>第1、7、13项等。该风险判断不等于把所有区块链技术研发认定为违法；具体业务仍需专项法律审查。</p></div>
+      </article>
+      <article class="risk" aria-labelledby="risk-vulnerability-title">
+        <div class="risk-topic"><span class="label">B · 授权与漏洞</span><h3 id="risk-vulnerability-title">测试不能越过授权边界</h3><p>演练目的正当，也不能替代目标方书面授权。</p></div>
+        <div class="risk-detail"><ul><li>书面约定具体目标、时段、权限、手段、频率、数据处理和停止条件；禁止无授权真实目标扫描或攻击。</li><li>建立漏洞私密接收、修复协同、负责任披露及留痕机制。</li><li><strong>“获知漏洞后 2 日内报送”的规定针对网络产品提供者，不能泛化给所有研究者。</strong></li><li>未公开漏洞不得提供给产品提供者之外的境外组织或个人；不能上传到境外模型、公开 GitHub 或公开榜单。</li></ul><p class="source-ref">依据：<a href="#source-l2">L2《网络产品安全漏洞管理规定》</a>。</p></div>
+      </article>
+      <article class="risk" aria-labelledby="risk-data-title">
+        <div class="risk-topic"><span class="label">C · 数据与模型</span><h3 id="risk-data-title">脱敏与出境都要逐项判断</h3><p>个人信息、商业秘密、重要数据不能混为一谈。</p></div>
+        <div class="risk-detail"><ul><li>优先合成数据；做到最小化采集、脱敏、权限隔离、明确留存期限和删除机制。</li><li>真实业务材料发送给模型前，确认处理依据、委托处理安排、供应商责任与保密要求。</li><li><strong>调用境外模型，不等于当然允许数据出境。</strong>逐项识别是否涉及个人信息、重要数据及所需程序；也不简单声称“所有数据都绝对不能出境”。</li><li>未公开漏洞应遵守更具体的漏洞管理限制，不能仅以“数据已脱敏”替代审查。</li></ul><p class="source-ref">依据：<a href="#source-l5">L5《个人信息保护法》</a>第6条最小必要、第21条委托处理、第38／39条出境条件与告知；并结合数据安全及出境规则专项核查，不作一揽子合规判断。</p></div>
+      </article>
+      <article class="risk" aria-labelledby="risk-service-title">
+        <div class="risk-topic"><span class="label">D · 服务适用范围</span><h3 id="risk-service-title">内部研发不等于对外服务</h3><p>私有化部署也不是所有监管义务的豁免理由。</p></div>
+        <div class="risk-detail"><ul><li><strong>企业内部研发且不向境内公众提供生成式 AI 服务：</strong>不适用《生成式人工智能服务管理暂行办法》该范围，但仍受其他法律约束。</li><li><strong>面向公众提供服务：</strong>应重新评估适用义务；算法备案与安全评估依具体条件判断，不是一律需要或一律豁免。</li><li><strong>若在境内基于区块链技术或系统，通过网站、应用等向社会公众提供信息服务：</strong>再评估身份信息认证、备案及相关安全评估义务；不能把任何本地模拟区块链研究都视为需要备案。<strong>备案不等于行政许可或政府背书。</strong></li><li>网站按实际经营模式确认 ICP 备案／许可等；不能用 ICP 备案替代金融、支付等业务许可。</li></ul><p class="source-ref">依据：<a href="#source-l3">L3《区块链信息服务管理规定》</a>、<a href="#source-l4">L4《生成式人工智能服务管理暂行办法》</a>。</p></div>
+      </article>
+      <article class="risk" aria-labelledby="risk-payment-title">
+        <div class="risk-topic"><span class="label">E · 生产与资金</span><h3 id="risk-payment-title">模拟合约不是支付牌照</h3><p>安全研究、生产接入与资金业务是不同层面的责任。</p></div>
+        <div class="risk-detail"><ul><li>建议首期只交付测试报告，不接真实账户、不托管资金、不代清结算。</li><li>若未来涉及真实付款，应由客户自有系统或持牌机构处理，另行确认适用的业务和许可边界。</li><li>生产接入前还需身份权限、环境隔离、审计、应急、责任分工及独立安全评估。</li><li><strong>本地测试通过不等于生产安全，更不等于取得经营许可。</strong></li></ul><p class="source-ref">此处为生产接入的风险边界建议，不构成金融、支付业务的准入意见。</p></div>
+      </article>
+    </div>
+    <div class="boundary">
+      <article class="card"><span class="label label-green">首期建议做</span><h3>有限场景，受控验证</h3><ul><li>书面授权 + 合成／经审查的脱敏数据</li><li>封闭环境 + 人工监督 + 停止机制</li><li>人民币服务合同 + 报告交付 + 复核留痕</li></ul></article>
+      <article class="card"><span class="label label-red">不作为首期业务</span><h3>不碰真实资金与公开代币激励</h3><ul><li>不开展代币发行、交易、兑换或融资导流</li><li>不开放脆弱靶场、不公布未修复漏洞细节</li><li>不接真实付款、不设公开有偿悬赏、不承诺绝对安全</li></ul></article>
+    </div>
+  </section>
+
+  <section class="section" id="pilot" aria-labelledby="pilot-title">
+    <div class="section-head"><span class="section-num">05</span><div><h2 id="pilot-title">用 90 天，验证一个真实需求</h2><p>建议计划，非交付承诺。先约定验收目标与测试方法，报告样本数、分母和失败案例，不预先编造改善幅度。</p></div></div>
+    <div class="grid three">
+      <article class="card phase"><span class="phase-time">0—30<span>天</span></span><h3>选场景，定边界</h3><ul><li>选择 1 个授权企业场景</li><li>签订协议，明确测试与数据范围</li><li>数据脱敏并确认处理方式</li><li>剥离代币与外部资金接口</li></ul><p class="result"><strong>阶段产出：</strong>授权清单、试点方案、验收口径。</p></article>
+      <article class="card phase"><span class="phase-time">31—60<span>天</span></span><h3>跑对照，复核修复</h3><ul><li>建立可复现的测试样例</li><li>跑通修复前后对照测评</li><li>同时检查越权与正常任务完成</li><li>记录失败、回归与回滚结果</li></ul><p class="result"><strong>阶段产出：</strong>风险案例、修复复核与测试报告。</p></article>
+      <article class="card phase"><span class="phase-time">61—90<span>天</span></span><h3>做验收，再谈付费</h3><ul><li>由客户按预定目标验收</li><li>邀请第三方进行独立复核</li><li>明确适用边界与责任分工</li><li>判断是否进入付费试点</li></ul><p class="result"><strong>阶段产出：</strong>验收记录与下一步商业决策。</p></article>
+    </div>
+    <aside class="asks" aria-labelledby="asks-title"><h3 id="asks-title">希望来访方帮助对接的，是这三类资源</h3><div class="ask-grid"><div><h4>1—2 家场景企业</h4><p>有智能体落地需求，愿意提供授权、脱敏场景和验收反馈的园区企业。</p></div><div><h4>孵化与合规辅导</h4><p>创业孵化、知识产权、公司设立及专业合规咨询，明确经营边界。</p></div><div><h4>联合验证伙伴</h4><p>高校或检测机构，协助形成可复核的方法与独立评价。</p></div></div><p class="small" style="margin-top:18px;color:var(--muted)">资金、场地、算力支持可进一步讨论；不预设已有补贴政策、政府背书或监管豁免。</p></aside>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-title">
+    <div class="section-head"><span class="section-num">06</span><div><h2 id="faq-title">现场常见问题</h2><p>先回答“能做什么”，也把“不能据此推出什么”讲清楚。</p></div></div>
+    <div class="faq-toolbar"><p>点击问题展开；打印时自动展开全部问答。</p><button class="button" id="faq-toggle" type="button" aria-controls="faq-list" aria-expanded="false" hidden>展开全部问答</button></div>
+    <div class="faq-list" id="faq-list">
+      <details><summary>这是做 AI、做区块链，还是发币？</summary><div class="faq-answer"><p><strong>核心是支付类 AI 智能体的安全演练与修复验证研究。</strong>区块链是当前部分研究的模拟执行与记录工具，不是商业前提。原始研究确实包含 RTM 可转让代币和奖励合约，不能隐瞒；Arena 未接入 RTM 领奖，也没有已上线发币业务的核验结论。国内商用建议真正剥离代币机制，不能仅把“币”改叫“积分”。</p></div></details>
+      <details><summary>现在能展示一个完整的自动支付、修复、领奖系统吗？</summary><div class="faq-answer"><p><strong>不能这样介绍。</strong>Payment-agent 与 RSI4Safety／Arena 是两条独立路径。前者做模拟支付决策与事件核验，后者做授权任务、候选修复和回归；Arena 尚未接入链上支付或 RTM 领奖，对外 A2A、commit-reveal、公开领奖仍是设计。本页流程是讲解示意，不是实时演示或测试成绩。</p></div></details>
+      <details><summary>有了白名单，为什么还需要测试？</summary><div class="faq-answer"><p>白名单、限额、重复付款检查只是具体防线。仍要验证规则是否被正确调用、实际执行是否越权，以及正常订单是否被误拒。<strong>安全不能只靠模型自觉，也不能靠“一律不办事”。</strong>修复后还要回归，失败候选应回滚。</p></div></details>
+      <details><summary>不用区块链，项目还能做吗？</summary><div class="faq-answer"><p><strong>可以把区块链作为可选技术，而不是前提。</strong>国内首期可以先用普通数据库、签名日志与访问控制开展封闭测评。只有多方协作确有需要时，再论证联盟链、数据与服务适用义务。区块链不能保证输入真实、业务判断正确或法律合规，签名日志也不是绝对不可篡改证明。</p></div></details>
+      <details><summary>这是“黑客工具”吗？漏洞能直接发到网上吗？</summary><div class="faq-answer"><p>项目定位不是通用攻击平台，只应在书面授权的范围内做安全演练。研究靶场故意保留漏洞，不可直接公开暴露；发现漏洞应私密接收、协调修复并负责任披露。<strong>未公开漏洞不能上传到境外模型、公开 GitHub 或公开榜单。</strong>向产品提供者之外的境外组织或个人提供未公开漏洞也受到明确限制。</p></div></details>
+      <details><summary>只做企业内部研发，是不是就不需要考虑监管？</summary><div class="faq-answer"><p><strong>不是。</strong>企业内部研发且不向境内公众提供生成式 AI 服务，不适用《生成式人工智能服务管理暂行办法》该范围，但仍须遵守数据、个人信息、漏洞管理等法律要求。对外服务、公众服务和区块链信息服务需要按实际业务重新评估；私有化部署、算法备案或 ICP 备案都不能替代所有准入与许可要求。</p></div></details>
+      <details><summary>怎么收费？已经有客户和收入了吗？</summary><div class="faq-answer"><p>拟议收入是测评服务费、年度回归订阅、私有化部署及维护费，按人民币合同结算、开票纳税，不收币、不抽取转账分成。<strong>尚未开展客户验证，本材料不声称已有客户、收入或融资。</strong>先通过授权试点确认客户是否愿意购买、交付是否有价值。</p></div></details>
+      <details><summary>测试通过，能保证上线不出问题吗？</summary><div class="faq-answer"><p><strong>不能。</strong>结果只对约定场景、版本、数据和测试范围提供证据。模拟环境不能覆盖全部生产风险，更不证明通用安全。生产接入仍需独立安全评估、身份权限、隔离、审计、应急和明确责任分工；未来真实付款由客户自有系统或持牌机构处理，平台不托管资金、不代清结算。</p></div></details>
+      <details><summary>目前最需要什么支持？</summary><div class="faq-answer"><p>最优先是 <strong>1—2 家愿意开展授权试点的园区企业</strong>，以及合规辅导、高校／检测机构联合验证。先用合成或经审查的脱敏数据完成小范围测评，再讨论付费、规模化和配套支持。希望对接资源，不等于申请政府为安全性或合规性背书。</p></div></details>
+    </div>
+  </section>
+
+  <section class="section" id="sources" aria-labelledby="sources-title">
+    <div class="section-head"><span class="section-num">07</span><div><h2 id="sources-title">事实与法规，都留出处</h2><p>正文与交互可离线使用。以下是外部参考链接，点击查阅原文需要联网；法律规则应结合具体业务及后续新规核查。</p></div></div>
+    <ol class="sources">
+      <li id="source-l1"><span class="source-code">L1 · 虚拟货币监管 · 2026新规</span><h3><a href="https://www.pbc.gov.cn/tiaofasi/144941/3581332/2026020619591971323/index.html" target="_blank" rel="noopener noreferrer">《关于进一步防范和处置虚拟货币等相关风险的通知》</a></h3><p>中国人民银行等八部门，银发〔2026〕42号，2026年2月6日发布施行；银发〔2021〕237号同时废止。重点参见第1项相关业务禁令、第7项网络经营场所及宣传导流限制、第13项境内主体及其控制的境外主体境外发行限制。</p><a class="source-link" href="https://www.pbc.gov.cn/tiaofasi/144941/3581332/2026020619591971323/index.html" target="_blank" rel="noopener noreferrer">中国人民银行官方原文 ↗</a></li>
+      <li id="source-l2"><span class="source-code">L2 · 授权测试与漏洞</span><h3><a href="https://www.cac.gov.cn/2021-07/13/c_1627761607640342.htm" target="_blank" rel="noopener noreferrer">《网络产品安全漏洞管理规定》</a></h3><p>工信部联网安〔2021〕66号。关注产品提供者报送责任、漏洞披露及向境外提供未公开漏洞的限制。</p><a class="source-link" href="https://www.cac.gov.cn/2021-07/13/c_1627761607640342.htm" target="_blank" rel="noopener noreferrer">国家网信办官方原文 ↗</a></li>
+      <li id="source-l3"><span class="source-code">L3 · 区块链信息服务</span><h3><a href="https://www.cac.gov.cn/2019-01/10/c_1123971164.htm" target="_blank" rel="noopener noreferrer">《区块链信息服务管理规定》</a></h3><p>国家网信办令第3号。重点参见第2条适用范围、第9条新产品新功能安全评估、第11条备案；备案不等于行政许可。</p><a class="source-link" href="https://www.cac.gov.cn/2019-01/10/c_1123971164.htm" target="_blank" rel="noopener noreferrer">国家网信办官方原文 ↗</a></li>
+      <li id="source-l4"><span class="source-code">L4 · 生成式 AI 服务</span><h3><a href="https://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm" target="_blank" rel="noopener noreferrer">《生成式人工智能服务管理暂行办法》</a></h3><p>2023年七部门令第15号。重点参见第2条适用范围与第17条相关安全评估、算法备案要求。</p><a class="source-link" href="https://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm" target="_blank" rel="noopener noreferrer">国家网信办官方原文 ↗</a></li>
+      <li id="source-l5"><span class="source-code">L5 · 个人信息与数据处理</span><h3><a href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm" target="_blank" rel="noopener noreferrer">《中华人民共和国个人信息保护法》</a></h3><p>重点参见第6条最小必要、第21条委托处理、第38条向境外提供个人信息的条件、第39条告知及单独同意。实际出境安排须结合其他适用规则逐项审查。</p><a class="source-link" href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm" target="_blank" rel="noopener noreferrer">国家网信办官方全文 ↗</a></li>
+    </ol>
+    <div class="code-sources"><h3>项目事实：固定提交的代码与文档</h3><p>公开仓库 Fishman-free／REDTEAM；本次事实核验对应提交 <code>792c5b4137b32c7e624a2b910b61ed3747367708</code>。文档和代码存在，不等于本次已经运行、验证效果或完成商用部署。</p><div class="code-links"><a href="https://github.com/Fishman-free/REDTEAM/blob/792c5b4137b32c7e624a2b910b61ed3747367708/README.md" target="_blank" rel="noopener noreferrer">项目说明 README ↗</a><a href="https://github.com/Fishman-free/REDTEAM/blob/792c5b4137b32c7e624a2b910b61ed3747367708/docs/EXPERIMENT_PROTOCOL.md" target="_blank" rel="noopener noreferrer">实验协议 ↗</a><a href="https://github.com/Fishman-free/REDTEAM/blob/792c5b4137b32c7e624a2b910b61ed3747367708/docs/RTM_BOUNTY_DESIGN.md" target="_blank" rel="noopener noreferrer">RTM 奖励设计 ↗</a><a href="https://github.com/Fishman-free/REDTEAM/blob/792c5b4137b32c7e624a2b910b61ed3747367708/contracts/PaymentAgent.sol" target="_blank" rel="noopener noreferrer">模拟支付合约 ↗</a></div></div>
+    <div class="note"><strong>阅读提示：</strong>“目前已有”指已核验的研究实现；“尚未打通”指仍存在的能力缺口；“拟议／建议”指有待授权试点与专业审查的方向。全文不构成法律意见、监管许可、收益承诺或安全保证。</div>
+  </section>
+</main>
+<footer class="wrap footer"><div><strong>REDTEAM</strong><p>让 AI 学会办事，更要守住权限。<br>本地离线讲解材料 · 不接真实资金 · 不代表监管批准</p></div><a href="#top">返回顶部 ↑</a></footer>
+<script>
+(function(){
+  'use strict';
+  var printButton=document.getElementById('print-button');
+  var faqToggle=document.getElementById('faq-toggle');
+  var questions=Array.prototype.slice.call(document.querySelectorAll('#faq-list details'));
+  var printState=null;
+  function updateFaqControl(){
+    var allOpen=questions.every(function(item){return item.open;});
+    faqToggle.textContent=allOpen?'收起全部问答':'展开全部问答';
+    faqToggle.setAttribute('aria-expanded',String(allOpen));
+  }
+  faqToggle.addEventListener('click',function(){
+    var shouldOpen=!questions.every(function(item){return item.open;});
+    questions.forEach(function(item){item.open=shouldOpen;});
+    updateFaqControl();
+  });
+  questions.forEach(function(item){item.addEventListener('toggle',updateFaqControl);});
+  printButton.addEventListener('click',function(){window.print();});
+  window.addEventListener('beforeprint',function(){
+    if(printState!==null){return;}
+    printState=questions.map(function(item){return item.open;});
+    questions.forEach(function(item){item.open=true;});
+  });
+  window.addEventListener('afterprint',function(){
+    if(printState===null){return;}
+    questions.forEach(function(item,index){item.open=printState[index];});
+    printState=null;
+    updateFaqControl();
+  });
+  printButton.hidden=false;
+  faqToggle.hidden=false;
+  updateFaqControl();
+}());
+</script>
+</body>
+</html>
