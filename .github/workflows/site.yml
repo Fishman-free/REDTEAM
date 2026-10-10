@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify all menu sources and the root Pages entry
+      - name: Verify actual inline content and the self-contained root HTML
         run: python scripts/build_site.py --check
-      - name: Verify the publication allowlist and exclusions
+      - name: Verify consolidated chapters, embedded demo and one-file output
         run: python -m unittest discover -s tests -p test_site_build.py -v
