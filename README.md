@@ -1,8 +1,8 @@
 # REDTEAM
 
-**统一项目网站：[fishman-free.github.io/REDTEAM](https://fishman-free.github.io/REDTEAM/)**。一个入口、五个菜单：项目概览、Flower 本地原型、研究与商业资料、历史项目简述、历史完整介绍。完整 HTML 内容保留在对应菜单中；历史材料明确标注，不把本地靶场或原始研究数据当作公开交互服务。页面来源与范围见[站点清单](docs/SITE_CONTENT_MANIFEST.md)。
+**项目网站：[fishman-free.github.io/REDTEAM](https://fishman-free.github.io/REDTEAM/)**。各方面内容已经去重整合进 **同一个自包含 HTML 正文**：项目机制、研究证据、Flower、企业服务、合作计划、治理与问答。菜单仅定位本页章节；没有 iframe、子页面载入或外置运行资源。历史独有内容已并入相关章节并校正事实，不把本地靶场或原始证据公开为交互服务。整合来源与范围见[站点清单](docs/SITE_CONTENT_MANIFEST.md)。
 
-站点维护：`python scripts/build_site.py` 更新根入口和 Pages 排除配置；`python scripts/build_site.py --check` 与 `python -m unittest discover -s tests -p test_site_build.py -v` 校验五个菜单及发布文件。现有 Pages 使用 `main` 根目录发布，根 `index.html` 是统一入口。
+站点维护：编辑 `docs/site/index.html`，执行 `python scripts/build_site.py` 字节一致地生成根 `index.html` 与 Pages 排除配置。`python scripts/build_site.py --check` 和 `python -m unittest discover -s tests -p test_site_build.py -v` 验证实际内容与单文件约束。Pages 仍从 `main` 根目录发布，最终构建仅包含一个 `index.html`。
 
 当前主线是 **PayAssist L0/L1 支付智能体的攻击、修复与独立验证**。从[运行指南](rsi4safety/payment_agents/README.md)开始；三环设计、信任边界和真实实验判断统一在[研究方案](docs/RESEARCH_PLAN.md)。
 
@@ -41,7 +41,7 @@ python -m pytest -q
 
 ## 独立产品研究：REDTEAM Flower
 
-商业主线为[安全评测、整改复核与持续回归服务（当前 Markdown）](docs/business/redteam-business-plan.md)。[REDTEAM Flower 协议](docs/FLOWER_RECOGNITION.md)与[静态演示页](docs/site/flower.html)介绍一个独立、可选的 **ERC-721 + ERC-5192 不可转让 NFT 本地原型**，不是历史 RTM ERC-20，不接入当前 PayAssist。发行者可信链下审核、接收 EOA 的 EIP-712 同意后免费发行；无销售、转让、授权、赎回、收益、算力效用或所有权特权，撤销保留原 token/owner。普通钱包控制不是真实身份认证；digest 只验证字节，不证明贡献真实。仅无分叉 Hardhat 31337、合成数据演示，公开发行尚待法律/隐私/安全与人工流程审查，NFT 名称或免费/锁定不保证合法。
+商业主线为[安全评测、整改复核与持续回归服务（当前 Markdown）](docs/business/redteam-business-plan.md)。[REDTEAM Flower 协议](docs/FLOWER_RECOGNITION.md)与[单页内的 Flower 板块](https://fishman-free.github.io/REDTEAM/#flower)介绍一个独立、可选的 **ERC-721 + ERC-5192 不可转让 NFT 本地原型**，不是历史 RTM ERC-20，不接入当前 PayAssist。发行者可信链下审核、接收 EOA 的 EIP-712 同意后免费发行；无销售、转让、授权、赎回、收益、算力效用或所有权特权，撤销保留原 token/owner。普通钱包控制不是真实身份认证；digest 只验证字节，不证明贡献真实。仅无分叉 Hardhat 31337、合成数据演示，公开发行尚待法律/隐私/安全与人工流程审查，NFT 名称或免费/锁定不保证合法。
 
 ```bash
 # 在 contracts/ 中；仅本地演示，不连接公共网络
