@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="REDTEAM 研究智能体在交易支付场景中的安全：授权安全挑战、可验证的攻防实验平台与可复现的安全数据。实验平台已建成并开源，为模型训练、应用评测和防御研究提供支持。">
+  <title>REDTEAM｜智能体安全众测与数据研究</title>
+  <link rel="canonical" href="https://fishman-free.github.io/REDTEAM/">
+  <meta property="og:title" content="REDTEAM｜智能体安全众测与数据研究">
+  <meta property="og:description" content="在虚拟智能体社区中发现问题，把有效挑战转化为有价值的安全数据。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://fishman-free.github.io/REDTEAM/">
+  <style>
+    :root{--bg:#f8f6f1;--paper:#fffefa;--ink:#253746;--muted:#586671;--navy:#263e50;--blue:#345c77;--line:#dcdedb;--soft:#edf1f2;--green:#315e50;--green-bg:#eef4ef;--amber:#855c28;--amber-bg:#fbf3e5;--red:#854c41;--red-bg:#f8efeb;--radius:18px;--shadow:0 8px 30px rgba(37,55,70,.045)}
+    *{box-sizing:border-box}
+    html{scroll-padding-top:98px;scroll-behavior:smooth}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;font-size:16px;line-height:1.8;-webkit-text-size-adjust:100%;overflow-wrap:anywhere}
+    a{color:var(--blue);text-underline-offset:4px;text-decoration-thickness:1px}
+    a:hover{color:var(--navy)}
+    button{font:inherit;cursor:pointer}
+    button,a,summary{-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:3px solid var(--blue);outline-offset:4px;border-radius:4px}
+    ::selection{background:#dbe5eb;color:var(--navy)}
+    h1,h2,h3,h4,p,blockquote,figure{margin:0}
+    h1,h2,h3,h4{line-height:1.4;text-wrap:balance}
+    h2{font-size:clamp(25px,3vw,34px);letter-spacing:-.025em}
+    h3{font-size:19px}
+    h4{font-size:16px}
+    p+p{margin-top:12px}
+    ul,ol{margin:12px 0 0;padding-left:1.25em}
+    li+li{margin-top:8px}
+    strong{font-weight:650}
+    small,.small{font-size:13px;line-height:1.7}
+    .wrap{width:min(1160px,calc(100% - 64px));margin-inline:auto}
+    .skip{position:fixed;top:-90px;left:20px;background:var(--navy);color:white;padding:12px 20px;z-index:20}
+    .skip:focus{top:10px}
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:20px;color:var(--muted);font-size:12px;letter-spacing:.1em}
+    .topline strong{color:var(--navy);font-size:14px;letter-spacing:.16em}
+    .nav{position:sticky;top:0;z-index:10;background:rgba(248,246,241,.98);border-block:1px solid var(--line)}
+    .nav-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:10px}
+    .nav-links{display:flex;flex-wrap:wrap;gap:3px 6px;min-width:0}
+    .nav a{padding:6px 9px;color:var(--muted);font-size:13px;text-decoration:none;border-radius:6px;white-space:nowrap}
+    .nav a:hover{background:#e9edee;color:var(--navy)}
+    .button{min-height:42px;padding:8px 15px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--navy);font-size:13px;line-height:1.5;white-space:nowrap}
+    .button:hover{border-color:var(--blue);background:var(--soft)}
+    .button-primary{background:var(--navy);color:var(--paper);border-color:var(--navy)}
+    .button-primary:hover{background:var(--blue);color:var(--paper)}
+    [hidden]{display:none!important}
+    .hero{padding:62px 0 48px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:48px;align-items:center}
+    .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--muted);font-weight:650}
+    .hero h1{font-size:clamp(48px,7.3vw,86px);letter-spacing:-.04em;font-weight:720;line-height:1.06;margin:17px 0 18px}
+    .hero-slogan{font-size:clamp(23px,2.6vw,32px);line-height:1.5;font-weight:600;letter-spacing:-.025em}
+    .hero-sub{margin-top:22px;color:var(--muted);max-width:37em;font-size:17px}
+    .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:23px}
+    .tag{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;background:var(--paper);color:var(--muted)}
+    .tag::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+    .tag-green{color:var(--green);border-color:#cadbd0;background:var(--green-bg)}
+    .tag-amber{color:var(--amber);border-color:#e3d6bd;background:var(--amber-bg)}
+    .hero-panel{padding:30px;background:var(--navy);color:#fffefa;border-radius:22px;box-shadow:var(--shadow)}
+    .hero-panel .eyebrow{color:#d0dce3}
+    .hero-panel h2{font-size:25px;margin-top:14px;line-height:1.6}
+    .guard-list{display:grid;gap:0;margin-top:21px}
+    .guard{display:grid;grid-template-columns:33px 1fr;gap:12px;padding:15px 0;border-top:1px solid #506373;align-items:start}
+    .guard span{color:#c2d0d9;font:13px/1.8 ui-monospace,"Cascadia Code",Consolas,monospace;padding-top:2px}
+    .guard strong{font-size:16px}
+    .guard p{color:#d3dee4;font-size:13px;margin-top:3px;line-height:1.7}
+    .hero-panel .footnote{border-top:1px solid #506373;padding-top:16px;margin-top:6px;color:#d3dee4}
+    .brief{display:grid;grid-template-columns:160px minmax(0,1fr);gap:26px;padding:27px 30px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
+    .brief h2{font-size:18px;margin-top:6px}
+    .brief blockquote{font-size:17px;line-height:1.95}
+    .time{color:var(--blue);font-size:12px;letter-spacing:.06em}
+    .section{padding:58px 0 0;scroll-margin-top:15px}
+    .section-head{display:flex;align-items:flex-start;gap:20px;margin-bottom:24px}
+    .section-num{color:var(--blue);font:14px/1.5 ui-monospace,"Cascadia Code",Consolas,monospace;padding:7px 0 0;min-width:24px}
+    .section-head p{color:var(--muted);margin-top:8px;max-width:56em}
+    .grid{display:grid;gap:18px}
+    .two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .card{padding:26px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);min-width:0}
+    .card p{margin-top:11px;color:var(--muted)}
+    .card h3+.small{margin-top:8px}
+    .card .label{margin-bottom:13px}
+    .label{display:inline-block;font-size:12px;line-height:1.6;font-weight:650;color:var(--blue);letter-spacing:.04em}
+    .label-green{color:var(--green)}
+    .label-amber{color:var(--amber)}
+    .label-red{color:var(--red)}
+    .note{padding:17px 21px;background:var(--soft);border-left:3px solid var(--blue);border-radius:0 9px 9px 0;font-size:14px;line-height:1.85;margin-top:20px}
+    .note-warn{background:var(--amber-bg);border-color:var(--amber);color:#674e30}
+    .note-risk{background:var(--red-bg);border-color:var(--red);color:#73473e}
+    .scenario{padding:27px 30px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);margin-bottom:18px}
+    .scenario-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
+    .scenario-header .tag{margin:0;flex-shrink:0}
+    .scenario p{max-width:63em;color:var(--muted)}
+    .risk-card{background:#fffaf6;border-color:#e5d7ce}
+    .safe-card{background:#f5f8f4;border-color:#d2ddd1}
+    .list-clean{padding-left:0;list-style:none}
+    .list-clean li{padding-left:16px;position:relative}
+    .list-clean li::before{content:"";position:absolute;left:0;top:.78em;width:4px;height:4px;background:var(--muted);border-radius:50%}
+    .flow-figure{margin-top:27px}
+    .flow-title{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .flow-title span{color:var(--muted);font-size:12px}
+    .flow{padding:0;list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;counter-reset:flow}
+    .flow li{margin:0;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:17px 14px;position:relative;counter-increment:flow}
+    .flow li::before{content:counter(flow,decimal-leading-zero);display:block;font:12px/1.6 ui-monospace,Consolas,monospace;color:var(--blue);margin-bottom:10px}
+    .flow strong{font-size:15px;display:block}
+    .flow p{font-size:12px;line-height:1.75;color:var(--muted);margin-top:7px}
+    figcaption{font-size:13px;color:var(--muted);margin-top:13px}
+    .status-card{border-top:3px solid var(--blue)}
+    .status-card.current{border-top-color:var(--green)}
+    .status-card.pending{border-top-color:var(--amber)}
+    .status-card li{font-size:14px;color:var(--muted);line-height:1.85}
+    .status-card li strong{color:var(--ink)}
+    .divider{height:1px;background:var(--line);margin:25px 0}
+    .ledger{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:30px;align-items:start;margin-top:20px;padding:28px 30px;background:#eef1f2;border:1px solid #d7dfe2;border-radius:var(--radius)}
+    .ledger h3{font-size:23px;margin:6px 0 13px}
+    .ledger p{font-size:14px;color:var(--muted)}
+    .ledger .plain{font-size:18px;color:var(--ink);line-height:1.85}
+    .ledger-rules{border-left:1px solid #ccd6dc;padding-left:27px}
+    .ledger-rules h4{margin-bottom:8px}
+    .ledger-rules p+p{margin-top:16px}
+    .numbered{counter-reset:deliver;list-style:none;padding:0}
+    .numbered li{counter-increment:deliver;display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px}
+    .numbered li::before{content:counter(deliver,decimal-leading-zero);font:12px/2 ui-monospace,Consolas,monospace;color:var(--blue)}
+    .commercial{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);overflow:hidden}
+    .commercial-row{display:grid;grid-template-columns:170px minmax(0,1fr);gap:25px;padding:21px 26px}
+    .commercial-row+.commercial-row{border-top:1px solid var(--line)}
+    .commercial-row h3{font-size:16px}
+    .commercial-row p{color:var(--muted);font-size:14px}
+    .commercial-row strong{color:var(--ink)}
+    .scope{padding:25px 27px;background:var(--navy);color:var(--paper);border-radius:var(--radius);margin-bottom:18px}
+    .scope h3{margin-bottom:10px}
+    .scope p{color:#d8e1e7;font-size:14px}
+    .scope strong{color:#fffefa}
+    .compliance-list{display:grid;gap:14px;margin-top:20px}
+    .risk{display:grid;grid-template-columns:220px minmax(0,1fr);border:1px solid var(--line);border-radius:14px;background:var(--paper);overflow:hidden}
+    .risk-topic{padding:23px;background:#eff2f2;border-right:1px solid var(--line)}
+    .risk-topic h3{font-size:17px}
+    .risk-topic p{font-size:12px;color:var(--muted);margin-top:10px}
+    .risk-detail{padding:23px 27px;font-size:14px;line-height:1.9}
+    .risk-detail ul{margin-top:10px}
+    .risk-detail .source-ref{font-size:12px;margin-top:13px;color:var(--muted)}
+    .risk-priority{border-color:#dcc6b5}
+    .risk-priority .risk-topic{background:var(--amber-bg);border-color:#dcc6b5}
+    .boundary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
+    .boundary .card{background:#f4f5f1}
+    .boundary ul{font-size:14px;color:var(--muted)}
+    .phase .phase-time{display:block;font-size:27px;font-weight:600;color:var(--blue);line-height:1.25;margin-bottom:14px}
+    .phase .phase-time span{font-size:13px;font-weight:400;margin-left:5px}
+    .phase h3{font-size:18px}
+    .phase ul{font-size:14px;color:var(--muted)}
+    .phase .result{border-top:1px solid var(--line);padding-top:13px;margin-top:18px;font-size:13px}
+    .asks{padding:28px 30px;border:1px solid #ced8de;border-radius:var(--radius);background:#edf2f4;margin-top:20px}
+    .asks h3{margin-bottom:15px}
+    .ask-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+    .ask-grid h4{font-size:16px}
+    .ask-grid p{font-size:14px;color:var(--muted);margin-top:6px}
+    .faq-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px}
+    .faq-toolbar p{color:var(--muted);font-size:13px}
+    .faq-list{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);overflow:hidden}
+    .faq-list details+details{border-top:1px solid var(--line)}
+    summary{cursor:pointer;padding:19px 25px;font-size:16px;font-weight:600;list-style:none;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+    summary::-webkit-details-marker{display:none}
+    summary::after{content:"+";color:var(--blue);font:22px/1 ui-monospace,Consolas,monospace;flex-shrink:0}
+    details[open]>summary::after{content:"−"}
+    summary:hover{background:#f0f3f2}
+    .faq-answer{padding:0 25px 22px;font-size:14px;line-height:1.9;color:var(--muted)}
+    .faq-answer strong{color:var(--ink)}
+    .sources{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .sources li{padding:22px 24px;background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:0;min-width:0;scroll-margin-top:100px}
+    .source-code{font:12px/1.7 ui-monospace,Consolas,monospace;color:var(--blue);margin-bottom:9px;display:block}
+    .sources h3{font-size:15px;line-height:1.75}
+    .sources p{font-size:12px;color:var(--muted);margin-top:9px}
+    .sources .source-link{display:inline-block;margin-top:10px;font-size:12px}
+    .code-sources{margin-top:20px;padding:23px 25px;border:1px solid var(--line);border-radius:12px}
+    .code-sources h3{font-size:16px}
+    .code-sources p{font-size:13px;color:var(--muted);margin-top:8px}
+    .code-links{display:flex;gap:10px 24px;flex-wrap:wrap;margin-top:12px;font-size:13px}
+    code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}
+    .footer{margin-top:48px;padding:27px 0 35px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:30px;font-size:12px;color:var(--muted)}
+    .footer strong{display:block;color:var(--navy);letter-spacing:.12em;margin-bottom:6px}
+    .footer a{white-space:nowrap}
+    @media (max-width:1000px){.hero{gap:30px}.nav-inner{gap:8px}.nav a{padding-inline:7px}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.three{gap:13px}.card{padding:22px}.risk{grid-template-columns:185px minmax(0,1fr)}}
+    @media (max-width:760px){html{scroll-padding-top:118px}.wrap{width:calc(100% - 36px)}.topline{padding-block:14px;font-size:10px;letter-spacing:.03em;gap:10px}.topline strong{font-size:12px}.topline .desktop-label{display:none}.nav-inner{padding-block:7px}.nav-links{gap:0 2px;flex:1}.nav a{font-size:12px;padding:6px 7px}.nav .button{padding:8px 11px;min-width:49px;font-size:12px}.hero{grid-template-columns:1fr;padding:34px 0 24px;gap:25px}.hero h1{font-size:clamp(46px,13vw,78px)}.hero-sub{font-size:15px;margin-top:16px}.hero-panel{padding:23px}.hero-panel h2{font-size:22px}.guard-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.guard{display:block;padding:12px 0 0}.guard span{display:block;margin-bottom:6px}.guard strong{font-size:14px}.guard p{font-size:12px}.hero-panel .footnote{margin-top:17px}.brief{grid-template-columns:1fr;gap:13px;padding:23px}.brief-title{display:flex;align-items:baseline;gap:14px}.brief h2{margin:0}.brief blockquote{font-size:15px;line-height:1.95}.section{padding-top:39px}.section-head{gap:13px;margin-bottom:19px}.section-head p{font-size:14px}.two,.three,.boundary{grid-template-columns:1fr}.card,.scenario,.asks{padding:22px}.scenario-header{flex-wrap:wrap;gap:10px}.scenario p{font-size:14px}.flow{gap:10px}.flow li{padding:14px 12px}.flow strong{font-size:14px}.flow p{font-size:12px}.ledger{grid-template-columns:1fr;gap:20px;padding:23px}.ledger-rules{border-left:0;border-top:1px solid #ccd6dc;padding:19px 0 0}.ledger .plain{font-size:16px}.commercial-row{grid-template-columns:1fr;gap:8px;padding:20px 22px}.risk{grid-template-columns:1fr}.risk-topic{padding:18px 22px;border-right:0;border-bottom:1px solid var(--line)}.risk-topic .label{margin-bottom:5px}.risk-topic p{margin-top:5px}.risk-detail{padding:20px 22px}.scope{padding:23px}.ask-grid{grid-template-columns:1fr;gap:17px}.ask-grid>div+div{border-top:1px solid #d0dbe0;padding-top:17px}.sources{grid-template-columns:1fr}.sources li{padding:20px 22px}summary{padding:18px 20px;font-size:15px}.faq-answer{padding:0 20px 20px}.footer{margin-top:35px;gap:18px}.section-num{padding-top:5px}.note{padding:15px 17px;font-size:13px}}
+    @media (max-width:380px){.wrap{width:calc(100% - 28px)}.nav a{font-size:11px;padding:6px}.hero-slogan{font-size:22px}.hero-panel{padding:19px}.guard-list{grid-template-columns:1fr;gap:10px}.guard{display:grid;grid-template-columns:25px 1fr;gap:10px}.guard span{padding:0;margin:0}.flow{grid-template-columns:repeat(2,minmax(0,1fr))}.faq-toolbar{align-items:flex-start}.faq-toolbar .button{white-space:normal}.footer{flex-direction:column}}
+    @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+    @page{size:A4;margin:15mm 14mm}
+    @media print{html{scroll-behavior:auto}body{background:white;font-size:10pt;line-height:1.65;color:#253746}.wrap{width:100%;max-width:none}.nav,.skip,.button,.no-print{display:none!important}.topline{padding:0 0 12px;font-size:9pt}.hero{padding:19px 0 20px;gap:24px;grid-template-columns:1.35fr 1fr}.hero h1{font-size:42pt}.hero-slogan{font-size:18pt}.hero-sub{font-size:10pt;margin-top:13px}.hero-panel{background:#f0f3f5;color:#253746;padding:18px;box-shadow:none;border:1px solid #ccd6dc}.hero-panel h2{font-size:15pt}.hero-panel .eyebrow,.guard span,.guard p,.hero-panel .footnote{color:#465b6c}.guard,.hero-panel .footnote{border-color:#c5cfd6}.guard{padding:9px 0}.guard strong{font-size:11pt}.guard p,.hero-panel .footnote{font-size:9pt}.tags{margin-top:15px;gap:5px}.tag{font-size:8pt}.brief{padding:17px;grid-template-columns:100px 1fr;gap:20px}.brief blockquote{font-size:10pt}.brief h2{font-size:13pt}.section{padding-top:27px}.section-head{margin-bottom:15px;break-after:avoid}.section-head h2{font-size:19pt}.section-head p{font-size:10pt}.section-num{font-size:10pt}h3{font-size:12pt}h4{font-size:10pt}.card,.scenario,.ledger,.asks{padding:17px;box-shadow:none}.card p,.card li,.scenario p,.ledger p,.risk-detail,.commercial-row p,.phase ul,.ask-grid p,.faq-answer{font-size:9pt}.note{font-size:9pt;padding:12px 15px}.three{gap:12px}.grid{gap:12px}.flow{grid-template-columns:repeat(3,minmax(0,1fr))}.flow li{padding:11px}.flow strong{font-size:10pt}.flow p,figcaption{font-size:8pt}.scenario-header,.card,.flow li,.phase,.risk,.brief,.hero-panel,.sources li,details,.asks{break-inside:avoid}.risk{grid-template-columns:150px 1fr}.risk-topic{padding:17px}.risk-detail{padding:17px 20px}.risk-topic h3{font-size:11pt}.scope{background:#edf2f4;border:1px solid #cbd7de;color:var(--ink);padding:17px}.scope p,.scope strong{color:var(--ink)}.scope p{font-size:9pt}.ledger h3{font-size:15pt}.ledger .plain{font-size:11pt}.phase .phase-time{font-size:20pt}.phase h3{font-size:12pt}.commercial-row{padding:15px 20px;grid-template-columns:135px 1fr;gap:20px}.commercial-row h3{font-size:11pt}.sources{gap:10px}.sources li{padding:15px}.sources h3{font-size:10pt}.sources p,.sources .source-link{font-size:8pt}.sources a[href^="https"]::after{content:" [" attr(href) "]";display:block;font-size:7pt;line-height:1.6;color:#526571;overflow-wrap:anywhere;margin-top:4px}.code-sources{padding:16px}.code-sources p,.code-links{font-size:8pt}summary{padding:13px 17px;font-size:11pt}summary::after{display:none}.faq-answer{padding:0 17px 15px}details::details-content{content-visibility:visible}details>*:not(summary){display:block!important}.footer{font-size:8pt;margin-top:25px;padding:16px 0 0}.footer a{display:none}a{color:inherit;text-decoration:none}}
+
+    .hero-actions{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:28px}
+    .hero-actions .button{display:inline-flex;align-items:center;text-decoration:none;padding:11px 20px;font-size:14px}
+    .text-link{font-size:14px;text-decoration:none}
+    .village{padding:28px 30px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper)}
+    .village-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:22px}
+    .actor{padding:22px;background:var(--soft);border:1px solid #d7dfe2;border-radius:12px;min-width:0}
+    .actor-code{font-size:11px;letter-spacing:.15em;color:var(--blue)}
+    .actor h4{font-size:20px;margin-top:10px}
+    .actor p{font-size:14px;color:var(--muted);margin-top:11px}
+    .actor-rule{font-size:12px;color:var(--blue);margin-top:18px;padding-top:12px;border-top:1px solid #ccd6dc}
+    .shared-rules{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px 20px;padding:19px 12px;margin-top:18px;font-size:13px;border-block:1px solid var(--line)}
+    .shared-rules strong{color:var(--navy);margin-right:8px}
+    .shared-rules span{color:var(--muted)}
+    .observer{margin-top:18px;padding:20px 22px;background:var(--navy);color:var(--paper);border-radius:10px}
+    .observer p{margin-top:7px;font-size:14px;color:#d8e1e7}
+    .scenario-after,.mechanism-notes,.data-uses,.business-model,.reward-options{margin-top:20px}
+    .mechanism-flow{margin-top:0}
+    .mechanism-flow .flow p{font-size:13px}
+    .sample{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper)}
+    .sample-head{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:23px 26px;border-bottom:1px solid var(--line)}
+    .sample-head span{font-size:12px;color:var(--muted);white-space:nowrap}
+    .sample-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0}
+    .sample-fields>div{padding:21px 26px;min-width:0}
+    .sample-fields>div:nth-child(even){border-left:1px solid var(--line)}
+    .sample-fields>div:nth-child(n+3){border-top:1px solid var(--line)}
+    .sample-fields dt{font-size:15px;font-weight:650;color:var(--navy)}
+    .sample-fields dd{margin:7px 0 0;font-size:14px;color:var(--muted)}
+    .collaboration-link{margin-top:22px!important;padding-top:18px;border-top:1px solid #d0dbe0;font-size:14px}
+    .footer-note{max-width:62em;font-size:12px}
+    .footer-links{display:flex;gap:12px 22px;flex-wrap:wrap;justify-content:flex-end}
+    @media(max-width:760px){.hero-slogan{font-size:clamp(23px,4.6vw,31px)}.hero-actions{gap:20px;margin-top:24px}.guard-list{grid-template-columns:1fr;gap:0}.guard{display:grid;grid-template-columns:27px 1fr;gap:12px;padding:14px 0}.guard span{margin:0}.guard strong{font-size:15px}.guard p{font-size:13px}.brief h2 br{display:none}.village{padding:22px}.village-grid{grid-template-columns:1fr;gap:12px}.actor{padding:20px}.actor h4{font-size:19px}.shared-rules{justify-content:flex-start;padding-inline:0;gap:8px 16px}.shared-rules strong{width:100%}.observer{padding:18px}.mechanism-flow .flow{grid-template-columns:repeat(2,minmax(0,1fr))}.sample-head{padding:20px;flex-wrap:wrap;gap:8px}.sample-head h3{font-size:18px}.sample-fields{grid-template-columns:1fr}.sample-fields>div{padding:18px 20px}.sample-fields>div:nth-child(even){border-left:0}.sample-fields>div+div{border-top:1px solid var(--line)}.footer{flex-direction:column}.footer-links{justify-content:flex-start}}
+    @media print{.hero-actions{display:none}.village{padding:17px}.village-grid{gap:12px}.actor{padding:14px;break-inside:avoid}.actor h4{font-size:12pt}.actor p,.actor-rule,.observer p,.sample-fields dd{font-size:9pt}.actor-code,.shared-rules,.sample-head span{font-size:8pt}.observer{background:#edf2f4;color:var(--ink)}.observer p{color:var(--muted)}.mechanism-flow .flow p{font-size:9pt}.sample-fields>div{break-inside:avoid;padding:14px 18px}.sample-fields dt{font-size:10pt}.sample-head{padding:16px 18px}.sample-head h3{font-size:12pt}.hero-actions,.footer-links{display:none}.footer-note{font-size:8pt}}
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<header class="wrap topline" id="top">
+  <div><strong>REDTEAM</strong><span class="desktop-label"> ／ 智能体安全研究</span></div>
+  <div>虚拟社区 · 授权众测 · 安全数据</div>
+</header>
+<nav class="nav" aria-label="项目目录">
+  <div class="wrap nav-inner">
+    <div class="nav-links">
+      <a href="#position">项目概览</a><a href="#why">为什么需要</a><a href="#community">虚拟社区</a><a href="#mechanism">运作机制</a><a href="#data">数据价值</a><a href="#incentives">贡献激励</a><a href="./flower.html">Flower 本地 NFT</a><a href="#collaborate">合作方向</a><a href="#faq">常见问题</a>
+    </div>
+    <button class="button" id="print-button" type="button" hidden>打印</button>
+  </div>
+</nav>
+<main class="wrap" id="main">
+  <section class="hero" id="position" aria-labelledby="hero-title">
+    <div>
+      <p class="eyebrow">面向 Agent 交易场景的安全众测与数据研究</p>
+      <h1 id="hero-title">REDTEAM</h1>
+      <p class="hero-slogan">让 AI 在虚拟世界里经受考验，<br>让真实世界的交易更可信。</p>
+      <p class="hero-sub">我们研究一个由 AI 智能体组成的虚拟交易社区：让参与者在明确授权、使用模拟资产的环境里寻找安全问题，把有效挑战转化为<strong>可复现、可核验、可用于改进防御的安全数据。</strong></p>
+      <div class="tags" aria-label="项目核心理念">
+        <span class="tag">虚拟交易场景</span><span class="tag">授权安全挑战</span><span class="tag">高价值安全样本</span>
+      </div>
+      <div class="hero-actions"><a class="button button-primary" href="#community">看懂这个社区</a><a class="text-link" href="https://github.com/Fishman-free/REDTEAM" target="_blank" rel="noopener noreferrer">查看研究代码 ↗</a></div>
+    </div>
+    <aside class="hero-panel" aria-label="核心研究问题">
+      <p class="eyebrow">当 AI 不只聊天，还能替人办事</p>
+      <h2>它替人花钱时，<br>如何不被“话术”带偏？</h2>
+      <div class="guard-list">
+        <div class="guard"><span>01</span><div><strong>构造场景</strong><p>把采购、交付、付款放进模拟社区。</p></div></div>
+        <div class="guard"><span>02</span><div><strong>发现反例</strong><p>用经授权的挑战检验决策与权限边界。</p></div></div>
+        <div class="guard"><span>03</span><div><strong>沉淀数据</strong><p>让一次有效发现，成为可重复使用的防御样本。</p></div></div>
+      </div>
+      <p class="small footnote">我们关注的不只是“谁赢了挑战”，更是“这次挑战能让 AI 学会防住什么”。</p>
+    </aside>
+  </section>
+
+  <section class="brief" aria-labelledby="idea-title">
+    <div class="brief-title"><span class="time">一句话理解</span><h2 id="idea-title">把安全测试<br>变成协作研究</h2></div>
+    <blockquote>REDTEAM 的构想，是把 AI 安全测试做成一场有规则的挑战：参与者寻找薄弱点，平台验证并记录有效贡献，模型与应用开发者获得能够用于训练、评测和修复验证的安全样本。</blockquote>
+  </section>
+
+  <section class="section" id="progress" aria-labelledby="progress-title">
+    <div class="section-head"><span class="section-num">✦</span><div><h2 id="progress-title">截至 2026 年 10 月，项目进行到了哪一步</h2><p>下面是已经建成并公开的部分，与仍在推进的部分。研究代码与阶段性结果均在项目代码库公开，可独立复核。</p></div></div>
+    <div class="grid two">
+      <article class="card"><span class="label">已建成</span><h3>攻防实验平台</h3><p>“发起挑战 → 独立裁决 → 修复防御 → 换例回归 → 通过才晋级”的完整实验流程已在开源代码中实现，由数百项自动化测试守护；模型自称的结果不作为证据，一切以平台账本为准。</p></article>
+      <article class="card"><span class="label">已落地</span><h3>双入口权限模型</h3><p>用户本人与外部来访分开接入：只有可信 owner 控制凭证路由能够形成付款授权；普通钱包控制不是真实身份认证，生产身份核验尚未完成。“商户说‘用户同意了’不算授权”不再是口号，而是平台对每笔付款逐条执行的判据。</p></article>
+      <article class="card"><span class="label">当前主线</span><h3>PayAssist L0 / L1 与四输入面</h3><p>当前研究禁出款与精确单笔付款，区分 dialogue、tool_return、document、memory 输入。历史 L0–L3 注册场景保留，但不拼入当前覆盖率；运行时触达、模型触达、对照失败与未覆盖项分别报告。</p></article>
+      <article class="card"><span class="label">历史统计已校正</span><h3>修复率，要看同一分母</h3><p>历史确定性实验的 20%→100% 曲线随已训练问题从未见族分母中移出而上升，逐点成功项仍为 2。它不能证明跨族泛化，也不能替代真实模型上的配对确认、正常效用与冻结验收。</p></article>
+    </div>
+    <div class="note"><strong>已有真实模型实验，也有明确未解决项。</strong>2026-10-05 的 <code>arena.payassist.live.v3</code> / <code>2026-10-05-required-reading-v5</code> 预算验证轮中，L0 有 6 个确认发现与 2 次晋级，L1 有 13 个模型层发现与 1 次晋级。两场冻结验收通过，但仍有 <strong>12 个开放发现（L0 1 + L1 11）</strong>，不是生产安全证书。L1 的 449 笔模拟落账均授权内，不等于模型没有越权提案。<a href="https://github.com/Fishman-free/REDTEAM/blob/main/rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md" target="_blank" rel="noopener noreferrer">精确口径与证据报告</a>。社区未运营，不提供公共攻击入口。</div>
+  </section>
+
+  <section class="section" id="why" aria-labelledby="why-title">
+    <div class="section-head"><span class="section-num">01</span><div><h2 id="why-title">AI 正从“回答问题”，走向“替人办事”</h2><p>能读信息、作出决策、调用软件执行任务的 AI，通常被称为 Agent，也就是“智能体”。当它参与采购、服务调用与支付时，安全问题就不再只是一句错误回答。</p></div></div>
+    <div class="grid two">
+      <article class="card"><span class="label">新的风险</span><h3>一段外部信息，可能改变一次交易</h3><p>商品页面、商家消息和工具返回本来只是参考资料，却可能夹带诱导性指令。如果智能体把这些内容误当成授权，就可能改变收款对象、重复付款，或做出超出用户意愿的操作。</p><p>这类把不可信内容“包装成指令”的风险，常被称为<strong>提示注入</strong>。我们关心它是否真的影响了业务执行，而不只是模型说了什么。</p></article>
+      <article class="card"><span class="label">持续的需求</span><h3>防御需要不断更新的高价值反例</h3><p>模型训练、程序规则和人工评测都很重要，但固定测试题很难覆盖不断变化的交互方式。真正有价值的是那些<strong>贴近业务、能被复现、能解释失效原因</strong>的安全样本。</p><p>REDTEAM 希望通过协作式安全挑战，把更多人的不同思路转化为可验证的数据，而不是只依赖少数人反复编写测试用例。</p></article>
+    </div>
+    <div class="note"><strong>会理解语言，不等于有权执行操作。</strong>大语言模型会根据学习到的模式和上下文生成输出；当输出进一步触发软件操作时，还需要独立的授权校验、执行约束和结果核验。</div>
+  </section>
+
+  <section class="section" id="community" aria-labelledby="community-title">
+    <div class="section-head"><span class="section-num">02</span><div><h2 id="community-title">把交易场景，放进一个虚拟小社区</h2><p>想象一个由多个 AI 智能体组成的小社区：有买方、有商家、有服务提供者。它们在设定好的规则下协作和交易，各自拥有模拟预算、任务与权限。</p></div></div>
+    <figure class="village" aria-labelledby="village-title">
+      <div class="flow-title"><h3 id="village-title">一个模拟交易场景</h3><span>社区结构示意 · 不涉及真实用户资产</span></div>
+      <div class="village-grid">
+        <div class="actor"><span class="actor-code">BUYER</span><h4>采购智能体</h4><p>带着用户指定的任务和预算，选择服务并提出付款请求。</p><div class="actor-rule">要守住：花钱的权限</div></div>
+        <div class="actor"><span class="actor-code">MERCHANT</span><h4>商家智能体</h4><p>提供商品或服务信息，参与报价、订单确认和交易沟通。</p><div class="actor-rule">要核对：对象与交易条件</div></div>
+        <div class="actor"><span class="actor-code">SERVICE</span><h4>服务智能体</h4><p>完成约定任务、返回交付结果，让交易具备业务上下文。</p><div class="actor-rule">要核对：交付是否成立</div></div>
+      </div>
+      <div class="shared-rules"><strong>共同的交易规则</strong><span>指定对象</span><span>预算上限</span><span>交付条件</span><span>防止重复付款</span></div>
+      <div class="observer"><strong>独立验证与记录</strong><p>把原始输入、智能体决策、实际执行和验证结论分别记录，判断是否真正突破了授权边界。这一层验证已在实验平台中实现：每笔付款由平台账本独立落账，智能体自称的结果不作为证据。</p></div>
+      <figcaption>参与者在约定范围内对社区发起安全挑战。挑战对象是受控的模拟系统，不是现实中的企业账户或个人钱包。</figcaption>
+    </figure>
+    <article class="scenario scenario-after">
+      <div class="scenario-header"><h3>例如：一笔本应“验收后再付款”的订单</h3><span class="tag">场景示例</span></div>
+      <p>用户要求向指定商家购买服务，并在交付确认后付款。外部消息却试图让智能体提前付款、变更收款对象，或对同一订单重复支付。一个有价值的挑战，应当说明<strong>原本允许做什么、哪条边界受到影响，以及执行系统实际做了什么</strong>。</p>
+    </article>
+  </section>
+
+  <section class="section" id="mechanism" aria-labelledby="mechanism-title">
+    <div class="section-head"><span class="section-num">03</span><div><h2 id="mechanism-title">从一次挑战，到一份能被复用的安全样本</h2><p>项目的机制设计围绕“挑战—验证—激励—数据利用”展开。重点不是组织无边界的攻击，而是让有效贡献有证据、有评价，也有持续参与的动力。</p></div></div>
+    <figure class="flow-figure mechanism-flow" aria-label="安全挑战与数据生成机制">
+      <ol class="flow">
+        <li><strong>定义任务与授权</strong><p>明确模拟场景、业务目标、权限和测试边界。</p></li>
+        <li><strong>提交安全挑战</strong><p>参与者在规则内寻找误付、越权等失效情形。</p></li>
+        <li><strong>独立核验结果</strong><p>根据执行记录判断，不把模型自称成功当作证据。</p></li>
+        <li><strong>评估样本价值</strong><p>复现、去重、标注，区分新发现与重复提交。</p></li>
+        <li><strong>按规则激励贡献</strong><p>结合有效性、影响和新颖性，在预算内评奖。</p></li>
+        <li><strong>服务训练与评测</strong><p>形成授权数据集，支持防御优化与回归验证。</p></li>
+      </ol>
+      <figcaption>机制的核心要求：奖励有效发现，而不是奖励未经授权的行为；积累可验证的样本，而不是堆积无法复现的聊天记录。</figcaption>
+    </figure>
+    <div class="note"><strong>这条流水线的前半段已经跑通。</strong>任务授权、挑战提交、独立核验与样本沉淀，已在实验平台中实现并纳入自动化测试；“按规则激励贡献”属于社区机制，仍在按合规框架设计。</div>
+    <div class="grid two mechanism-notes">
+      <article class="card"><h3>既要测安全，也要测办事能力</h3><p>如果智能体拒绝所有任务，虽然不会付款，却也无法完成业务。因此，评估应同时关注<strong>违规操作是否被阻止，以及正常任务是否顺利完成</strong>。</p></article>
+      <article class="card"><h3>模拟损失不是唯一奖励标准</h3><p>“骗走多少模拟资产”可以是影响指标之一，但不能替代样本质量。可复现性、新颖性、权限影响、重复程度和奖励预算，都需要纳入规则，避免刷分与重复领奖。</p></article>
+    </div>
+  </section>
+
+  <section class="section" id="data" aria-labelledby="data-title">
+    <div class="section-head"><span class="section-num">04</span><div><h2 id="data-title">真正积累的，是带证据的安全数据</h2><p>同样是一次失败，只有说明“为什么失败、怎样复现、如何验证修复”，才能成为模型与应用开发者可用的研究材料。这是项目希望创造的核心价值。</p></div></div>
+    <div class="sample" aria-label="一份安全样本的组成">
+      <div class="sample-head"><h3>一份有用的样本，应该回答六个问题</h3><span>样本结构</span></div>
+      <dl class="sample-fields">
+        <div><dt>任务与授权</dt><dd>用户原本希望完成什么？智能体被允许做什么？</dd></div>
+        <div><dt>交互过程</dt><dd>哪些外部信息、对话或工具结果影响了决策？</dd></div>
+        <div><dt>实际执行</dt><dd>系统真正执行了哪些操作，而非仅仅生成了什么文字？</dd></div>
+        <div><dt>风险标签</dt><dd>问题属于越权、对象混淆、重复支付，还是其他类型？</dd></div>
+        <div><dt>复现条件</dt><dd>在什么场景、版本和规则下，能够重新观察到问题？</dd></div>
+        <div><dt>修复与复测</dt><dd>修改防线后，问题是否消失？正常任务是否仍能完成？</dd></div>
+      </dl>
+    </div>
+    <div class="note"><strong>这六个问题，现在由平台逐项记录并可机器校验。</strong>每个测试场景在运行前冻结判别标准——什么算越权、分母怎么算；运行后输出“通过、失败、出错、暂不支持”四类结果，暂不支持的场景如实标注，不会悄悄计入通过。</div>
+    <div class="grid three data-uses">
+      <article class="card"><span class="label">面向模型团队</span><h3>安全训练数据</h3><p>为模型后训练、安全行为研究提供有针对性的反例与反馈，帮助模型区分外部信息和可信授权。</p></article>
+      <article class="card"><span class="label">面向应用企业</span><h3>业务场景评测</h3><p>检验智能体在采购、支付和工具调用中的权限边界，支持不同模型、策略与防线的对照研究。</p></article>
+      <article class="card"><span class="label">面向持续迭代</span><h3>修复与回归验证</h3><p>把发现过的问题保留为测试样本，观察系统升级后是否重新出现，避免一次修复后失去持续验证。</p></article>
+    </div>
+    <div class="commercial business-model">
+      <div class="commercial-row"><h3>商业主线</h3><p>拟提供<strong>企业封闭授权的安全评测、整改复核与持续回归服务</strong>；安全数据合作须另审查授权与用途。客户、价格与收入均待验证，不依赖 NFT 销售、代币预期或持有资格。<a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/business/redteam-business-plan.md" target="_blank" rel="noopener noreferrer">当前商业 Markdown</a>优先；现存 PDF 是 Flower 更新前旧快照，未重新生成，产品说明已被 Markdown 替代。</p></div>
+      <div class="commercial-row"><h3>数据使用原则</h3><p>样本对外提供前，需要完成必要授权、脱敏与权利审查，约定用途及访问范围。真实个人信息、商业秘密和未公开漏洞，不因“用于 AI 安全”就可以自由转让或公开。</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="incentives" aria-labelledby="incentives-title">
+    <div class="section-head"><span class="section-num">05</span><div><h2 id="incentives-title">激励持续贡献，而不是围绕奖励工具做项目</h2><p>参与者投入时间与创造力，项目需要一套清楚、公平、可持续的贡献评价机制。奖励的目的，是吸引有价值的发现，而不是把模拟安全挑战变成资产投机。</p></div></div>
+    <article class="ledger" aria-labelledby="ledger-title">
+      <div><span class="label">为什么研究区块链</span><h3 id="ledger-title">像一本能共同核对的电子账本</h3><p class="plain">区块链可用于探索多人协作下的记录一致性、贡献凭证和奖励规则。“智能合约”则是按预设条件运行的程序。</p></div>
+      <div class="ledger-rules"><h4>它能辅助记录与执行，不能替代判断</h4><p>奖励预算、结算条件和操作记录可以被规则化；但“这个发现是否真实、是否值得奖励”，仍需要独立验证与治理。</p><p>区块链不能消除算力、审核、运营和合规成本。<strong>如果普通数据库、签名记录与常规支付就能满足需求，也可以不使用区块链。</strong></p></div>
+    </article>
+    <div class="grid three reward-options">
+      <article class="card"><span class="label">激励方式</span><h3>安全挑战赛</h3><p>由组织方设置明确范围和固定奖金预算，按样本质量评审，形成集中式的研究交流与数据征集。</p></article>
+      <article class="card"><span class="label">合作方式</span><h3>企业联合奖励</h3><p>围绕企业授权的模拟场景，由合作方提供研究经费或奖励预算，建立贡献验证与成果使用规则。</p></article>
+      <article class="card"><span class="label">社区方式</span><h3>REDTEAM Flower 本地 NFT</h3><p>独立 ERC-721 + ERC-5192 原型：可信发行者审核、EOA 接收者 EIP-712 同意后免费发行，永久不可转让，撤销保留原 token/owner。仅合成数据与无分叉 Hardhat 31337；无销售、收益、赎回、算力效用或所有权特权。<a href="./flower.html">查看同 token 的本地快照</a>。</p></article>
+    </div>
+    <div class="note"><strong>本地原型，不等于公开发行许可。</strong>历史 RTM 是可转让 ERC-20 研究，仍排除商业路线，不是 Flower，不兑换、不迁移。Flower 免费发行与锁定不保证合法；普通钱包控制不是真实身份认证，digest 不证明贡献事实，公开链仍可能暴露地址与贡献关联。公开发行须另做法律、隐私、安全和人工流程审查；口头建议不是监管批准或正式法律意见。原稿法律引文未独立核验，不能据此断言真实性、效力或适用范围。</div>
+  </section>
+
+  <section class="section" id="collaborate" aria-labelledby="collaborate-title">
+    <div class="section-head"><span class="section-num">06</span><div><h2 id="collaborate-title">让参与者、研究者与应用企业连接起来</h2><p>这是一个在高校导师指导下开展的学生研究项目。我们希望围绕智能体支付安全、对抗数据与贡献激励，建立一个能够持续发现问题、分享研究价值的协作社区。</p></div></div>
+    <div class="grid three">
+      <article class="card"><span class="label">安全研究者与开发者</span><h3>贡献不同的思考方式</h3><p>围绕授权场景提出挑战、分析失效原因、改进验证方法，让有效发现获得认可。</p></article>
+      <article class="card"><span class="label">模型团队与应用企业</span><h3>带来真正的业务问题</h3><p>共同定义任务与风险，提供可用于研究的脱敏场景，探索安全数据和定制评测的价值。</p></article>
+      <article class="card"><span class="label">高校与研究机构</span><h3>建立可信的评价方法</h3><p>参与样本质量、独立验证、激励公平性及数据治理研究，让结论更可复核。</p></article>
+    </div>
+    <aside class="asks" aria-labelledby="collaboration-title"><h3 id="collaboration-title">可以一起讨论的合作议题</h3><div class="ask-grid"><div><h4>场景与数据</h4><p>采购、支付、服务调用等模拟任务，合法授权的数据与评价标准。</p></div><div><h4>算力与奖励</h4><p>模型调用、研究算力、竞赛组织和贡献奖励预算。</p></div><div><h4>研究与治理</h4><p>联合研究、样本复核、知识产权、隐私保护和合规设计。</p></div></div><p class="collaboration-link"><a href="https://github.com/Fishman-free/REDTEAM" target="_blank" rel="noopener noreferrer">从公开项目代码，进一步了解 REDTEAM ↗</a></p></aside>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-title">
+    <div class="section-head"><span class="section-num">07</span><div><h2 id="faq-title">关于 REDTEAM，你可能还想了解</h2><p>把研究对象、参与方式和数据价值说清楚。</p></div></div>
+    <div class="faq-toolbar"><p>点击问题查看说明。</p><button class="button" id="faq-toggle" type="button" aria-controls="faq-list" aria-expanded="false" hidden>展开全部问答</button></div>
+    <div class="faq-list" id="faq-list">
+      <details><summary>项目现在进行到哪一步了？</summary><div class="faq-answer"><p>研究平台的主体已经建成并开源：模拟交易场景、双入口权限模型、由易到难的场景分级，以及“发起挑战、独立裁决、修复防御、回归验证”的实验流程，都有可运行的实现和自动化测试。<strong>2026-10-05 live.v3 / required-reading-v5 已执行真实模型预算验证轮，冻结验收通过仍有 12 个开放发现，不是生产安全证书</strong>。模型越权提案与宿主阻止分别计量；具体版本、重复数、分母与限制见上方证据报告。社区未运营；Flower 是独立合成本地原型，不是公共发行。</p></div></details>
+      <details><summary>“AI 越学越会修”这句话有依据吗？</summary><div class="faq-answer"><p>历史确定性研究曾报告 20%→100%，但未见族随训练从分母移出，逐点成功项始终 2；<strong>不能据此证明跨族泛化</strong>。当前真实模型 live.v3 的限定证据表明部分修复与冻结验收改善，同时保留 12 个开放发现。智能体包改善也不能直接称基础模型被训练得更强。</p></div></details>
+      <details><summary>REDTEAM 是一个支付平台吗？</summary><div class="faq-answer"><p>项目研究的是<strong>智能体在交易和支付场景中的安全问题，以及如何产生有价值的对抗数据</strong>。虚拟社区使用模拟任务与资产，不是为公众办理真实资金收付的交易平台。</p></div></details>
+      <details><summary>为什么要让参与者尝试“骗过”智能体？</summary><div class="faq-answer"><p>这是一种经授权的红队测试：在受控环境里主动寻找薄弱点，帮助防御方提前识别问题。参与必须遵守目标、权限和数据范围；研究价值来自可验证的发现，不来自对真实第三方的未授权攻击。</p></div></details>
+      <details><summary>一份挑战记录，怎样才能成为有价值的数据？</summary><div class="faq-answer"><p>它需要包含清晰的任务授权、交互过程、实际执行证据和复现条件，并经过验证、去重与标注。在合法授权和必要脱敏之后，才适合用于模型训练、应用评测或修复验证。<strong>数量多不代表质量高。</strong></p></div></details>
+      <details><summary>为什么不用固定的安全测试题？</summary><div class="faq-answer"><p>固定测试题便于比较，也应保留；协作式挑战则有助于补充新的交互路径和业务反例。两者相互补充：新发现进入经过验证的样本库，再作为后续评测和回归测试的依据。</p></div></details>
+      <details><summary>不用区块链，项目还成立吗？</summary><div class="faq-answer"><p>成立。核心是模拟场景、有效挑战、独立验证与安全数据。区块链是记录和激励机制的一种研究选项，也可以采用普通数据库、签名日志以及经过合规审查的奖金与贡献记录机制。技术应服务研究目标，而不是反过来。</p></div></details>
+      <details><summary>项目如何形成商业价值？</summary><div class="faq-answer"><p>商业主线是企业封闭授权的安全评测、整改复核与持续回归服务，收入与客户均待验证。Flower 是独立、可选、待审查的本地 NFT 原型，不售卖、不提供权益、不作为服务资格。当前商业计划以 Markdown 为准，现存 PDF 未同步本次更新。</p></div></details>
+    </div>
+  </section>
+</main>
+<footer class="wrap footer"><div><strong>REDTEAM</strong><p>在模拟世界里发现问题，为真实世界积累防线。</p><p class="footer-note">本页介绍项目理念与机制，不提供公开攻击入口、代币认购或投资服务。参与研究须在明确授权范围内进行。</p></div><div class="footer-links"><a href="./flower.html">Flower 本地 NFT</a><a href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/INDEX.md" target="_blank" rel="noopener noreferrer">当前资料索引</a><a href="https://github.com/Fishman-free/REDTEAM" target="_blank" rel="noopener noreferrer">项目代码 ↗</a><a href="#top">返回顶部 ↑</a></div></footer>
+<script>
+(function(){
+  'use strict';
+  var printButton=document.getElementById('print-button');
+  var faqToggle=document.getElementById('faq-toggle');
+  var questions=Array.prototype.slice.call(document.querySelectorAll('#faq-list details'));
+  var printState=null;
+  function updateFaqControl(){
+    var allOpen=questions.every(function(item){return item.open;});
+    faqToggle.textContent=allOpen?'收起全部问答':'展开全部问答';
+    faqToggle.setAttribute('aria-expanded',String(allOpen));
+  }
+  faqToggle.addEventListener('click',function(){
+    var shouldOpen=!questions.every(function(item){return item.open;});
+    questions.forEach(function(item){item.open=shouldOpen;});
+    updateFaqControl();
+  });
+  questions.forEach(function(item){item.addEventListener('toggle',updateFaqControl);});
+  printButton.addEventListener('click',function(){window.print();});
+  window.addEventListener('beforeprint',function(){
+    if(printState!==null){return;}
+    printState=questions.map(function(item){return item.open;});
+    questions.forEach(function(item){item.open=true;});
+  });
+  window.addEventListener('afterprint',function(){
+    if(printState===null){return;}
+    questions.forEach(function(item,index){item.open=printState[index];});
+    printState=null;
+    updateFaqControl();
+  });
+  printButton.hidden=false;
+  faqToggle.hidden=false;
+  updateFaqControl();
+}());
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{
+  "protocol": "redteam-flower-demo-v1",
+  "synthetic": true,
+  "network": {
+    "name": "hardhat",
+    "chainId": 31337,
+    "forked": false
+  },
+  "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "snapshots": [
+    {
+      "label": "issued",
+      "tokenId": "1",
+      "revoked": false,
+      "metadata": {
+        "name": "REDTEAM Flower #1",
+        "description": "Non-transferable recognition of a REDTEAM contribution. Revocation changes recognition status only.",
+        "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIHJ4PSIzMiIgZmlsbD0iI2ZhZjhmNSIvPjxwYXRoIGQ9Ik0yMDAgMjI1VjM0MCIgc3Ryb2tlPSIjNDk3NjU1IiBzdHJva2Utd2lkdGg9IjEyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMjAwIDMwMFExNDUgMzAwIDE0MCAyNTVRMTkwIDI1NSAyMDAgMzAwTTIwMCAyNzVRMjU1IDI3NSAyNjAgMjM1UTIxMCAyMzUgMjAwIDI3NSIgZmlsbD0iIzQ5NzY1NSIvPjxnIGZpbGw9IiNiYzQwNTMiPjxlbGxpcHNlIGN4PSIyMDAiIGN5PSIxMzIiIHJ4PSIzOCIgcnk9IjU4Ii8+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjEzMiIgcng9IjM4IiByeT0iNTgiIHRyYW5zZm9ybT0icm90YXRlKDYwIDIwMCAxOTApIi8+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjEzMiIgcng9IjM4IiByeT0iNTgiIHRyYW5zZm9ybT0icm90YXRlKDEyMCAyMDAgMTkwKSIvPjxlbGxpcHNlIGN4PSIyMDAiIGN5PSIxMzIiIHJ4PSIzOCIgcnk9IjU4IiB0cmFuc2Zvcm09InJvdGF0ZSgxODAgMjAwIDE5MCkiLz48ZWxsaXBzZSBjeD0iMjAwIiBjeT0iMTMyIiByeD0iMzgiIHJ5PSI1OCIgdHJhbnNmb3JtPSJyb3RhdGUoMjQwIDIwMCAxOTApIi8+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjEzMiIgcng9IjM4IiByeT0iNTgiIHRyYW5zZm9ybT0icm90YXRlKDMwMCAyMDAgMTkwKSIvPjwvZz48Y2lyY2xlIGN4PSIyMDAiIGN5PSIxOTAiIHI9IjM0IiBmaWxsPSIjZTViNTRiIi8+PC9zdmc+",
+        "attributes": [
+          {
+            "trait_type": "Token number",
+            "value": 1
+          },
+          {
+            "trait_type": "Category",
+            "value": "system finding"
+          },
+          {
+            "trait_type": "Status",
+            "value": "active"
+          }
+        ]
+      }
+    },
+    {
+      "label": "revoked",
+      "tokenId": "1",
+      "revoked": true,
+      "metadata": {
+        "name": "REDTEAM Flower #1",
+        "description": "Non-transferable recognition of a REDTEAM contribution. Revocation changes recognition status only.",
+        "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIHJ4PSIzMiIgZmlsbD0iI2ZhZjhmNSIvPjxwYXRoIGQ9Ik0yMDAgMjI1VjM0MCIgc3Ryb2tlPSIjNDk3NjU1IiBzdHJva2Utd2lkdGg9IjEyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMjAwIDMwMFExNDUgMzAwIDE0MCAyNTVRMTkwIDI1NSAyMDAgMzAwTTIwMCAyNzVRMjU1IDI3NSAyNjAgMjM1UTIxMCAyMzUgMjAwIDI3NSIgZmlsbD0iIzQ5NzY1NSIvPjxnIGZpbGw9IiNiYzQwNTMiPjxlbGxpcHNlIGN4PSIyMDAiIGN5PSIxMzIiIHJ4PSIzOCIgcnk9IjU4Ii8+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjEzMiIgcng9IjM4IiByeT0iNTgiIHRyYW5zZm9ybT0icm90YXRlKDYwIDIwMCAxOTApIi8+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjEzMiIgcng9IjM4IiByeT0iNTgiIHRyYW5zZm9ybT0icm90YXRlKDEyMCAyMDAgMTkwKSIvPjxlbGxpcHNlIGN4PSIyMDAiIGN5PSIxMzIiIHJ4PSIzOCIgcnk9IjU4IiB0cmFuc2Zvcm09InJvdGF0ZSgxODAgMjAwIDE5MCkiLz48ZWxsaXBzZSBjeD0iMjAwIiBjeT0iMTMyIiByeD0iMzgiIHJ5PSI1OCIgdHJhbnNmb3JtPSJyb3RhdGUoMjQwIDIwMCAxOTApIi8+PGVsbGlwc2UgY3g9IjIwMCIgY3k9IjEzMiIgcng9IjM4IiByeT0iNTgiIHRyYW5zZm9ybT0icm90YXRlKDMwMCAyMDAgMTkwKSIvPjwvZz48Y2lyY2xlIGN4PSIyMDAiIGN5PSIxOTAiIHI9IjM0IiBmaWxsPSIjZTViNTRiIi8+PC9zdmc+",
+        "attributes": [
+          {
+            "trait_type": "Token number",
+            "value": 1
+          },
+          {
+            "trait_type": "Category",
+            "value": "system finding"
+          },
+          {
+            "trait_type": "Status",
+            "value": "revoked"
+          }
+        ]
+      }
+    }
+  ],
+  "checks": {
+    "transferBlocked": true,
+    "approvalsBlocked": true
+  }
+}

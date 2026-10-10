@@ -77,6 +77,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Contract and payment-agent suites
         run: npm test
+      - name: Nontransferable flower demo (local synthetic evidence only)
+        run: npm run flower:demo
       - name: Single-turn payment demo (offline)
         run: npm run demo:agent
       - name: Multi-turn payment demo (offline)

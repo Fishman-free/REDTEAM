@@ -30,10 +30,11 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
       - uses: actions/configure-pages@v5
-      - name: Stage project landing page
-        run: |
-          mkdir -p _site
-          cp docs/site/index.html _site/index.html
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Stage the validated unified static site
+        run: python scripts/build_site.py --output-dir _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
