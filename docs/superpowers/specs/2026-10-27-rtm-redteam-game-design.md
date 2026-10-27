@@ -232,6 +232,7 @@ paidFee[contestId][attacker][msgHash]
 ### 4.4 DataMarket.sol（新）
 
 - `contract DataMarket is Ownable`；`operator` 由 owner 通过 `setOperator` 轮换，仅 operator 可 `publish`。**Arena 不提供 publish，也不为本模块改动 Arena。**
+- 构造参数 rtm/arena/treasury 非零（`ZeroAddress`）；operator 轮换发 `OperatorUpdated`，`dataPriceBps`/`attackerDataPrice` 更新分别发 `DataPriceUpdated`/`AttackerDataPriceUpdated`；合约不托管资金。
 - `publish(contestId, root)`（onlyOperator）：root 非零（`ZeroRoot`）；`arena.contestInfo(contestId).state == 2`（Ended，否则 `NotEnded`）；每场仅一次（`AlreadyPublished`）；写入 `datasetRoot` 并发 `DatasetPublished`。
 - `approveSale(contestId, buyer)`：买家非零（`ZeroAddress`）；调用者必须是该场已注册攻方（`arena.isRegisteredAttacker`，否则 `NotAttacker`）；授权精确绑定 `(contestId, attacker, buyer)`，不是全场通用同意；发 `SaleApproved`。
 - `buyOwn(contestId)`：仅已发布数据集（`NotPublished`）；仅 `msg.sender == info.defender`（`NotDefender`）且非 mining（`NotNormalContest`）；每地址一次（`AlreadyBought`）。价格 = `info.stake × dataPriceBps / 10000`（S 从 Arena 读取，买家不能传 stake）；seller = buyer = defender，70% → Treasury，30% 退回 defender（净付 70%，事件按实际金额记录）。
