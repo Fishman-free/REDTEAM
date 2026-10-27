@@ -57,6 +57,13 @@ SELF_CHECK_N = (1, 2, 5)
 SELF_CHECK_DECAYS = (1.0, 0.99)
 SELF_CHECK_TOL = 1e-12
 
+# 默认参数 + 默认扫描下的 golden 回归值。
+GOLDEN_TOL = 1e-9
+GOLDEN_FORFEITED = 4.8416182399
+GOLDEN_DEFAULT_N_STAR = (0, 1, 1, 2)
+GOLDEN_EV_P001_N1 = 1.4688132464  # 8 位参考值 1.46881325 的舍入前值
+GOLDEN_RATIO_P005 = 0.0298742846
+
 
 @dataclass(frozen=True)
 class Params:
@@ -117,7 +124,6 @@ class MarketResult:
     attacker_ev_realized: Optional[float]
     defender_ev_strong: Optional[float]
     zero_sum_residual: float
-    n_star_is_equilibrium: bool
     threshold_verified: Optional[bool]
 
     def as_json(self) -> dict:
@@ -135,12 +141,41 @@ class MarketResult:
             "attacker_ev_realized": self.attacker_ev_realized,
             "defender_ev_strong": self.defender_ev_strong,
             "zero_sum_residual": self.zero_sum_residual,
-            "n_star_is_equilibrium": self.n_star_is_equilibrium,
             "threshold_verified": self.threshold_verified,
         }
 
 
+def _require_finite(name: str, value: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a number, got {value!r}")
+    try:
+        finite = math.isfinite(value)
+    except (TypeError, OverflowError):
+        finite = False
+    if not finite:
+        raise ValueError(f"{name} must be finite, got {value!r}")
+
+
 def validate(params: Params, p_markets: Sequence[float]) -> None:
+    _require_finite("S", params.S)
+    _require_finite("stake_rate", params.stake_rate)
+    _require_finite("fee_rate", params.fee_rate)
+    _require_finite("llm_cost", params.llm_cost)
+    _require_finite("keep", params.keep)
+    _require_finite("decay", params.decay)
+    _require_finite("strong_fraction", params.strong_fraction)
+    _require_finite("M", params.M)
+    _require_finite("epochs", params.epochs)
+    _require_finite("max_attackers", params.max_attackers)
+
+    for name, value in (
+        ("M", params.M),
+        ("epochs", params.epochs),
+        ("max_attackers", params.max_attackers),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{name} must be an integer, got {value!r}")
+
     if params.S <= 0:
         raise ValueError("S must be positive")
     if not 0.0 < params.stake_rate < 1.0:
@@ -164,8 +199,15 @@ def validate(params: Params, p_markets: Sequence[float]) -> None:
     if not p_markets:
         raise ValueError("at least one p_market is required")
     for p in p_markets:
+        _require_finite("p_market", p)
         if not 0.0 < p <= 1.0:
             raise ValueError(f"p_market must be in (0,1], got {p}")
+
+    if not math.isfinite(params.message_cost) or params.message_cost <= 0.0:
+        raise ValueError(
+            "fee_rate*S + llm_cost must be finite and > 0; "
+            "zero-cost configurations are outside the model scope"
+        )
 
 
 def breach_stats(p: float, n: int, params: Params) -> BreachStats:
@@ -218,7 +260,7 @@ def defender_ev(p: float, n: int, params: Params) -> tuple[float, Optional[Breac
 
 def find_equilibrium(
     p_market: float, params: Params
-) -> tuple[int, list[float], bool]:
+) -> tuple[int, list[float]]:
     """按市场预期计算 N*：最大的 N 使单攻方 EV>=0（N 上限 50）。"""
     evs = [
         attacker_ev(p_market, n, params)[0]
@@ -228,14 +270,7 @@ def find_equilibrium(
     for n, ev in enumerate(evs, start=1):
         if ev >= 0.0:
             n_star = n
-
-    if n_star == 0:
-        equilibrium_ok = evs[0] < 0.0
-    else:
-        equilibrium_ok = evs[n_star - 1] >= 0.0
-        if n_star < params.max_attackers:
-            equilibrium_ok = equilibrium_ok and evs[n_star] < 0.0
-    return n_star, evs, equilibrium_ok
+    return n_star, evs
 
 
 def solve_threshold(
@@ -292,12 +327,13 @@ def solve_threshold(
     return ratio, abs(root_ev) <= THRESHOLD_EQ_TOL
 
 
-def self_check(params: Params) -> dict:
+def self_check(params: Params, rows: Sequence[MarketResult]) -> dict:
     """运行可执行的解析自检，返回可写入 assertions 的报告。
 
     1) telescoping 恒等式 N*p_self == 1-P_survive，固定 (p,N,decay) 网格；
-    2) 闭式阈值（仅 decay=1.0）：与二分阈值比较默认活跃市场。
-       decay!=1.0 时整项不适用；N*F/S>=1 时跳过该市场。
+    2) 闭式阈值（仅 decay=1.0）：对当前扫描去重后的 N*>0 市场，
+       比较闭式解与二分结果；
+    3) golden 回归：仅当 Params 与 p_market 扫描均为默认值时执行。
     """
     telescoping_checked = 0
     telescoping_max_error = 0.0
@@ -321,21 +357,42 @@ def self_check(params: Params) -> dict:
                     )
     telescoping_pass = not telescoping_failures
 
+    # 当前扫描先去重；重复 p_market 的 N* 冲突视为失败。
+    market_ns: dict[float, int] = {}
+    duplicate_conflicts: list[dict] = []
+    for row in rows:
+        if row.p_market in market_ns:
+            if market_ns[row.p_market] != row.n_star:
+                duplicate_conflicts.append(
+                    {
+                        "p_market": row.p_market,
+                        "first_N_star": market_ns[row.p_market],
+                        "duplicate_N_star": row.n_star,
+                    }
+                )
+        else:
+            market_ns[row.p_market] = row.n_star
+
+    active = [(p, n) for p, n in market_ns.items() if n > 0]
     closed_checked = 0
     closed_max_error = 0.0
     closed_failures: list[dict] = []
     closed_checks: list[dict] = []
     closed_skipped: list[dict] = []
-    closed_applicable = params.decay == 1.0
+    closed_reason: Optional[str] = None
 
-    if closed_applicable:
-        for p_market in DEFAULT_P_MARKETS:
-            n_star, _, _ = find_equilibrium(p_market, params)
-            if n_star == 0:
-                closed_skipped.append(
-                    {"p_market": p_market, "reason": "N*=0"}
-                )
-                continue
+    if params.decay != 1.0:
+        closed_reason = (
+            f"decay={params.decay} != 1.0; "
+            "closed form only applies at decay=1.0"
+        )
+        closed_skipped.append({"reason": closed_reason})
+    elif not active:
+        closed_reason = "no active markets (N*>0) in current scan"
+        for p, n in market_ns.items():
+            closed_skipped.append({"p_market": p, "reason": "N*=0"})
+    else:
+        for p_market, n_star in active:
             exposure = n_star * params.forfeited_per_attacker / params.S
             if exposure >= 1.0:
                 closed_skipped.append(
@@ -349,7 +406,9 @@ def self_check(params: Params) -> dict:
             p_def_closed = 1.0 - (1.0 - exposure) ** (
                 1.0 / (n_star * params.M)
             )
-            ratio_bisect, _ = solve_threshold(p_market, n_star, params)
+            ratio_bisect, bisect_ok = solve_threshold(
+                p_market, n_star, params
+            )
             p_def_bisect = ratio_bisect * p_market
             error = abs(p_def_closed - p_def_bisect)
             closed_checked += 1
@@ -359,24 +418,101 @@ def self_check(params: Params) -> dict:
                 "N_star": n_star,
                 "closed_form_p_def": p_def_closed,
                 "bisection_p_def": p_def_bisect,
+                "bisection_verified": bisect_ok,
                 "abs_error": error,
             }
             closed_checks.append(check)
-            if error >= SELF_CHECK_TOL:
+            if error >= SELF_CHECK_TOL or not bisect_ok:
                 closed_failures.append(check)
-    else:
-        closed_skipped.append(
+        if not closed_checks:
+            closed_failures.append(
+                {
+                    "reason": (
+                        "active markets present but no closed-form "
+                        "check executed"
+                    )
+                }
+            )
+        active_markets = {p for p, _ in active}
+        for p, n in market_ns.items():
+            if p not in active_markets:
+                closed_skipped.append({"p_market": p, "reason": "N*=0"})
+
+    if duplicate_conflicts:
+        closed_failures.append(
             {
-                "reason": (
-                    f"decay={params.decay} != 1.0; "
-                    "closed form only applies at decay=1.0"
-                )
+                "reason": "duplicate p_market with conflicting N*",
+                "duplicates": duplicate_conflicts,
             }
         )
 
+    closed_applicable = params.decay == 1.0 and bool(active)
     closed_pass = not closed_failures
+
+    default_params = params == Params()
+    default_scan = [row.p_market for row in rows] == list(DEFAULT_P_MARKETS)
+    golden_applicable = default_params and default_scan
+    golden_reason: Optional[str] = None
+    if not default_params:
+        golden_reason = "params differ from defaults"
+    elif not default_scan:
+        golden_reason = "p_market scan differs from default"
+
+    golden_checks: list[dict] = []
+    if golden_applicable:
+        f_actual = params.forfeited_per_attacker
+        golden_checks.append(
+            {
+                "name": "forfeited_per_attacker",
+                "actual": f_actual,
+                "expected": GOLDEN_FORFEITED,
+                "abs_error": abs(f_actual - GOLDEN_FORFEITED),
+                "tolerance": GOLDEN_TOL,
+                "pass": abs(f_actual - GOLDEN_FORFEITED) <= GOLDEN_TOL,
+            }
+        )
+        n_actual = [row.n_star for row in rows]
+        n_expected = list(GOLDEN_DEFAULT_N_STAR)
+        golden_checks.append(
+            {
+                "name": "default_N_star",
+                "actual": n_actual,
+                "expected": n_expected,
+                "pass": n_actual == n_expected,
+            }
+        )
+        ev_actual, _ = attacker_ev(0.01, 1, params)
+        golden_checks.append(
+            {
+                "name": "attacker_ev_p001_n1",
+                "actual": ev_actual,
+                "expected": GOLDEN_EV_P001_N1,
+                "reference": 1.46881325,
+                "abs_error": abs(ev_actual - GOLDEN_EV_P001_N1),
+                "tolerance": GOLDEN_TOL,
+                "pass": abs(ev_actual - GOLDEN_EV_P001_N1) <= GOLDEN_TOL,
+            }
+        )
+        n_star_005, _ = find_equilibrium(0.05, params)
+        ratio_actual, ratio_ok = solve_threshold(0.05, n_star_005, params)
+        golden_checks.append(
+            {
+                "name": "ratio_threshold_p005",
+                "actual": ratio_actual,
+                "expected": GOLDEN_RATIO_P005,
+                "abs_error": abs(ratio_actual - GOLDEN_RATIO_P005),
+                "tolerance": GOLDEN_TOL,
+                "pass": (
+                    abs(ratio_actual - GOLDEN_RATIO_P005) <= GOLDEN_TOL
+                    and ratio_ok
+                ),
+            }
+        )
+    golden_failures = [check for check in golden_checks if not check["pass"]]
+    golden_pass = not golden_failures
+
     return {
-        "pass": telescoping_pass and closed_pass,
+        "pass": telescoping_pass and closed_pass and golden_pass,
         "telescoping": {
             "checked": telescoping_checked,
             "max_abs_error": telescoping_max_error,
@@ -390,18 +526,27 @@ def self_check(params: Params) -> dict:
         },
         "closed_form_threshold": {
             "applicable": closed_applicable,
+            "reason": closed_reason,
             "checked": closed_checked,
             "max_abs_error": closed_max_error if closed_checked else None,
             "tolerance": SELF_CHECK_TOL,
             "checked_markets": closed_checks,
             "skipped": closed_skipped,
+            "duplicate_conflicts": duplicate_conflicts,
             "failures": closed_failures,
+        },
+        "golden": {
+            "applicable": golden_applicable,
+            "reason": golden_reason,
+            "tolerance": GOLDEN_TOL,
+            "checks": golden_checks,
+            "failures": golden_failures,
         },
     }
 
 
 def simulate_market(p_market: float, params: Params) -> MarketResult:
-    n_star, evs, equilibrium_ok = find_equilibrium(p_market, params)
+    n_star, evs = find_equilibrium(p_market, params)
     first_entrant_ev = evs[0]
 
     if n_star == 0:
@@ -419,7 +564,6 @@ def simulate_market(p_market: float, params: Params) -> MarketResult:
             attacker_ev_realized=None,
             defender_ev_strong=None,
             zero_sum_residual=0.0,
-            n_star_is_equilibrium=equilibrium_ok,
             threshold_verified=None,
         )
 
@@ -456,7 +600,6 @@ def simulate_market(p_market: float, params: Params) -> MarketResult:
         attacker_ev_realized=attacker_ev_realized,
         defender_ev_strong=defender_ev_strong,
         zero_sum_residual=zero_sum_residual,
-        n_star_is_equilibrium=equilibrium_ok,
         threshold_verified=threshold_verified,
     )
 
@@ -474,10 +617,74 @@ def build_assertion_report(
         }
     )
 
+    equilibrium_checks: list[dict] = []
+    for row in rows:
+        n_star = row.n_star
+        at_cap = n_star == params.max_attackers
+        if n_star < 0 or n_star > params.max_attackers:
+            equilibrium_checks.append(
+                {
+                    "p_market": row.p_market,
+                    "N_star": n_star,
+                    "at_cap": False,
+                    "ev_at_N_star": None,
+                    "ev_at_next": None,
+                    "pass": False,
+                    "note": "N* outside [0, cap]",
+                }
+            )
+        elif n_star == 0:
+            ev_next, _ = attacker_ev(row.p_market, 1, params)
+            equilibrium_checks.append(
+                {
+                    "p_market": row.p_market,
+                    "N_star": 0,
+                    "at_cap": False,
+                    "ev_at_N_star": None,
+                    "ev_at_next": ev_next,
+                    "pass": ev_next < 0.0,
+                    "note": "no-entry: EV_att(N=1) < 0",
+                }
+            )
+        else:
+            ev_n, _ = attacker_ev(row.p_market, n_star, params)
+            if at_cap:
+                equilibrium_checks.append(
+                    {
+                        "p_market": row.p_market,
+                        "N_star": n_star,
+                        "at_cap": True,
+                        "ev_at_N_star": ev_n,
+                        "ev_at_next": None,
+                        "pass": ev_n >= 0.0,
+                        "note": (
+                            "cap-bound: EV_att(N*) >= 0; "
+                            "free entry beyond cap not evaluated"
+                        ),
+                    }
+                )
+            else:
+                ev_next, _ = attacker_ev(
+                    row.p_market, n_star + 1, params
+                )
+                equilibrium_checks.append(
+                    {
+                        "p_market": row.p_market,
+                        "N_star": n_star,
+                        "at_cap": False,
+                        "ev_at_N_star": ev_n,
+                        "ev_at_next": ev_next,
+                        "pass": ev_n >= 0.0 and ev_next < 0.0,
+                        "note": (
+                            "recomputed EV_att(N*) >= 0 and "
+                            "EV_att(N*+1) < 0"
+                        ),
+                    }
+                )
+
     n_star_bounded = all(
-        0 <= row.n_star <= params.max_attackers and row.n_star_is_equilibrium
-        for row in rows
-    )
+        0 <= row.n_star <= params.max_attackers for row in rows
+    ) and all(check["pass"] for check in equilibrium_checks)
     items.append(
         {
             "name": "n_star_bounded",
@@ -485,9 +692,15 @@ def build_assertion_report(
             "detail": {
                 "cap": params.max_attackers,
                 "max_N_star": max((row.n_star for row in rows), default=0),
-                "all_n_star_equilibria_verified": all(
-                    row.n_star_is_equilibrium for row in rows
+                "at_cap": any(
+                    check["at_cap"] for check in equilibrium_checks
                 ),
+                "at_cap_markets": [
+                    check["p_market"]
+                    for check in equilibrium_checks
+                    if check["at_cap"]
+                ],
+                "recomputed": equilibrium_checks,
             },
         }
     )
@@ -702,7 +915,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for row in rows:
         emit(row.as_json())
 
-    analytical = self_check(params)
+    analytical = self_check(params, rows)
     report = build_assertion_report(rows, params, analytical)
     emit(report)
     if not report["all_passed"]:
