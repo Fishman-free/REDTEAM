@@ -14,9 +14,9 @@ interface IRTMArena {
 /// @notice "REDTEAM" (RTM)。发币由 Arena 红队挖矿线性注入（无减半、无总量上限）。
 /// @dev "标记"语义：活跃靶钱包（守方智能体的钱包 W）的转出只有两个合法去向——
 ///      该场注册攻方（触发 Arena.onBreach 原子结算）或 Arena 的
-///      `controllerTransfer` 控制器划转。其余任何转出（含守方小号、任意第三方，
-///      以及 Arena 地址本身）一律 revert TargetTransferRestricted。
-///      转入靶钱包不受限；靶注销后恢复普通钱包。
+///      `controllerTransfer` 控制器划转。其余任何转出（含守方小号、任意第三方、
+///      其他比赛的靶钱包，以及 Arena 地址本身）一律 revert TargetTransferRestricted；
+///      活跃靶的零金额转出同样 revert。转入靶钱包不受限；靶注销后恢复普通钱包。
 contract RTMToken is ERC20, Ownable {
     /// @notice 唯一铸币者/控制器（Arena），部署时绑定，不可更换。
     address public immutable minter;
@@ -35,6 +35,7 @@ contract RTMToken is ERC20, Ownable {
     error NotMinter();
     error ZeroAddress();
     error InvalidMinter();
+    error InvalidContestId();
     error ZeroAmount();
     error TargetTransferRestricted(address from, address to);
     error NotArena();
@@ -51,10 +52,11 @@ contract RTMToken is ERC20, Ownable {
         arena = IRTMArena(arena_);
     }
 
-    /// @notice 注册靶钱包：仅 Arena。
+    /// @notice 注册靶钱包：仅 Arena。contestId 必须非零（0 是非靶哨兵）。
     function registerTarget(address wallet, bytes32 contestId) external {
         if (msg.sender != minter) revert NotArena();
         if (wallet == address(0)) revert ZeroAddress();
+        if (contestId == bytes32(0)) revert InvalidContestId();
         targetContest[wallet] = contestId;
         emit TargetRegistered(wallet, contestId);
     }
@@ -101,6 +103,9 @@ contract RTMToken is ERC20, Ownable {
     function _update(address from, address to, uint256 value) internal override {
         bytes32 contestId = targetContest[from];
         if (contestId != bytes32(0)) {
+            // 零金额转出同样禁止：否则攻方可诱导守方调用 transfer(to=attacker, 0)
+            // 触发 Breach 并白拿奖池。
+            if (value == 0) revert TargetTransferRestricted(from, to);
             if (arena.isRegisteredAttacker(contestId, to)) {
                 delete targetContest[from];
                 emit TargetUnregistered(from, contestId);

@@ -62,6 +62,31 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await stub.breachCalls()).to.equal(0n);
   });
 
+  it('不同比赛的靶钱包之间互转 revert（靶转靶不是合法出口）', async () => {
+    const contestB = ethers.id('contest-2');
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.mint(rtm.target, bystander.address, RTM(50));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+    await stub.registerTarget(rtm.target, bystander.address, contestB);
+
+    // 收款方即使是另一场的靶，也不是本场注册攻方，不能作为出口。
+    await expect(rtm.connect(defender).transfer(bystander.address, RTM(1)))
+      .to.be.revertedWithCustomError(rtm, 'TargetTransferRestricted')
+      .withArgs(defender.address, bystander.address);
+
+    expect(await rtm.isTarget(defender.address)).to.equal(true);
+    expect(await rtm.isTarget(bystander.address)).to.equal(true);
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(100));
+    expect(await rtm.balanceOf(bystander.address)).to.equal(RTM(50));
+    expect(await stub.breachCalls()).to.equal(0n);
+  });
+
+  it('registerTarget 拒绝 bytes32(0) 的 contestId', async () => {
+    await expect(stub.registerTarget(rtm.target, defender.address, ethers.ZeroHash))
+      .to.be.revertedWithCustomError(rtm, 'InvalidContestId');
+    expect(await rtm.isTarget(defender.address)).to.equal(false);
+  });
+
   it('靶向已登记攻方转账即攻破：到账、注销、Breach 事件与 onBreach 回调各一次', async () => {
     await stub.setAttacker(contestId, attacker.address, true);
     await stub.registerTarget(rtm.target, defender.address, contestId);
@@ -83,6 +108,25 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await stub.lastBreachContest()).to.equal(contestId);
     expect(await stub.lastBreachWinner()).to.equal(attacker.address);
     expect(await stub.breachCalls()).to.equal(1n);
+  });
+
+  it('靶向任何地址（含已登记攻方）转账零金额都 revert，不触发攻破', async () => {
+    await stub.setAttacker(contestId, attacker.address, true);
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+
+    await expect(rtm.connect(defender).transfer(attacker.address, 0))
+      .to.be.revertedWithCustomError(rtm, 'TargetTransferRestricted')
+      .withArgs(defender.address, attacker.address);
+    await expect(rtm.connect(defender).transfer(outsider.address, 0))
+      .to.be.revertedWithCustomError(rtm, 'TargetTransferRestricted')
+      .withArgs(defender.address, outsider.address);
+
+    expect(await rtm.isTarget(defender.address)).to.equal(true);
+    expect(await rtm.targetContest(defender.address)).to.equal(contestId);
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(100));
+    expect(await rtm.balanceOf(attacker.address)).to.equal(0n);
+    expect(await stub.breachCalls()).to.equal(0n);
   });
 
   it('靶直接向 Arena 地址转账也 revert（不能绕过 controllerTransfer）', async () => {
