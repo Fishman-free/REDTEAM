@@ -62,6 +62,23 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await stub.breachCalls()).to.equal(0n);
   });
 
+  it('allowance 不构成靶的转出出口：transferFrom 仍 revert', async () => {
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+    await rtm.connect(defender).approve(outsider.address, RTM(30));
+    expect(await rtm.allowance(defender.address, outsider.address)).to.equal(RTM(30));
+
+    await expect(rtm.connect(outsider).transferFrom(defender.address, outsider.address, RTM(10)))
+      .to.be.revertedWithCustomError(rtm, 'TargetTransferRestricted')
+      .withArgs(defender.address, outsider.address);
+
+    expect(await rtm.allowance(defender.address, outsider.address)).to.equal(RTM(30));
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(100));
+    expect(await rtm.balanceOf(outsider.address)).to.equal(0n);
+    expect(await rtm.isTarget(defender.address)).to.equal(true);
+    expect(await stub.breachCalls()).to.equal(0n);
+  });
+
   it('不同比赛的靶钱包之间互转 revert（靶转靶不是合法出口）', async () => {
     const contestB = ethers.id('contest-2');
     await stub.mint(rtm.target, defender.address, RTM(100));
@@ -129,7 +146,39 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await stub.breachCalls()).to.equal(0n);
   });
 
+  it('onBreach 回调 revert 时整笔交易回滚，靶保持注册', async () => {
+    await stub.setAttacker(contestId, attacker.address, true);
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+    await stub.setRevertOnBreach(true);
+
+    await expect(rtm.connect(defender).transfer(attacker.address, RTM(10)))
+      .to.be.revertedWith('ArenaStub: breach reverted');
+
+    expect(await rtm.isTarget(defender.address)).to.equal(true);
+    expect(await rtm.targetContest(defender.address)).to.equal(contestId);
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(100));
+    expect(await rtm.balanceOf(attacker.address)).to.equal(0n);
+    expect(await stub.breachCalls()).to.equal(0n);
+    expect(await stub.lastBreachWinner()).to.equal(ethers.ZeroAddress);
+  });
+
   it('靶直接向 Arena 地址转账也 revert（不能绕过 controllerTransfer）', async () => {
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+
+    await expect(rtm.connect(defender).transfer(stub.target, RTM(1)))
+      .to.be.revertedWithCustomError(rtm, 'TargetTransferRestricted')
+      .withArgs(defender.address, stub.target);
+
+    expect(await rtm.isTarget(defender.address)).to.equal(true);
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(100));
+    expect(await rtm.balanceOf(stub.target)).to.equal(0n);
+    expect(await stub.breachCalls()).to.equal(0n);
+  });
+
+  it('Arena 即使被误登记为该场攻方，也永远不是靶的合法收款方', async () => {
+    await stub.setAttacker(contestId, stub.target, true);
     await stub.mint(rtm.target, defender.address, RTM(100));
     await stub.registerTarget(rtm.target, defender.address, contestId);
 
@@ -161,6 +210,34 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await stub.breachCalls()).to.equal(0n);
   });
 
+  it('controllerTransfer 拒绝零地址 from，不能借 OZ mint 路径绕过 MiningMinted', async () => {
+    await stub.mint(rtm.target, owner.address, RTM(5));
+    const supplyBefore = await rtm.totalSupply();
+
+    await expect(stub.controllerSend(rtm.target, ethers.ZeroAddress, outsider.address, RTM(1)))
+      .to.be.revertedWithCustomError(rtm, 'ZeroAddress');
+
+    expect(await rtm.totalSupply()).to.equal(supplyBefore);
+    expect(await rtm.balanceOf(outsider.address)).to.equal(0n);
+  });
+
+  it('controllerTransfer 划转给已登记攻方不触发 onBreach，但仍注销靶', async () => {
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+    await stub.setAttacker(contestId, attacker.address, true);
+
+    const tx = await stub.controllerSend(rtm.target, defender.address, attacker.address, RTM(40));
+    await expect(tx)
+      .to.emit(rtm, 'TargetUnregistered')
+      .withArgs(defender.address, contestId);
+    await expect(tx).to.not.emit(rtm, 'Breach');
+
+    expect(await rtm.balanceOf(attacker.address)).to.equal(RTM(40));
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(60));
+    expect(await rtm.isTarget(defender.address)).to.equal(false);
+    expect(await stub.breachCalls()).to.equal(0n);
+  });
+
   it('注销后靶恢复普通钱包，可向任意第三方转账', async () => {
     await stub.mint(rtm.target, defender.address, RTM(100));
     await stub.registerTarget(rtm.target, defender.address, contestId);
@@ -187,6 +264,15 @@ describe('RTMToken 靶钱包转账策略', function () {
       .to.be.revertedWithCustomError(rtm, 'NotArena');
     await expect(rtm.connect(owner).controllerTransfer(defender.address, outsider.address, RTM(1)))
       .to.be.revertedWithCustomError(rtm, 'NotArena');
+  });
+
+  it('mint 发出 MiningMinted 事件并增加总供给', async () => {
+    await expect(stub.mint(rtm.target, outsider.address, RTM(12)))
+      .to.emit(rtm, 'MiningMinted')
+      .withArgs(outsider.address, RTM(12));
+
+    expect(await rtm.balanceOf(outsider.address)).to.equal(RTM(12));
+    expect(await rtm.totalSupply()).to.equal(RTM(12));
   });
 
   it('minter 侧参数校验：拒绝零地址与零金额', async () => {

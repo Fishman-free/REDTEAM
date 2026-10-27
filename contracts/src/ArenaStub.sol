@@ -10,9 +10,14 @@ contract ArenaStub {
     bytes32 public lastBreachContest;
     address public lastBreachWinner;
     uint256 public breachCalls;
+    bool public revertOnBreach;
 
     function setAttacker(bytes32 contestId, address who, bool ok) external {
         attackers[contestId][who] = ok;
+    }
+
+    function setRevertOnBreach(bool yes) external {
+        revertOnBreach = yes;
     }
 
     function isRegisteredAttacker(bytes32 contestId, address who) external view returns (bool) {
@@ -20,6 +25,7 @@ contract ArenaStub {
     }
 
     function onBreach(bytes32 contestId, address winner) external {
+        if (revertOnBreach) revert("ArenaStub: breach reverted");
         lastBreachContest = contestId;
         lastBreachWinner = winner;
         breachCalls += 1;

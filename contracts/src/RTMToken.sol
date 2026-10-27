@@ -85,10 +85,11 @@ contract RTMToken is ERC20, Ownable {
 
     /// @notice 结算/退款/赎回的唯一划转入口（仅 Arena）。
     /// @dev 绕过靶策略；若 from 仍是活跃靶，先注销再划转（CEI）。
-    ///      Arena 不得用 transferFrom + allowance 移动 W 资金。
+    ///      from/to 均不得为零地址：from=0 会被 OZ 当作 mint 路径，
+    ///      绕过 MiningMinted。Arena 不得用 transferFrom + allowance 移动 W 资金。
     function controllerTransfer(address from, address to, uint256 amount) external {
         if (msg.sender != minter) revert NotArena();
-        if (to == address(0)) revert ZeroAddress();
+        if (from == address(0) || to == address(0)) revert ZeroAddress();
         bytes32 contestId = targetContest[from];
         if (contestId != bytes32(0)) {
             delete targetContest[from];
@@ -106,6 +107,8 @@ contract RTMToken is ERC20, Ownable {
             // 零金额转出同样禁止：否则攻方可诱导守方调用 transfer(to=attacker, 0)
             // 触发 Breach 并白拿奖池。
             if (value == 0) revert TargetTransferRestricted(from, to);
+            // Arena 地址永远不是合法收款方：即使被误登记为该场攻方也拒绝。
+            if (to == minter) revert TargetTransferRestricted(from, to);
             if (arena.isRegisteredAttacker(contestId, to)) {
                 delete targetContest[from];
                 emit TargetUnregistered(from, contestId);
