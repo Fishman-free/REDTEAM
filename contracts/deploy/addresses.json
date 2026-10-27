@@ -1,0 +1,18 @@
+{
+  "network": "besu-testnet",
+  "chainId": 48850,
+  "rpc": "http://127.0.0.1:8546",
+  "deployer": "0x352f7c7cDb049aD5ff811Bbf3ED542A85013dad4",
+  "platform": "0x352f7c7cDb049aD5ff811Bbf3ED542A85013dad4",
+  "operator": "0x352f7c7cDb049aD5ff811Bbf3ED542A85013dad4",
+  "ticketSigner": "0x352f7c7cDb049aD5ff811Bbf3ED542A85013dad4",
+  "treasury": "0x4B6648955b5938F9BE2bc35d3dD9300a4062f611",
+  "arena": "0x3a8df899d27801D0b37db9dF8A29Aa27B6610111",
+  "rtm": "0xF08F681A58aB71E9FaC4B9E55DE4b29e309C46d7",
+  "faucet": "0x042Bc6dfbc08ECe0Db7901b1d2D65a1F9ede35b3",
+  "dataMarket": "0x9446F32556dE6E053F6E22205d7300f0ED1d28Fb",
+  "faucetDrip": "200.0",
+  "faucetFunding": "1000000.0",
+  "treasuryAllowance": "1000000.0",
+  "deployedAt": "2026-10-27T13:41:05.280Z"
+}
