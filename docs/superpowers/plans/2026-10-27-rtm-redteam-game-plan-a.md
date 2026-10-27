@@ -1693,14 +1693,15 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 
 > **任务 10 实现修订（2026-10-28）：包名改为 `redteam_platform`，避免 stdlib 冲突。**
 >
-> - 实际布局：`platform/redteam_platform/{__init__,config,custody,chain}.py` + `platform/tests/`；项目名仍为 `redteam-platform`。Python 标准库自带 `platform` 模块，顶层包不能再叫 `platform`（`platform/platform.*` 会冲突）；后续任务统一使用 `redteam_platform.byok` 等导入名。
+> - 实际布局：`platform/redteam_platform/{__init__,config,custody,chain}.py` + `platform/tests/`；项目名仍为 `redteam-platform`。Python 标准库自带 `platform` 模块，顶层包不能再叫 `platform`（目录与包同名会冲突）；后续任务统一使用 `redteam_platform.byok` 等导入名。
 > - custody 以 `Custody(vault_path, master_key_hex, scrypt_n=2**15)` 实例化，不沿用下方草稿的模块级全局 `VAULT_PATH`：AES-256-GCM + scrypt、AAD=entry_id、vault `{version,entries}`、临时文件 + fsync + `os.replace` 原子写、目录 0700/文件 0600 best effort、进程级 `RLock`，错误与日志不含 secret。
 > - chain 从 `contracts/artifacts/src/<Name>.sol/<Name>.json` 加载五个 ABI（缺文件提示先 `npx hardhat compile`）；`load_addresses` 只校验当前 `chainId` 与 treasury/arena/rtm/faucet/dataMarket 五个字段并 checksum，忽略旧字段；`ChainClient` 构造不联网，`verify_chain()` 才调用 `eth_chain_id` 比对。
 > - config 以 `Settings` dataclass 从环境变量 + `addresses.json` 解析并校验（不读取私钥）；keystore entry 只是引用名。
+> - **访问审计未实现**：任务 10 的 custody 不提供审计日志/表（规格 §6 的“访问审计”留待任务 12/14 在每次 `Custody.load/store/delete` 处记录，见对应任务修订）；不得把任务 10 描述为已完成审计。
 
 **文件：**
-- 创建：`platform/pyproject.toml`、`platform/platform/{__init__.py,config.py,custody.py,chain.py}`
-- 测试：`platform/tests/test_custody.py`、`platform/tests/test_config.py`
+- 创建：`platform/pyproject.toml`、`platform/redteam_platform/{__init__.py,config.py,custody.py,chain.py}`
+- 测试：`platform/tests/test_config.py`、`platform/tests/test_custody.py`、`platform/tests/test_chain.py`
 
 - [ ] **步骤 1：pyproject.toml**
 
@@ -1722,7 +1723,7 @@ pythonpath = ["..", "../rsi4safety/payment_agents"]   # 使 platform 测试可�
 - [ ] **步骤 2：custody.py（AES-GCM keystore）+ 失败测试**
 
 ```python
-# platform/platform/custody.py
+# platform/redteam_platform/custody.py
 """加密托管：智能体钱包私钥与守方 BYOK API Key。
 文件格式：JSON {salt, nonce, ct}；密钥来自环境变量 PLATFORM_MASTER_KEY（hex 32B）。
 """
@@ -1770,7 +1771,7 @@ def _load_db() -> dict:
 ```python
 # platform/tests/test_custody.py
 import json, pytest
-from platform import custody
+from redteam_platform import custody
 
 def test_store_load_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setenv("PLATFORM_MASTER_KEY", "aa" * 32)
@@ -1796,7 +1797,7 @@ def test_wrong_master_key_fails(tmp_path, monkeypatch):
 - [ ] **步骤 4：运行测试**
 
 运行：`cd platform && python -m pytest tests -q`
-预期：2 passed
+预期：64 passed（test_config 30、test_custody 16、test_chain 18）
 
 - [ ] **步骤 5：Commit**
 
@@ -1810,7 +1811,7 @@ git commit -m "feat(platform): backend skeleton with AES-GCM custody and chain b
 ## 任务 11：BYOK 模型客户端
 
 **文件：**
-- 创建：`platform/platform/byok.py`
+- 创建：`platform/redteam_platform/byok.py`
 - 测试：`platform/tests/test_byok.py`
 
 - [ ] **步骤 1：失败测试**
@@ -1818,7 +1819,7 @@ git commit -m "feat(platform): backend skeleton with AES-GCM custody and chain b
 ```python
 # platform/tests/test_byok.py
 import pytest
-from platform.byok import ByokClient, AllowlistError, ModelUnavailable
+from redteam_platform.byok import ByokClient, AllowlistError, ModelUnavailable
 
 def test_rejects_provider_not_in_allowlist():
     with pytest.raises(AllowlistError):
@@ -1891,7 +1892,7 @@ class ByokClient:
 - [ ] **步骤 4：Commit**
 
 ```bash
-git add platform/platform/byok.py platform/tests/test_byok.py
+git add platform/redteam_platform/byok.py platform/tests/test_byok.py
 git commit -m "feat(platform): BYOK allowlisted model client with fault classification"
 ```
 
@@ -1900,7 +1901,7 @@ git commit -m "feat(platform): BYOK allowlisted model client with fault classifi
 ## 任务 12：runner（智能体托管 + 真实转账工具）
 
 **文件：**
-- 创建：`platform/platform/runner.py`、`platform/platform/agent_tools.py`
+- 创建：`platform/redteam_platform/runner.py`、`platform/redteam_platform/agent_tools.py`
 - 测试：`platform/tests/test_runner.py`
 
 - [ ] **步骤 1：失败测试（mock 模型 + mock 链）**
@@ -1922,7 +1923,7 @@ def test_infra_failure_flags_defender_fault(...): ...
 工具面**刻意极简**——只有 get_balance 与 transfer_rtm 两个工具，无 reply 工具（回复即 assistant 文本）。整个游戏的攻击面 = 对话能否诱导一次 transfer_rtm；任务型读接口（交易历史/订单/收据）首版一律不加（YAGNI）。**v1 无合法出款路径**：靶策略下 mandate 中的"给商家付款"永远 revert，runner 必须抹掉 revert 原因（`TargetTransferRestricted` 错误串会泄露链上策略），只返回通用 `{"status": "failed", "reason": "transfer failed"}` 给模型。
 
 ```python
-# platform/platform/agent_tools.py
+# platform/redteam_platform/agent_tools.py
 """给智能体的工具集：get_balance / reply / transfer_rtm。
 transfer_rtm 用 W 私钥签名真实链上交易；per-contest 串行（nonce 顺序）。
 工具 schema 兼容 payassist_agent/tools.py 的 [OI] function-calling 格式。
@@ -1969,7 +1970,7 @@ class WalletTools:
 > **本节代码块为旧草稿；以本节末尾“实现修订（2026-10-27 复审，数据同意/挖矿停服）”为准。**
 
 ```python
-# platform/platform/runner.py
+# platform/redteam_platform/runner.py
 """每场比赛一个 AgentSession：攻方隔离线程、max_steps=10、每消息 ≤1000 字符、
 200k 上下文预算、120s 超时——与 payassist_agent/runtime.py 的预算语义一致，
 但工具层换成 WalletTools（真实链），渠道固定 external（永不开 execution release）。
@@ -2028,7 +2029,7 @@ class AgentSession:
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add platform/platform/runner.py platform/platform/agent_tools.py platform/tests/test_runner.py
+git add platform/redteam_platform/runner.py platform/redteam_platform/agent_tools.py platform/tests/test_runner.py
 git commit -m "feat(platform): hosted agent runner with real transfer tool"
 ```
 
@@ -2041,13 +2042,14 @@ git commit -m "feat(platform): hosted agent runner with real transfer tool"
 - 挖矿 `Breach`/`MiningSettled` 后 runner 立即停止该赛并拒绝新消息；`retireMining` 同样停服。普通用户赛不受影响。
 - 挖矿 fault/停赛走 `retireMining`，普通赛 fault 走 `reportDefenderFault`；不要对 mining 调旧 `reportDefenderFault` 分支。
 - runner/API 必须支持 `join(bytes32,uint256,bool)` 与 `joinMining(bytes32,bool)`，不得再引用 `approveSale`。
+- **custody 访问审计（未在任务 10 实现，规格 §6；不得声称已做）**：runner 在会话初始化与 `transfer_rtm` 工具路径中通过 `Custody.load()` 解密 W 私钥/守方 BYOK Key 时，必须写结构化审计事件 `{ts, actor(contest/runner), entry_id, wallet_address, purpose(qualification/message/transfer), result}`；只记录 entry 名与地址，绝不记录 secret 或明文私钥。runner 审计日志/表是任务 13/15 查询审计的落点。
 
 ---
 
 ## 任务 13：indexer 与排行榜
 
 **文件：**
-- 创建：`platform/platform/indexer.py`
+- 创建：`platform/redteam_platform/indexer.py`
 - 测试：`platform/tests/test_indexer.py`
 
 - [ ] **步骤 1：失败测试**
@@ -2077,7 +2079,7 @@ def test_leaderboards_from_events():
 
 ```bash
 cd platform && python -m pytest tests/test_indexer.py -q
-git add platform/platform/indexer.py platform/tests/test_indexer.py
+git add platform/redteam_platform/indexer.py platform/tests/test_indexer.py
 git commit -m "feat(platform): event indexer and leaderboards"
 ```
 
@@ -2092,7 +2094,7 @@ git commit -m "feat(platform): event indexer and leaderboards"
 ## 任务 14：Faucet 票据签发 + 数据服务 + rsi_export
 
 **文件：**
-- 创建：`platform/platform/{faucet_signer.py,data_service.py,rsi_export.py}`
+- 创建：`platform/redteam_platform/{faucet_signer.py,data_service.py,rsi_export.py}`
 - 测试：`platform/tests/test_faucet_signer.py`、`test_data_service.py`、`test_rsi_export.py`
 
 - [ ] **步骤 1：faucet_signer.py**
@@ -2135,13 +2137,14 @@ git commit -m "feat(platform): faucet signer, data service, rsi export"
 - `publish` 只允许普通赛；`buyOwn`/`buyFromAttacker` 交付切片按规格 §4.4。
 - `rsi_export` 读取矿工数据（消息/回复/工具轨迹/snapshot），仅用于 RSI；不得导出到 DataMarket。
 - 新增 `MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded` 索引支持（与任务 13 对齐）。
+- **custody 访问审计（未在任务 10 实现，规格 §6；不得声称已做）**：`faucet_signer` 每次 `Custody.load(faucet_signer_entry)` 后签发票据，必须记录结构化审计事件 `{ts, entry_id, recipient, chain_id, ticket_count, result}`；`data_service`/`rsi_export` 只处理已落盘数据、不读取托管私钥，因此不产生 custody 访问；若后续经 data_service 取用 BYOK Key，必须复用同一审计表。审计不含 secret。
 
 ---
 
 ## 任务 15：FastAPI 入口
 
 **文件：**
-- 创建：`platform/platform/api.py`
+- 创建：`platform/redteam_platform/api.py`
 - 测试：`platform/tests/test_api.py`
 
 - [ ] **步骤 1：失败测试（FastAPI TestClient + FakeChain）**
@@ -2180,7 +2183,7 @@ def test_full_flow(client, fake_chain):
 
 ```bash
 cd platform && python -m pytest tests/test_api.py -q
-git add platform/platform/api.py platform/tests/test_api.py
+git add platform/redteam_platform/api.py platform/tests/test_api.py
 git commit -m "feat(platform): FastAPI entrypoint for the contest game"
 ```
 

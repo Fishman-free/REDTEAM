@@ -53,10 +53,12 @@ export PLATFORM_MASTER_KEY=<上一步输出>
 export CHAIN_RPC=http://127.0.0.1:8546
 ```
 
-vault 文件不会自动创建；首次 `Custody.store()` 会创建目录（0700，best effort）
-并以临时文件 + fsync + `os.replace` 原子写入（0600，best effort）。
-`platform/vault.json` 已在 `.gitignore` 中，禁止提交。丢失主密钥将无法恢复
-vault 内容。
+vault 文件不会自动创建；首次 `Custody.store()` 会以临时文件 + fsync +
+`os.replace` 原子写入（文件 0600，best effort）。只有 Custody **新建**的目录才会
+尝试 chmod 0700；默认路径的父目录 `platform/` 在仓库中已存在，Custody 不会
+修改它的权限。`platform/vault.json` 已在 `.gitignore` 中，禁止提交。丢失主密钥
+将无法恢复 vault 内容。`Custody` 提供 `store(entry_id, secret)`、
+`load(entry_id)` 与 `delete(entry_id)`；删除只移除条目，不实现密钥轮换。
 
 ## 合约地址与 ABI
 
@@ -95,4 +97,5 @@ cd platform
 
 - 不提交 vault、`.venv`、私钥或任何真实 API Key。
 - 错误信息与日志不得包含 secret；custody 已按此实现。
-- 本阶段不实现密钥轮换/多主密钥，也不实现 FastAPI/uvicorn（后续任务）。
+- 本阶段不实现密钥轮换/多主密钥、custody 访问审计，也不实现 FastAPI/uvicorn
+  （审计落点见计划任务 12/14；均在后续任务）。
