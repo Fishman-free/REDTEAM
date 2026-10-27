@@ -9,4 +9,4 @@
 
 设计沿革见 `docs/references/research/RTM_BOUNTY_DESIGN.md`（标注已取代）与
 `docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md`（现行机制）。
-本目录代码不再编译、不再维护，仅供历史审查。
+本目录代码不再编译、不再维护，仅供历史审查。`archieve/manifest.json` 记录的是 Git blob（LF）字节的 SHA-256。
