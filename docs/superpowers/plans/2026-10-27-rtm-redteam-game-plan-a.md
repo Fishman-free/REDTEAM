@@ -10,6 +10,8 @@
 
 **范围边界：** 主网（4 验证者）genesis 与部署同测试网模板但不启动；桥/Uniswap/法币相关一概不做（计划 B）。未在本计划出现的规格条目均属计划 B。
 
+> **2026-10-27 挖矿层修订：** 本文件任务 4/5/7/9/16/17 中关于线性挖矿（`accrue`/`E_rate`/`miningRate`）、矿工质押/罚款、`approveSale` 逐买家同意与旧部署地址的内容**已被《挖矿层修订（2026-10-27）》取代**。执行 R2/R3/R4 时禁止照抄旧挖矿代码；普通用户攻防层（质押、25%/2h 罚款、0.5%×S、弃权、普通数据市场 70/30）保留。
+
 ---
 
 ## 文件结构
@@ -1591,6 +1593,71 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 
 ---
 
+## 挖矿层修订（2026-10-27）
+
+> **本节优先级高于本文件其余历史任务。** 用户最新决定：平台挖矿层改为"矿工无质押 + 成功攻破固定 1 RTM + 攻破即停赛/RSI/新版本/hash 退役"；用户攻防层保持原设计。**禁止照抄旧挖矿代码**：任务 4 的 `createMiningContest(wallet,E_rate,r)`、`accrue`、`miningRate/miningMinted`、`MAX_MINING_RATE`，任务 5 的 mining k=84 罚款/accrue 用例，任务 7/16 的 `approveSale/saleApproved`，任务 9 的旧 `addresses.json` 与旧 ABI，全部作废。普通用户层测试（质押、罚款曲线、0.5%×S、弃权、pause、fuzz、buyOwn/70-30）保留。
+
+### R1 规格与发币文档（本任务）
+
+- 更新 `docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md`：§1/§2 角色、§3.2 参数、§3.3 罚款范围、§3.4 奖池、§3.5 均衡、§3.6 重写、§3.7 数据市场、§4.1/§4.2/§4.4/§4.5/§4.7、§5/§6/§7、§10/§11、附录。
+- 更新 `docs/RTM发币机制设计.md`：删除线性挖矿/E_rate/accrue/矿工质押/罚款/W 全余额/平台自挖无增发的旧表述/approveSale；改为固定 1 RTM、0.005/条、无质押、数据同意、事件驱动供给。
+- 验收：`git diff --check`；`rg` 自检；只改文档，不改 `contracts/`、测试或地址文件。
+
+### R2 Arena 重构（固定奖励，无质押）
+
+**取代任务 4 的挖矿实现与任务 5 的 mining 测试；普通赛代码/测试保留。**
+
+- 常量：`MINING_REWARD = 1e18`、`MINING_FEE_BPS = 50`、`MAX_ACTIVE_MINING = 3`、`MAX_ATTACKERS = 50`；普通赛 `EPOCH=2h`、25%、`FEE_BPS=50` 不变。
+- 删除：`accrue`、`E_rate`、`miningRate`、`miningMinted`、`MAX_MINING_RATE`；挖矿赛 `stakeBps`、矿工罚款、矿工 `collectPenalties`/`withdrawStake`/剩余质押提款。
+- `Contest` 增加 `defenseHash`，删除 `miningRate/miningMinted`；新增 `retiredDefenseHash`、`activeDefenseHash`、`activeMiningCount`。
+- `Attacker` 增加 `dataConsent`；`base` 普通赛=S、挖矿赛=1e18；`stake` 挖矿赛=0。
+- `createMiningContest(address wallet, bytes32 defenseHash)` only operator：W 新/非靶/未受控/余额 0；hash 非零/未 retired/无 active 同 hash；K<3；Treasury `safeTransferFrom(treasury→W, 1e18)`（预授权+余额），注册靶，记录 `isMining/defenseHash`，无 stakeBps/rate。
+- `join(bytes32 id, uint256 maxStake, bool dataConsent)`：仅普通赛；记录 `dataConsent`；事件带该字段。
+- `joinMining(bytes32 id, bool acceptData)`：仅挖矿赛；`acceptData=true` 否则 `DataConsentRequired`；无质押、无 transferFrom、每地址一次、≤50；记录 `stake=0/base=1e18/dataConsent=true`；发 `MiningJoined` + `DataConsentRecorded`。
+- `attack`：普通赛 0.5%×S；挖矿赛 0.5%×1 RTM=0.005 RTM；进 Treasury；矿工需 tRTM（Faucet）。
+- `onBreach`：普通赛原逻辑；挖矿赛立即 endedAt、hash retired、释放 K、`rtm.mint(treasury, 1e18)` 补铸、发 `MiningSettled`；W 余额（正常 1 RTM）已由 Token 扫给 winner。
+- `retireMining(id)` only operator：未攻破退役，W 余额（正常 1 RTM）`controllerTransfer` 回 Treasury，不铸造，hash retired，释放 K。
+- 新增只读 `dataConsent(id, attacker)` 供 DataMarket 校验。
+- 测试：保留普通罚款曲线；删除 mining k=84 accrue；新增固定奖励/无质押/0.005/hash 退役/同 hash 拒绝/K=3/Treasury 预置与补铸/未攻破退回不铸/join 同意/停服。`npm test` 全绿。
+- **禁止照抄任务 4 代码块中的 `accrue/miningRate/miningMinted/stakeBps`。**
+
+### R3 DataMarket consent 改造
+
+**取代任务 7 与任务 16 的 `approveSale/saleApproved/SaleApproved`。**
+
+- 删除 `approveSale`、`saleApproved`、`SaleApproved`、`NotApproved`。
+- `buyFromAttacker(contestId, attacker)`：仅 defender、普通赛、赛后、已发布；`arena.dataConsent(contestId, attacker)` 必须 true，否则 `NotConsented`；价格 `attackerDataPrice`，70/30，一次性。
+- `publish` 只允许普通赛：`contestInfo` 的 `isMining=true` 时 revert `NotNormalContest`；矿工数据仅 RSI，不发布/不出售。
+- `buyOwn` 不变：defender、普通赛、赛后、10%×S、70% 平台/30% 退回守方、一次性。
+- 数据集根只含已同意攻方数据 + 守方自有数据；后端过滤 opt-out；链上 consent 审计。
+- 测试：consent true/false、NotConsented、mining publish 拒绝、70/30、无 approveSale 路径；普通层 70/30 与 buyOwn 测试保留。
+
+### R4 重新部署与新地址
+
+**任务 9 的旧地址（Treasury `0x4B66…`、Arena `0x3a8d…`、RTM `0xF08F…`、Faucet `0x042B…`、DataMarket `0x9446…`）与旧 ABI 全部作废。**
+
+- 部署脚本按 R2/R3 新 ABI 重部署；Treasury 预注 3 RTM（`MINING_REWARD × K`）并 `approveSpender(rtm, arena, miningAllowance)`；测试网可用 `mintForTest(treasury, miningFund)`。
+- `addresses.json` 更新五合约地址并新增 `miningReward/miningFeeBps/miningFund/treasuryMiningAllowance`；断言 `activeMiningCount()==0`、Treasury 余额/allowance、`rtm.minter()==arena` 等。
+- 更新 platform `contracts.ts/chain.py`、dApp `ADDRESSES`、README/runbook；旧地址不得继续使用。
+- 用新 hash 开一场挖矿赛做烟测：joinMining→0.005/条→攻破→Treasury +1 补铸、hash retired；再测 retireMining 退回不铸。
+- 重部署保护：`DEPLOY_ALLOW_REDEPLOY=1`，不提交私钥。
+
+### 受影响任务一览
+
+| 旧任务 | 处置 |
+|---|---|
+| 任务 1/2/3 | 归档 README、P0 中的 `E_rate` 初值建议、RTMToken 注释中的"线性发币"表述均已作废；P0 只跑用户层，合约注释按 R2 更新 |
+| 任务 4 Arena | 普通赛部分保留；挖矿部分按 R2 重写，旧代码块禁止照抄 |
+| 任务 5 罚款曲线 | 普通赛测试保留；删除 mining k=84/accrue 用例 |
+| 任务 7 DataMarket | Faucet 保留；DataMarket 按 R3 改造 |
+| 任务 9 部署 | 旧地址/旧 ABI 作废，按 R4 重部署 |
+| 任务 16 dApp | MiningCenter 去掉 accrue，改 joinMining(id,true)+数据条款；DataMarket 去掉 approveSale |
+| 任务 17 e2e | 挖矿流程改为 Treasury 预置→固定 1 RTM→停服/RSI/新 hash；普通层流程保留 |
+
+**执行顺序：R1 → R2 → R3 → R4。** R2/R3 可并行开发，但 R4 必须等两者完成；普通用户层测试不得因重构删除。
+
+---
+
 ## 任务 10：平台后端骨架（config/custody/chain）
 
 **文件：**
@@ -2234,6 +2301,7 @@ git commit -m "docs: align site copy and index with the red-team mining game"
 
 ## 关键风险提醒（执行者必读）
 
+- **2026-10-27 挖矿层修订已取代任务 4/5/7/9 的旧挖矿、`approveSale` 与旧地址内容；执行任何挖矿相关任务前先读《挖矿层修订（2026-10-27）》，禁止照抄旧 `accrue/miningRate` 代码。**
 - Arena 任务 4 步骤 3 的代码骨架含三处**已知需修正**点（已在步骤 4 列明），落地时必须按修正块实现，不可照抄骨架；
 - `remainingStake` 的循环上限是 D/EPOCH=84，勿引入无界循环；
 - RTMToken `_update` 攻破分支的顺序必须是：注销靶 → 转账 → 事件 → onBreach 回调（CEI）；
