@@ -27,15 +27,15 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
 
     // ---- 固定参数 ----
     uint64 public constant EPOCH = 2 hours;
-    uint256 internal constant KEEP_NUM = 75; // 每 epoch 保留 75%
-    uint256 internal constant KEEP_DEN = 100;
+    uint256 public constant KEEP_NUM = 75; // 每 epoch 保留 75%
+    uint256 public constant KEEP_DEN = 100;
     uint32 public constant MAX_ATTACKERS = 50;
     uint256 public constant FEE_BPS = 50; // 消息费 = base * 0.5%
     uint64 public constant MIN_DURATION = 6 hours;
     uint64 public constant MAX_DURATION = 7 days;
     uint32 public constant MIN_STAKE_BPS = 200; // 2%
     uint32 public constant MAX_STAKE_BPS = 2000; // 20%
-    uint256 internal constant PRECISION = 1e18;
+    uint256 public constant PRECISION = 1e18;
 
     enum State {
         None,
@@ -79,9 +79,9 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     bool public immutable testnet;
 
     mapping(bytes32 => Contest) internal contests;
-    mapping(bytes32 => address[]) internal contestAttackers;
-    mapping(bytes32 => mapping(address => Attacker)) internal attackers;
-    mapping(bytes32 => mapping(address => mapping(bytes32 => uint256))) internal paidFee;
+    mapping(bytes32 => address[]) public contestAttackers;
+    mapping(bytes32 => mapping(address => Attacker)) public attackers;
+    mapping(bytes32 => mapping(address => mapping(bytes32 => uint256))) public paidFee;
     /// @notice 消息 hash 一经付费即永久占用；退款只清 paidFee，不清本标记。
     mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public usedMsg;
     bytes32[] public contestList;
@@ -117,6 +117,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     event ContestSettled(bytes32 indexed id, address indexed winner, uint256 amount);
     event StakeWithdrawn(bytes32 indexed id, address indexed attacker, uint256 amount);
     event MiningAccrued(bytes32 indexed id, address indexed wallet, uint256 amount);
+    event OperatorUpdated(address indexed operator);
 
     error ZeroAddress();
     error BadParams();
@@ -171,6 +172,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function setOperator(address op) external onlyOwner {
         if (op == address(0)) revert ZeroAddress();
         operator = op;
+        emit OperatorUpdated(op);
     }
 
     /// @notice 测试网注水：仅 testnet=true 的部署可用。
