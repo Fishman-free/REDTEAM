@@ -1691,6 +1691,13 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 
 ## 任务 10：平台后端骨架（config/custody/chain）
 
+> **任务 10 实现修订（2026-10-28）：包名改为 `redteam_platform`，避免 stdlib 冲突。**
+>
+> - 实际布局：`platform/redteam_platform/{__init__,config,custody,chain}.py` + `platform/tests/`；项目名仍为 `redteam-platform`。Python 标准库自带 `platform` 模块，顶层包不能再叫 `platform`（`platform/platform.*` 会冲突）；后续任务统一使用 `redteam_platform.byok` 等导入名。
+> - custody 以 `Custody(vault_path, master_key_hex, scrypt_n=2**15)` 实例化，不沿用下方草稿的模块级全局 `VAULT_PATH`：AES-256-GCM + scrypt、AAD=entry_id、vault `{version,entries}`、临时文件 + fsync + `os.replace` 原子写、目录 0700/文件 0600 best effort、进程级 `RLock`，错误与日志不含 secret。
+> - chain 从 `contracts/artifacts/src/<Name>.sol/<Name>.json` 加载五个 ABI（缺文件提示先 `npx hardhat compile`）；`load_addresses` 只校验当前 `chainId` 与 treasury/arena/rtm/faucet/dataMarket 五个字段并 checksum，忽略旧字段；`ChainClient` 构造不联网，`verify_chain()` 才调用 `eth_chain_id` 比对。
+> - config 以 `Settings` dataclass 从环境变量 + `addresses.json` 解析并校验（不读取私钥）；keystore entry 只是引用名。
+
 **文件：**
 - 创建：`platform/pyproject.toml`、`platform/platform/{__init__.py,config.py,custody.py,chain.py}`
 - 测试：`platform/tests/test_custody.py`、`platform/tests/test_config.py`
