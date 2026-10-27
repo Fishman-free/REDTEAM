@@ -1,0 +1,305 @@
+# REDTEAM 攻守博弈与红队挖矿机制设计规格
+
+- 日期：2026-10-27
+- 状态：待用户审查
+- 范围：替换 `contracts/` 现有 RTM/Bounty 机制，新增平台后端、dApp、双链基建
+- 仓库用途声明：本机制用于支付智能体的安全评测与防御性研究（RSI for safety），所有攻击面均为参与者自愿上链的智能体，不针对第三方系统
+
+---
+
+## 1. 目标与非目标
+
+### 1.1 目标
+
+1. 把现有"评估者手工记账式"的 RTM 悬赏重构为链上三方博弈：守方上链智能体、攻方付费进攻、平台托管与收费。
+2. 每一方的理性策略都有正期望收益（机制可持续），且合谋（尤其自攻自守）无利可图。
+3. 平台自有智能体作为常驻守方，攻击它即"挖矿"，实现无减半的持续发币，攻击数据回流 RSI 修复闭环，令挖矿难度随防御进步上升。
+4. 自建测试链与主链（Besu QBFT，零 gas），主链 RTM 可通过 Base 跨链桥与 Uniswap V2 实现与 USDC/ETH 的自由双向兑换。
+5. dApp 提供守方/攻方/矿工入口、攻守矿三方排行榜、水龙头、数据市场与兑换页面。
+
+### 1.2 非目标
+
+- 不修改 EVM 共识层：攻破判定在合约与代币层实现，验证者仍为标准 QBFT PoA。
+- 不做预测市场、不做治理代币、不做质押生息。
+- 现有静态研究站（`docs/site/index.html`）保持无钱包、无后端，仅更新文字并与 dApp 互链。
+- PayAssist 评测主线（L0/L1 研究协议）不被本机制替换；runner 复用其运行时，但比赛协议独立版本化。
+
+---
+
+## 2. 参与方与信任模型
+
+| 角色 | 做什么 | 付什么成本 | 得什么收益 |
+|---|---|---|---|
+| 守方 | 注册智能体配置并质押 S 开赛 | S（到期可回）、BYOK 推理费 | 攻方罚款、到期赎回 S、守住后的榜单声誉 |
+| 攻方 | 质押 s 加入，付费发消息诱导智能体转账 | s（随时间被罚没）、消息费、自备模型成本 | 攻破得 W 全部余额 |
+| 矿工 | 攻击平台挖矿赛智能体 | 同攻方 | 攻破得 W 全部余额（新铸 RTM） |
+| 平台 | 托管智能体与钱包私钥、运行 runner、 indexer、RSI | 服务器、挖矿赛推理费 | 消息手续费、数据销售收入、挖矿赛罚款归集 |
+
+**信任边界（明示）**：
+
+- 平台保管 W 私钥与守方 API Key：托管泄露风险归平台，密钥 AES-GCM 加密、访问留审计。
+- 平台操作员有 defenderFault 报告权与 pause 权：全部走链上交易，事件留痕，事后可审计（复用现有审计链思路）。
+- 守方不可信（可能蜜罐）→ 资格测试 + 平台托管签名；攻方不可信（可能女巫）→ 每地址一次加入 + 按条计费 + 水龙头票据；守攻可能同一人 → 奖池不含攻方资金，自攻自守严格亏损手续费。
+
+---
+
+## 3. 机制设计（博弈论分析）
+
+### 3.1 比赛生命周期
+
+```
+守方注册配置 ──资格测试──▶ createContest(S, D, r) ──▶ 攻方 join(s=rS) ──▶ attack(msg, fee=0.5%S)
+        │                                                        │
+        │              ┌─────────────────────────────────────────┤
+        │              ▼                     ▼                  ▼
+        │          到期未破               被攻破             守方弃权(Key失效)
+        │     W余额划回守方         W余额全归获胜攻方      S按已送达消息条数分给攻方
+        └──   攻方提走剩余质押       其余攻方提剩余质押     攻方提走未罚没部分
+```
+
+### 3.2 参数表（默认值；P0 仿真校准后定稿）
+
+| 参数 | 符号 | 默认 | 说明 |
+|---|---|---|---|
+| 守方质押 | S | 50 tRTM | 奖池=守方质押，由 Arena `transferFrom` 拉入 W |
+| 比赛时长 | D | 24h | 范围 [6h, 7d]，守方自选 |
+| 攻方质押比例 | r | 10% | 范围 [2%, 20%]，守方自选；s = r·S |
+| 罚款周期 | E | 2h | 全局常量（合约参数，测试可用小值） |
+| 罚款率 | — | 25% | 每 epoch 罚剩余质押的 25%；24h 后剩约 3.2% |
+| 消息费 | f | 0.5% × S | 每条消息付给平台金库 |
+| 消息长度 | — | 1000 字符 | 超长拒绝 |
+| 每赛攻方上限 | — | 50 | gas 与状态上界 |
+| 挖矿铸币速率 | — | 待 P0 定 | 每 2h epoch 线性铸 E_rate，无总量上限、无减半 |
+| 数据售价 | — | dataPriceBps × S | bps 由平台设置 |
+
+### 3.3 罚款数学（链上惰性计算）
+
+以攻方各自 `joinedAt` 起算，第 k 个 epoch 结束后剩余质押：
+
+```
+remaining(k) = s × (3/4)^k       （罚款率 25%）
+k = floor(elapsed / E)
+elapsed = min(now, end) − joinedAt − pausedOverlap(joinedAt)
+```
+
+- 守方可随时 `collectPenalties` 拉取（合约记 `paidOut`，拉取差额），无需守方在线等 epoch。
+- 攻方余额只会随块时间减少，任何人可验证，链上无循环、无 keeper（乘以常数 3/4 用乘法实现，仍为 O(1)）。
+- **博弈含义**：攻方成本随时间几何衰减——12 个 epoch（24h）后剩约 3.2%，前 3 个 epoch（6h）剩约 42%，攻方在前期有充足的试探窗口，参与意愿高；守方的"存活收入"理论峰值约为 3×s 的几何级数和（仍显著为正）。P0 仿真在该默认值下复核双方 EV。
+
+### 3.4 攻破判定（代币层，"标记"的 tRTM/RTM）
+
+RTMToken 重写 ERC-20 `_update`：
+
+```solidity
+if (isActiveTarget(from)) {
+    if (to == arena) { /* 控制器划转：settle/退款/赎回，放行 */ }
+    else if (isRegisteredAttacker(contestOf(from), to)) {
+        arena.onBreach(contestOf(from), to);   // 先效果后转账（CEI）
+    } else revert TargetTransferRestricted();  // 转给任何第三方直接失败
+}
+```
+
+- **检测规则即结算规则**：用户要求的"检测到守方向攻方转移即结束比赛"由代币在转账交易内原子完成：注销 W → 把 W 全部余额经控制器划给获胜攻方 → 记录 `Breach` 事件。没有链下裁判窗口，没有竞态。
+- 靶钱包之间互转、入金不受限；比赛结束（破/到期/弃权）即注销，恢复普通钱包。
+- 守方向"非该场攻方"转账（比如守方换小号想私下转走）被代币 revert——这就是"测试币标记"的实现。
+- 挖矿赛与普通赛共用同一套逻辑，defender = 平台金库地址。
+- 智能体违规转出的金额全额归获胜攻方（即 W 余额划转），不做单独的"没收/罚没"步骤：奖池本身就守方质押，转给攻方即赔付，链上无需也无法证明"双方是不是同一人"。
+
+### 3.5 均衡分析（关键结论）
+
+1. **自攻自守（合谋）严格亏损**：守方收益 = 攻方罚款 + W 余额回流；攻方支出 = s 罚没 + 消息费。同一人兼任时，罚款从左口袋到右口袋，净变化 = −消息费 −（挖矿赛下新铸币不回流自己）。每条消息亏 0.5%×S，无任何参数能让其为正。**不需要识破合谋，机制内生无利可图。**
+2. **守方参与条件**：守方 EV = S×(存活概率) + Σ罚款 − S×(被破概率)。守方在"自认智能体较强"时上线；排行榜声誉（守住时长、承受消息数）提供额外激励。守方无须为"被看到攻击过程"付费前无退出权，但其损失上界 = S + 推理费，且罚款收入常为正。
+3. **攻方参与条件**：攻方 EV = P_breach×(W余额) − s×(1−2^−k) − f×n − 推理费。P0 仿真扫描 P_breach、N（对手数稀释）、k 给出自由进入均衡人数 N*：当 N 超过 N* 时边际攻方 EV<0 自动退出市场，无需准入控制。
+4. **蜂蜜罐守方不可行**：守方不能提供"永不转账"智能体——资格测试要求主人授权转账成功；转账由平台托管的 runner 用 W 私钥执行，守方无法在链外拦截；BYOK 端点被平台白名单锁死，不能换假模型。
+5. **守方弃权无利可图**：Key 失效 → 与被破同结算（S 分给攻方），临阵撤 Key 不保 S。已在途罚款被守方拉走的部分不追回（链上不可逆），规格明示该不对称。
+6. **平台中性**：平台收入全部来自手续费与数据销售，不持彩池、不参与攻守，激励与任何一方的胜负脱钩。
+
+### 3.6 红队挖矿（持续发币 + RSI 难度递增）
+
+1. 平台部署自有智能体（DefensePackage v1）开**挖矿赛**：defender = 金库，无到期时间，奖池由铸币补充。
+2. 任何人 `accrue(contestId)`：每满 E（2h）线性铸 `E_rate` RTM 进 W，任何人可触发（免 keeper）。
+3. 矿工按攻方规则加入、罚款（挖矿赛罚款归金库，覆盖平台自付推理费）、付费发消息。
+4. 攻破后：平台收集该赛全部记录 → `rsi_export` 导出 findings → 离线跑修复闭环（复用 `campaign_repair.repair_round` 修复门禁 + `role_memory` 技能沉淀）→ 产出新 DefensePackage → 开新挖矿赛。
+5. **难度递增不靠人工调参**：同一攻击模式沉淀为技能后，对旧版本有效、对新版本无效，矿工需要真正的增量攻击；难度由历史攻破率和承受消息数在排行榜上可见。
+6. **减半机制删除**：RTMToken 不再有 `yearBudget`/`mintedByYear`；总供给无上限，速率由 `E_rate` 单点控制（可经治理调整）。
+
+### 3.7 数据市场
+
+- 比赛结束时 runner 把全量记录（含攻方消息、智能体回复、工具轨迹）打包为 Merkle 树，`DataMarket.publish(contestId, root)`。
+- **双向购买（需卖家同意）**：
+  - **守方购买**：被攻破守方 `buy(contestId)` 付 `dataPriceBps × S`，获得攻破自己的攻击数据（防御修复用）。
+  - **守方购买攻方数据**：守方也可以购买**某位攻方**的进攻数据（研究攻击手法）。成交需**攻方同意**（`approveSale(contestId, buyer)` 由攻方签名上链），未经同意不可成交——攻方是数据的生产者，对自己的攻击手法有定价与披露决定权。
+  - **攻方购买**：攻方同理可在守方同意下购买自己未直接参与的场次数据。（首期实现守方→攻方数据购买；攻方→守方数据留作后续扩展。）
+- **平台抽成 70%**：任一数据成交额的 70% 归平台（Treasury），30% 归数据提供方（被购买的攻方，或同意出售的守方）。抽成比例 `platformShareBps = 7000` 为合约参数。
+- 被攻破守方购买路径无须卖家同意（自己钱包失窃的数据，卖方权利归守方自己）；涉及"他人视角数据"的购买一律需对应参与方签名同意。
+- 挖矿赛数据仅平台留存用于 RSI，不对外售。
+
+### 3.8 排行榜（用户需求：攻守双榜激励参与）
+
+由 indexer 从链上事件计算，按网络分开：
+
+| 榜 | 指标 |
+|---|---|
+| 攻方/矿工榜 | 累计胜场、赢得 RTM 总额、难度分 = Σ(攻破前该目标承受的付费消息数)，最长连胜 |
+| 守方榜 | 守住比赛数、累计承受付费消息数、净收入（罚款−被破损失）、最长存活时间 |
+| 矿工视角挖矿榜 | 挖矿赛累计产出、当前奖池规模、历史攻破率（难度走势） |
+
+难度分使"攻破一个扛住 300 条消息的强智能体"远重于"捡软柿子"，抑制刷弱靶。
+
+---
+
+## 4. 合约规格
+
+全部 Solidity 0.8.24（沿用 `contracts/hardhat.config.js` 的 cancun 设置），OpenZeppelin Contracts 5.x。
+
+### 4.1 RTMToken.sol（重写）
+
+- ERC-20（`_update` 覆写）+ `Ownable`。无预铸。minter = Arena（部署时绑定，同旧版约束：minter 必须有代码）。
+- 靶注册表：`registerTarget(W, contestId)` / `unregisterTarget(W)` 仅 Arena 可调。
+- 攻方集合查询 `isRegisteredAttacker(contestId, addr)` 委托 Arena。
+- `onBreach` 回调（仅 Arena）：结束比赛并控制器划转（CEI 顺序：先状态后转账）。
+- 铸币：`mint(to, amount)` 仅 minter，无年份预算（**减半删除**）；`miningRate` 等参数放 Arena。
+- 事件：`TargetRegistered/TargetUnregistered/Breach`；错误：`TargetTransferRestricted/NotMinter/...`。
+- 不变量：靶活跃期间 W 的任何转出仅两个去向（注册攻方→触发 onBreach；Arena→控制器划转）；否则转账 revert。
+
+### 4.2 Arena.sol（新，核心）
+
+状态：`contests{defender, wallet W, S, r, D, start, end, state(live/ended), attackerCount, prizePaid, penaltyPaidOut, msgPaidCount[], pausedTotal, lastPauseAt}`；`attackers{stake s, joinedAt, pausedAtJoin, deliveredCount, withdrawn}`；挖矿赛标记与 `E_rate`。
+
+函数：
+- `createContest(S, D, r)`：守方 approve 后调用；`transferFrom` 拉入 W；同交易注册靶。挖矿赛版本 `createMiningContest(E_rate)` 仅平台操作员。
+- `join(contestId)`：`transferFrom(s = r·S)`；每地址一次；50 人上限；记录 joinedAt 与暂停快照。
+- `attack(contestId, msgHash)`：付费 f=0.5%×S 转 Treasury；发 `AttackPaid(attacker, msgHash, seq)`；内容不上链（链下 runner 凭 txHash+hash 对账）。
+- `markDelivered(attacker, contestId)`（runner 操作员）：递增 deliveredCount（弃权分配权重）。
+- `collectPenalties(contestId)`（守方）：按各攻方 `remaining − 已付` 差额结算（pull）。
+- `pause()/unpause()`（平台）：累计 pausedTotal，冻结所有时钟。
+- `reportDefenderFault(contestId)`（runner 操作员）：S 按各攻方 deliveredCount 加权分配；攻方可提 `s − 已被守方拉走的部分`；发 `DefenderFault` 事件。
+- `onBreach(contestId, winner)`（由 RTMToken 回调）：settle——W 余额控制器划给 winner；注销靶；发 `Breach(contestId, winner, amount)`。
+- `expire(contestId)`：到期未破，W 余额划回守方；攻方提剩余。
+- `withdrawMyStake(attacker, contestId)`：pull 提款（ended 后）。
+- `accrue(contestId)`：挖矿赛按 `floor(elapsed/E)×E_rate − 已铸` 铸币进 W。
+- `refundUnserved(attacker, contestId, seq)`（runner 操作员）：平台未能送达的付费消息按 seq 退手续费（幂等，防重复退）。
+
+安全：`ReentrancyGuard`；全部 checks-effects-interactions；靶划转走控制器而非直接 transfer（避免靶注册中途被绕过）；任何路径资金只增不减、可全额追回（除已被守方拉走的罚款）。
+
+### 4.3 Faucet.sol（测试网）
+
+- `claim(ticket, sig)`：EIP-712 票据（域分隔含 chainId），per-address nonce + 24h 冷却；后端签发（captcha/OAuth 防女巫）。发 X tRTM + 平台代付 gas（测试网原生币由平台预充给 Faucet）。
+- 模板沿用 `ContributionFlower.sol` 的 EIP-712+nonce+deadline 结构。
+
+### 4.4 DataMarket.sol（新）
+
+- `publish(contestId, root)`（runner 操作员）：登记数据集根哈希。
+- `approveSale(contestId, buyer)`：攻方对"出售自己的进攻数据给某买家"的链上签名同意（也可由后端以攻方 EIP-712 签名代提交）。
+- `buy(contestId)`：
+  - **守方买自己被攻破的数据**：无需卖家同意（链上校验 defender == msg.sender），付 `dataPriceBps×S`。
+  - **守方买某攻方的进攻数据**：需该攻方 `approveSale` 在先；价格为合约参数 `attackerDataPrice`（可按场设定）。
+- 成交资金拆分：**70% → Treasury（平台抽成）**，30% → 数据提供方（被购数据的攻方，或同意出售的守方地址）。`platformShareBps = 7000` 为常量参数。
+- `DataSold(buyer, seller, contestId, amount, platformCut)` 事件驱动后端交付；买家按 Merkle 根校验数据完整性。
+
+### 4.5 Treasury.sol（新）
+
+- 收集消息手续费、数据销售款、挖矿赛罚款；`withdraw(owner)`；升级路线：owner 换多签。
+
+### 4.6 保留与归档
+
+- **保留不动**：PaymentAgent.sol、RewardSettlement.sol、ExperimentalToken.sol、ContributionFlower.sol 及其测试。
+- **归档（需用户确认后执行，沿用 archieve/ 惯例）**：RTMToken.sol（旧）、BountyVault.sol、BountyRound.sol、scripts/rtm-reward-bridge.js、test/rtm.test.js、test/rtm-budget-model.test.js、test/rtm-bridge.test.js、audit-poc.test.js 中依赖减半的 M-01/M-02/I-01 用例（改写为 Arena 对应用例或移除）。
+
+### 4.7 Hardhat 测试计划
+
+1. 罚款曲线：`evm_increaseTime` 跨多 epoch，核验 `remaining = s×(3/4)^k`、守方 collect 差额、重复 collect 幂等。
+2. 攻破端到端：质押→加入→靶转账给攻方→onBreach→W 全额给 winner→其余提款。
+3. 靶限制：活跃靶转第三方 revert；转 Arena 控制器放行；注销后恢复自由。
+4. 弃权：按 deliveredCount 分配，小号无增益（零 delivered 的地址分不到）。
+5. pause：时钟冻结（暂停期间 elapsed 不增），恢复后继续。
+6. 不变式 fuzz：任何操作序列下 Σ托管资金可全额追回；controller-sweep 仅 Arena 可触发；无重入路径。
+7. 边界：50 人上限、每地址一次、消息费精确、D 上下限、r 上下限。
+8. 挖矿：accrue 线性、重复 accrue 幂等、并发挖矿赛上限 K。
+
+---
+
+## 5. 链基建（infra/）
+
+- 测试网：1 验证者 Besu QBFT，docker-compose；genesis：`zeroBaseFee:true`、`contractSizeLimit:2147483647`、`shanghaiTime/cancunTime:0`（必须匹配 cancun 编译，否则合约交易 revert——Besu issue #8954）；每节点 `--min-gas-price=0`。
+- 主网：4 验证者（初期全平台控制，路线图引入外部验证者），同上。
+- `besu operator generate-block-chain-config` 生成 genesis/extraData 的 runbook；验证者密钥管理文档（离线生成、加密存档）。
+- 公网 RPC 前置限流网关（Nginx/专用代理）：免费 gas 必须防 spam。
+- `contracts/hardhat.config.js` 增加 `besu-testnet`/`besu-mainnet`（env RPC+账户）与两个本地 hardhat fork 网络（桥测试用）。
+
+---
+
+## 6. 平台后端（新顶层 platform/，FastAPI + web3.py）
+
+| 模块 | 职责 | 复用锚点 |
+|---|---|---|
+| custody.py | AES-GCM keystore 管 W 私钥与守方 API Key；访问审计 | 新写 |
+| byok.py | 白名单供应商表（平台固定 base_url+模型名）；守方 Key；`ModelError.kind` 区分 infrastructure（→弃权）与 agent_protocol | `payassist_agent/model_client.py`（端点校验模式照搬） |
+| runner.py | 每赛一智能体进程；攻方隔离多轮线程；真实 `transfer_rtm(to,amount)` 工具（W 签名、nonce、per-thread 串行）；资格测试 | `payassist_agent/runtime.py`（PaymentAgent：max_steps=10/max_turns=40/120s/200k 预算全沿用） |
+| indexer.py | 链事件→SQLite→三榜 | 新写 |
+| api.py | 守方注册；攻方消息提交 `{txHash, content}`（indexer 确认 AttackPaid 后入队）；水龙头票据签发；数据交付；排行榜查询 | `payassist_agent/service.py`（FastAPI + token 鉴权模式） |
+| rsi_export.py | 攻破后导出有界攻方视图+完整 snapshot → 离线修复闭环 → 新 DefensePackage | `campaign_repair.py`、`defense.py`、`role_memory.py` |
+
+要点：
+- `channel=external` 永不打开 execution release（runtime 语义已保证，直接沿用）。
+- 资格测试 = 一轮 owner channel + `requests_execution=True` 的转账演练，必须成功才允许 `createContest`。
+- runner 操作员密钥独用于 `reportDefenderFault`/`markDelivered`/`publish`；pause 由运维多签流程触发。
+- 消息处理为同步收费、异步执行的短队列；runner 故障时消息可退费（链上 `refundUnserved`）。
+
+---
+
+## 7. dApp（新顶层 dapp/，Vite + React + TS + wagmi/viem）
+
+- 视觉复用静态站设计令牌：`--bg:#000`、`--panel:#0a0c10`、coral `--accent:#ff997b`、mono wordmark、方角、hairline、点阵动画。
+- 与静态研究站**并存互链**（静态站校验器禁止钱包/fetch，不可原地改造）。
+- 页面：守方中心（注册+配置+创建比赛+我的比赛）、攻方中心（比赛列表+加入+攻击聊天窗）、挖矿中心、排行榜（攻/守/矿，网络切换）、水龙头（测试网）、数据市场、兑换/桥（主网，feature flag 控制）。
+- 链交互 wagmi；后端 REST（回复轮询起步，后续可升 WebSocket）。
+
+---
+
+## 8. 主网桥与兑换（P6，独立模块 + feature flag）
+
+- 本链 `RTMBridge.sol`：lock/unlock，日限额、暂停开关。
+- Base 上 `WrappedRTM.sol` + `Bridge.sol`：M-of-N 中继签名 mint/burn；`relayer.py` 独立进程（签名者集、每日上限、异常自动暂停、监控告警）。
+- 金库在 Base Uniswap V2 建 wRTM/USDC 池并播种流动性 → 用户自由买卖进出主流币。地址：主网 Router02 `0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24`；Base Sepolia 测试 Router `0x1689E7B1F10000AE47eBfE339a4f69dECd19F602`（勿混用）。
+- 桥测试：两个 hardhat 网络间 lock→mint→burn→unlock 全往返（mock 中继）。
+
+**法律风险（已向用户明示，不构成法律意见）**：代币发行融资与虚拟货币兑换在大陆属高风险（2017 七部委公告、银发〔2021〕237 号）；仓库既有合规报告将"RTM 出现交易/兑换"列为停线条件。本模块与测试网功能完全隔离，由 feature flag 控制，上线前需正式法律意见。
+
+---
+
+## 9. 实施顺序与验收
+
+| 阶段 | 交付 | 验收 |
+|---|---|---|
+| P0 | 规格文档 + `tools/sim/mechanism_sim.py` 参数仿真 | 存在守方/攻方双方正 EV 参数域，默认参数落入域内；合谋收益恒负已验证 |
+| P1 | 五个合约 + Hardhat 测试（§4.7） | `npm test` 全绿，含不变式 fuzz |
+| P2 | Besu 双网 docker-compose + 部署脚本 + runbook | 本地起网、部署、零 gas 交易成功 |
+| P3 | platform/ 后端六模块 + 单测 | mock 链 + mock 模型全流程过 |
+| P4 | dApp 全页面 | webapp-testing 全流程通过 |
+| P5 | 挖矿赛 + RSI 接线 | accrue→攻破→导出→修复→新赛闭环演示 |
+| P6 | 桥 + Uniswap 池（Base Sepolia 演练） | 双 hardhat 网往返 + Sepolia 测试网演练 |
+| P7 | 文档、静态站文字更新、CI | `build_site.py --check` + 既有全部套件不回归 |
+
+端到端验收脚本：领水→注册守方→开赛(S=50)→双攻方加入→付费消息→罚款曲线→模拟攻破→结算与提款→弃权路径→pause 路径→数据购买→挖矿闭环→桥往返。
+
+---
+
+## 10. 风险与开放问题
+
+1. **托管集中**：W 私钥与守方 Key 均平台保管；泄露即平台责任。缓解：AES-GCM、审计、密钥隔离、路线图（MPC/TEE）。
+2. **平台信任操作**：defenderFault / pause / 资格测试全由平台操作员执行。缓解：链上事件留痕、操作员密钥独立、事后审计。
+3. **经济参数**：罚款率已按用户决定改为 25%/2h（24h 后剩约 3.2%）；P0 仿真在该默认值下复核双方 EV 与自由进入均衡人数。
+4. **法律**：主网兑换模块高风险，feature flag 隔离，需正式法律意见后才可启用。
+5. **桥安全**：中继 M-of-N、限额、可暂停；桥是历史被盗重灾区，列为独立安全审查项。
+6. **零 gas 滥用**：公网 RPC 限流网关 + 水龙头票据防女巫。
+7. **开放问题**（实现前需定）：`E_rate` 具体值（P0 定）；数据售价 bps；守方 BYOK 白名单首批供应商；挖矿赛并发上限 K；平台操作员密钥治理（单签起步，路线图多签）；弃权路径下"已被守方拉走的罚款不退"这一不对称是否需要在 UI 与条款中高亮（当前决定：高亮）。
+
+---
+
+## 附：被本规格取代的内容
+
+- `RTMToken` 按年减半（YEAR0_BUDGET/`mintedByYear`）→ 删除，改挖矿线性铸币。
+- `BountyVault` 评估者门控发奖 → 被 Arena 质押/罚款/结算取代。
+- `BountyRound` ETH 托管 → 被 Arena 托管取代。
+- `docs/references/research/RTM_BOUNTY_DESIGN.md` §2 减半曲线 → 标注"已被本规格取代"。
