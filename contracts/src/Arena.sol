@@ -27,15 +27,15 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
 
     // ---- 固定参数 ----
     uint64 public constant EPOCH = 2 hours;
-    uint256 public constant KEEP_NUM = 75; // 每 epoch 保留 75%
-    uint256 public constant KEEP_DEN = 100;
+    uint256 internal constant KEEP_NUM = 75; // 每 epoch 保留 75%
+    uint256 internal constant KEEP_DEN = 100;
     uint32 public constant MAX_ATTACKERS = 50;
     uint256 public constant FEE_BPS = 50; // 消息费 = base * 0.5%
     uint64 public constant MIN_DURATION = 6 hours;
     uint64 public constant MAX_DURATION = 7 days;
     uint32 public constant MIN_STAKE_BPS = 200; // 2%
     uint32 public constant MAX_STAKE_BPS = 2000; // 20%
-    uint256 public constant PRECISION = 1e18;
+    uint256 internal constant PRECISION = 1e18;
 
     enum State {
         None,
@@ -79,9 +79,11 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     bool public immutable testnet;
 
     mapping(bytes32 => Contest) internal contests;
-    mapping(bytes32 => address[]) public contestAttackers;
-    mapping(bytes32 => mapping(address => Attacker)) public attackers;
-    mapping(bytes32 => mapping(address => mapping(bytes32 => uint256))) public paidFee;
+    mapping(bytes32 => address[]) internal contestAttackers;
+    mapping(bytes32 => mapping(address => Attacker)) internal attackers;
+    mapping(bytes32 => mapping(address => mapping(bytes32 => uint256))) internal paidFee;
+    /// @notice 消息 hash 一经付费即永久占用；退款只清 paidFee，不清本标记。
+    mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public usedMsg;
     bytes32[] public contestList;
 
     event ContestCreated(
@@ -115,7 +117,6 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     event ContestSettled(bytes32 indexed id, address indexed winner, uint256 amount);
     event StakeWithdrawn(bytes32 indexed id, address indexed attacker, uint256 amount);
     event MiningAccrued(bytes32 indexed id, address indexed wallet, uint256 amount);
-    event OperatorUpdated(address indexed operator);
 
     error ZeroAddress();
     error BadParams();
@@ -133,7 +134,6 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     error TooManyAttackers();
     error PausedNow(bytes32 id);
     error NotPaused(bytes32 id);
-    error DuplicateMessage(bytes32 msgHash);
     error FeeZero();
     error NothingToMark();
     error NothingToRefund();
@@ -171,7 +171,6 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function setOperator(address op) external onlyOwner {
         if (op == address(0)) revert ZeroAddress();
         operator = op;
-        emit OperatorUpdated(op);
     }
 
     /// @notice 测试网注水：仅 testnet=true 的部署可用。
@@ -261,6 +260,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
                 || (normal && wallet == defender)
         ) revert InvalidWallet(wallet);
         if (rtm.isTarget(wallet)) revert InvalidWallet(wallet);
+        // W 单场专用：曾注册为靶（含已结算）的地址永不复用。
+        if (rtm.isControlledWallet(wallet)) revert BadParams();
     }
 
     // ------------------------------------------------------------------
@@ -271,6 +272,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function join(bytes32 id) external nonReentrant {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
+        if (block.timestamp >= c.end) revert ContestExpired(id);
         if (c.lastPauseAt != 0) revert PausedNow(id);
         Attacker storage a = attackers[id][msg.sender];
         if (a.joined) revert AlreadyJoined();
@@ -297,15 +299,17 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function attack(bytes32 id, bytes32 msgHash) external nonReentrant returns (uint256 seq) {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
+        if (block.timestamp >= c.end) revert ContestExpired(id);
         if (c.lastPauseAt != 0) revert PausedNow(id);
         Attacker storage a = attackers[id][msg.sender];
         if (!a.joined) revert NotJoined();
         if (msgHash == bytes32(0)) revert BadParams();
-        if (paidFee[id][msg.sender][msgHash] != 0) revert DuplicateMessage(msgHash);
+        if (usedMsg[id][msg.sender][msgHash]) revert BadParams();
 
         seq = ++a.attackCount;
         uint256 fee = (a.base * FEE_BPS) / 10_000;
         if (fee == 0) revert FeeZero();
+        usedMsg[id][msg.sender][msgHash] = true;
         paidFee[id][msg.sender][msgHash] = fee;
         rtm.transferFrom(msg.sender, treasury, fee);
         emit AttackPaid(id, msg.sender, msgHash, seq, fee);
@@ -500,12 +504,15 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function reportDefenderFault(bytes32 id) external onlyOperator nonReentrant {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
+        if (block.timestamp >= c.end) revert ContestExpired(id);
         _end(c, block.timestamp);
 
         address[] memory list = contestAttackers[id];
         _waiveAll(id, list);
 
         if (c.isMining) {
+            // 挖矿赛没有 S，但已铸余额必须清零，避免 W 结算后仍持仓。
+            _sweepWallet(c, treasury);
             emit DefenderFault(id);
             return;
         }

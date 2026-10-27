@@ -195,9 +195,7 @@ describe('Arena + Treasury', function () {
         .to.be.revertedWithCustomError(arena, 'OwnableUnauthorizedAccount');
       await expect(arena.setOperator(ethers.ZeroAddress))
         .to.be.revertedWithCustomError(arena, 'ZeroAddress');
-      await expect(arena.connect(owner).setOperator(outsider.address))
-        .to.emit(arena, 'OperatorUpdated')
-        .withArgs(outsider.address);
+      await arena.connect(owner).setOperator(outsider.address);
       expect(await arena.operator()).to.equal(outsider.address);
       expect(await arena.operator()).to.not.equal(operator.address);
     });
@@ -376,6 +374,25 @@ describe('Arena + Treasury', function () {
         arena.connect(operator).createMiningContest(walletSigner.address, RTM(1), BPS)
       ).to.be.revertedWithCustomError(arena, 'InvalidWallet');
     });
+
+    it('已结算 W 永不复用：expire 后 createContest / createMiningContest 均 BadParams', async function () {
+      const { arena, rtm, operator, defender, outsider, walletSigner } = game;
+      const { id, end } = await makeContest(game, { wallet: walletSigner.address });
+      await time.increaseTo(end);
+      await arena.connect(outsider).expire(id);
+
+      expect(await rtm.isTarget(walletSigner.address)).to.equal(false);
+      expect(await rtm.isControlledWallet(walletSigner.address)).to.equal(true);
+
+      await expect(
+        arena
+          .connect(operator)
+          .createContest(defender.address, walletSigner.address, STAKE, DURATION, BPS)
+      ).to.be.revertedWithCustomError(arena, 'BadParams');
+      await expect(
+        arena.connect(operator).createMiningContest(walletSigner.address, RTM(1), BPS)
+      ).to.be.revertedWithCustomError(arena, 'BadParams');
+    });
   });
 
   // ==================================================================
@@ -392,10 +409,6 @@ describe('Arena + Treasury', function () {
         .to.emit(arena, 'Joined')
         .withArgs(id, attackerA.address, s);
 
-      const info = await arena.attackers(id, attackerA.address);
-      expect(info.stake).to.equal(s);
-      expect(info.base).to.equal(STAKE);
-      expect(info.joined).to.equal(true);
       expect(await arena.isRegisteredAttacker(id, attackerA.address)).to.equal(true);
       expect(await arena.isRegisteredAttacker(id, game.attackerB.address)).to.equal(false);
       expect(await rtm.balanceOf(attackerA.address)).to.equal(before - s);
@@ -446,7 +459,8 @@ describe('Arena + Treasury', function () {
         await arena.connect(w).join(id);
       }
 
-      expect(await arena.contestAttackers(id, 49)).to.equal(wallets[49].address);
+      expect(await arena.isRegisteredAttacker(id, wallets[0].address)).to.equal(true);
+      expect(await arena.isRegisteredAttacker(id, wallets[49].address)).to.equal(true);
 
       const w51 = new ethers.Wallet(ethers.hexlify(ethers.randomBytes(32)), ethers.provider);
       await owner.sendTransaction({ to: w51.address, value: ethers.parseEther('0.02') });
@@ -469,20 +483,41 @@ describe('Arena + Treasury', function () {
         .to.emit(arena, 'AttackPaid')
         .withArgs(id, attackerA.address, h1, 1n, fee);
       expect(await rtm.balanceOf(treasury.target)).to.equal(before + fee);
-      expect(await arena.paidFee(id, attackerA.address, h1)).to.equal(fee);
+      expect(await arena.usedMsg(id, attackerA.address, h1)).to.equal(true);
 
       await expect(arena.connect(attackerA).attack(id, h2))
         .to.emit(arena, 'AttackPaid')
         .withArgs(id, attackerA.address, h2, 2n, fee);
-      expect((await arena.attackers(id, attackerA.address)).attackCount).to.equal(2n);
 
       await expect(arena.connect(attackerA).attack(id, h1))
-        .to.be.revertedWithCustomError(arena, 'DuplicateMessage')
-        .withArgs(h1);
+        .to.be.revertedWithCustomError(arena, 'BadParams');
       await expect(arena.connect(attackerA).attack(id, ethers.ZeroHash))
         .to.be.revertedWithCustomError(arena, 'BadParams');
       await expect(arena.connect(attackerB).attack(id, ethers.id('msg-3')))
         .to.be.revertedWithCustomError(arena, 'NotJoined');
+    });
+
+    it('到期后 expire 前：join / attack / reportDefenderFault 均 ContestExpired', async function () {
+      const { arena, operator, outsider, attackerA, attackerB, defender } = game;
+      const { id, end } = await makeContest(game);
+      await joinAs(game, attackerA, id);
+      await time.increaseTo(end);
+
+      await expect(joinAs(game, attackerB, id))
+        .to.be.revertedWithCustomError(arena, 'ContestExpired')
+        .withArgs(id);
+      await expect(arena.connect(attackerA).attack(id, ethers.id('late-msg')))
+        .to.be.revertedWithCustomError(arena, 'ContestExpired')
+        .withArgs(id);
+      await expect(arena.connect(operator).reportDefenderFault(id))
+        .to.be.revertedWithCustomError(arena, 'ContestExpired')
+        .withArgs(id);
+      expect(await arena.contestState(id)).to.equal(1n);
+
+      await expect(arena.connect(outsider).expire(id))
+        .to.emit(arena, 'Expired')
+        .withArgs(id, defender.address, STAKE);
+      expect(await arena.contestState(id)).to.equal(2n);
     });
 
     it('attack：暂停中/结束后拒绝；fee 为 0 时拒绝', async function () {
@@ -529,7 +564,6 @@ describe('Arena + Treasury', function () {
       await expect(arena.connect(operator).markDelivered(id, attackerA.address))
         .to.emit(arena, 'MarkDelivered')
         .withArgs(id, attackerA.address, 1n);
-      expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(1n);
       await expect(arena.connect(operator).markDelivered(id, attackerA.address))
         .to.be.revertedWithCustomError(arena, 'NothingToMark');
 
@@ -537,7 +571,6 @@ describe('Arena + Treasury', function () {
       await expect(arena.connect(operator).markDelivered(id, attackerA.address))
         .to.emit(arena, 'MarkDelivered')
         .withArgs(id, attackerA.address, 2n);
-      expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(2n);
     });
 
     it('pause/unpause：仅 operator、重复 pause / 未暂停 unpause 拒绝', async function () {
@@ -857,18 +890,8 @@ describe('Arena + Treasury', function () {
       expect(await rtm.balanceOf(defender.address)).to.equal(defBefore);
       expect(await arena.contestState(id)).to.equal(2n);
 
-      const infoA = await arena.attackers(id, attackerA.address);
-      const infoB = await arena.attackers(id, attackerB.address);
-      const infoC = await arena.attackers(id, outsider.address);
-      expect(infoA.delivered).to.equal(2n);
-      expect(infoB.delivered).to.equal(1n);
-      expect(infoC.delivered).to.equal(0n);
-      expect(infoA.waived).to.equal(true);
-      expect(infoB.waived).to.equal(true);
-      expect(infoC.waived).to.equal(true);
-      expect(infoA.penaltyTaken).to.equal(RTM(2.5));
-      expect(infoB.penaltyTaken).to.equal(RTM(2.5));
-      expect(infoC.penaltyTaken).to.equal(RTM(2.5));
+      // delivered 权重已由 2:1:0 的 S 分配验证；waived 与 penaltyTaken 由
+      // collect 失败和 below 的 stakeLeft 提款金额验证。
       expect(await arena.penaltyDue(id, attackerA.address)).to.equal(0n);
 
       await time.increase(4n * HOUR);
@@ -910,8 +933,8 @@ describe('Arena + Treasury', function () {
         .to.be.revertedWithCustomError(arena, 'NothingToWithdraw');
     });
 
-    it('弃权 mining：不分 S、不扫 W，攻方自行提质押', async function () {
-      const { arena, rtm, operator, attackerA, walletSigner } = game;
+    it('弃权 mining：不分 S，但 W 已铸余额清零进 Treasury', async function () {
+      const { arena, rtm, treasury, operator, attackerA, walletSigner } = game;
       const { id } = await makeMining(game, { rate: RTM(2) });
       await time.increase(2n * HOUR);
       await arena.accrue(id);
@@ -921,15 +944,31 @@ describe('Arena + Treasury', function () {
       await joinAs(game, attackerA, id);
       const s = (RTM(2) * BigInt(BPS)) / 10000n;
       const aBefore = await rtm.balanceOf(attackerA.address);
+      const tBefore = await rtm.balanceOf(treasury.target);
 
       await arena.connect(operator).reportDefenderFault(id);
-      expect(await rtm.balanceOf(walletSigner.address)).to.equal(wBefore);
+      expect(await rtm.balanceOf(walletSigner.address)).to.equal(0n);
+      expect(await rtm.balanceOf(treasury.target)).to.equal(tBefore + wBefore);
       expect(await rtm.balanceOf(attackerA.address)).to.equal(aBefore);
       expect(await arena.contestState(id)).to.equal(2n);
 
       await expect(arena.connect(attackerA).withdrawStake(id))
         .to.emit(arena, 'StakeWithdrawn')
         .withArgs(id, attackerA.address, s);
+    });
+
+    it('mining 弃权零余额仍成功，跳过零额 controllerTransfer', async function () {
+      const { arena, rtm, treasury, operator, wallet2Signer } = game;
+      const { id } = await makeMining(game, { wallet: wallet2Signer.address, rate: RTM(1) });
+      expect(await rtm.balanceOf(wallet2Signer.address)).to.equal(0n);
+      const tBefore = await rtm.balanceOf(treasury.target);
+
+      await expect(arena.connect(operator).reportDefenderFault(id))
+        .to.emit(arena, 'DefenderFault')
+        .withArgs(id);
+      expect(await rtm.balanceOf(wallet2Signer.address)).to.equal(0n);
+      expect(await rtm.balanceOf(treasury.target)).to.equal(tBefore);
+      expect(await arena.contestState(id)).to.equal(2n);
     });
   });
 
@@ -953,10 +992,10 @@ describe('Arena + Treasury', function () {
       await expect(arena.accrue(id))
         .to.be.revertedWithCustomError(arena, 'NothingToWithdraw');
 
-      await joinAs(game, attackerA, id);
-      const info = await arena.attackers(id, attackerA.address);
-      expect(info.base).to.equal(rate);
-      expect(info.stake).to.equal((rate * BigInt(BPS)) / 10000n);
+      const s = (rate * BigInt(BPS)) / 10000n;
+      await expect(joinAs(game, attackerA, id))
+        .to.emit(arena, 'Joined')
+        .withArgs(id, attackerA.address, s);
 
       const fee = (rate * 50n) / 10000n;
       const feeBefore = await rtm.balanceOf(treasury.target);
@@ -1043,6 +1082,7 @@ describe('Arena + Treasury', function () {
       const h1 = ethers.id('refund-me');
       await arena.connect(attackerA).attack(id, h1);
       const fee = (STAKE * 50n) / 10000n;
+      expect(await arena.usedMsg(id, attackerA.address, h1)).to.equal(true);
 
       await expect(arena.connect(operator).refundUnserved(id, attackerA.address, h1))
         .to.be.reverted; // Treasury 尚未授权 Arena
@@ -1057,13 +1097,17 @@ describe('Arena + Treasury', function () {
         .to.emit(arena, 'RefundUnserved')
         .withArgs(id, attackerA.address, h1, fee);
       expect(await rtm.balanceOf(attackerA.address)).to.equal(aBefore + fee);
-      expect(await arena.paidFee(id, attackerA.address, h1)).to.equal(0n);
+      expect(await arena.usedMsg(id, attackerA.address, h1)).to.equal(true);
       expect(await rtm.allowance(treasury.target, arena.target)).to.equal(0n);
 
       await expect(arena.connect(operator).refundUnserved(id, attackerA.address, h1))
         .to.be.revertedWithCustomError(arena, 'NothingToRefund');
       await expect(arena.connect(attackerA).refundUnserved(id, attackerA.address, h1))
         .to.be.revertedWithCustomError(arena, 'NotOperator');
+
+      // 退款只清 paidFee，不清 usedMsg：同一 hash 不得再次付费。
+      await expect(arena.connect(attackerA).attack(id, h1))
+        .to.be.revertedWithCustomError(arena, 'BadParams');
     });
 
     it('Treasury：withdraw / approveSpender 仅 owner，forceApprove 可覆盖额度', async function () {
