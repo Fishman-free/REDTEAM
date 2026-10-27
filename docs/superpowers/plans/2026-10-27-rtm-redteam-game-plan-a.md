@@ -407,7 +407,9 @@ contract ArenaStub {
 4. 靶**自己** `transfer(arena, …)` revert（新增控制器调用方检查）；
 5. 只有 stub 调用 `controllerSend(rtm, target, to, amount)`（内部走 `controllerTransfer`）才放行且不需要 allowance，并注销靶；
 6. 注销后靶恢复普通钱包，可转给任意第三方；
-7. `mint`、`controllerTransfer`、`registerTarget` 非 Arena 调用分别 revert `NotMinter` / `NotArena` / `NotArena`。
+7. `mint`、`controllerTransfer`、`registerTarget` 非 Arena 调用分别 revert `NotMinter` / `NotArena` / `NotArena`；
+8. 注册 minter 自身 revert `InvalidTarget`；重复注册 revert `AlreadyTarget`；非靶 unregister 幂等 no-op；
+9. controllerTransfer 从非受控地址 revert `NotControlledWallet`；amount=0 revert `ZeroAmount`；注销后的受控钱包仍可被 controllerTransfer 划转。
 
 - [ ] **步骤 2：运行测试验证失败**
 
@@ -441,6 +443,8 @@ contract RTMToken is ERC20, Ownable {
 
     /// @notice 靶钱包 => 所在比赛 id（bytes32(0) 表示非靶）。
     mapping(address => bytes32) public targetContest;
+    /// @notice 曾注册为靶的受控钱包；controllerTransfer 只能划转这些地址。
+    mapping(address => bool) public isControlledWallet;
     /// @notice Arena 合约（即 minter，单独存储便于类型化调用）。
     IRTMArena public immutable arena;
 
@@ -455,6 +459,9 @@ contract RTMToken is ERC20, Ownable {
     error ZeroAmount();
     error TargetTransferRestricted(address from, address to);
     error InvalidContestId();
+    error InvalidTarget();
+    error AlreadyTarget();
+    error NotControlledWallet();
     error NotArena();
 
     constructor(address initialOwner, address arena_)
@@ -471,14 +478,18 @@ contract RTMToken is ERC20, Ownable {
     function registerTarget(address wallet, bytes32 contestId) external {
         if (msg.sender != minter) revert NotArena();
         if (wallet == address(0)) revert ZeroAddress();
+        if (wallet == minter) revert InvalidTarget();
         if (contestId == bytes32(0)) revert InvalidContestId();
+        if (targetContest[wallet] != bytes32(0)) revert AlreadyTarget();
         targetContest[wallet] = contestId;
+        isControlledWallet[wallet] = true;
         emit TargetRegistered(wallet, contestId);
     }
 
     function unregisterTarget(address wallet) external {
         if (msg.sender != minter) revert NotArena();
         bytes32 id = targetContest[wallet];
+        if (id == bytes32(0)) return; // 幂等 no-op
         delete targetContest[wallet];
         emit TargetUnregistered(wallet, id);
     }
@@ -503,6 +514,8 @@ contract RTMToken is ERC20, Ownable {
     function controllerTransfer(address from, address to, uint256 amount) external {
         if (msg.sender != minter) revert NotArena();
         if (from == address(0) || to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (!isControlledWallet[from]) revert NotControlledWallet();
         bytes32 contestId = targetContest[from];
         if (contestId != bytes32(0)) {
             delete targetContest[from];
@@ -553,9 +566,26 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 ## 任务 4：Arena 合约（比赛全生命周期）
 
 **文件：**
-- 创建：`contracts/src/Arena.sol`
+- 创建：`contracts/src/Arena.sol`、`contracts/src/Treasury.sol`
 - 删除：`contracts/src/ArenaStub.sol`
-- 测试：`contracts/test/rtm-game.test.js`（扩展 deployGame helper 与端到端用例）
+- 测试：`contracts/test/rtm-game.test.js`（扩展端到端用例）
+
+**实现修订（2026-10-27，安全审查后，强制以此为准；下方代码块是草稿，含已知缺陷，不得照抄）**
+
+1. `createContest(defender, wallet, S, D, r)` **仅 operator**：平台完成资格测试后调用；校验 wallet 非零/非 minter/非已注册靶；`transferFrom(defender→W, S)`；同交易注册靶。守方只 approve S，不能自行传任意 wallet（否则可注册受害者并扫余额）。
+2. `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；记录 `stakeBps=r`；`end=max`。
+3. `Attacker` 记账字段：`stake, base(feeBase), joinedAt, pausedAtJoin, attackCount, delivered, penaltyTaken, stakeWithdrawn, waived, joined`。`base` 在 join 时快照（normal=S，mining=W 余额）；`s=base·r/10000`。
+4. `Contest` 增加 `endedAt`；**所有结束路径**（breach/expire/fault）设置 `endedAt`，`_elapsed` 用 `min(now, end, endedAt)` 冻结时间；`_pow75(k)` 用平方-乘 O(log k)，禁止 O(k) 循环。
+5. `attack`：`seq=++attackCount`；`fee=feeBase·0.5%`；`paidFee[id][attacker][msgHash]` 记录并拒绝重复 hash；fee 转 Treasury；暂停中 revert。挖矿赛费率不得为 0。
+6. `markDelivered`：仅 operator；要求已加入且 `delivered < attackCount`。
+7. `refundUnserved`：仅按 `paidFee` 精确退款（Treasury 需 `approveSpender(Arena)`），清零记录、幂等；删除占位行。
+8. 罚款记账：`accrued = s − s·(3/4)^k`；`collectPenalties` 的 `due = accrued − penaltyTaken`；`withdrawStake` 用 `stakeWithdrawn` 独立记账。normal 到期/攻破：攻击方提 `s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后收取；fault：`waived=true`，提 `s − penaltyTaken − stakeWithdrawn`（未拉取罚款豁免，已拉走不退）。
+9. `reportDefenderFault`：仅 operator；normal 按 delivered 分 S（无 delivered 退 defender）；mining 只结束并允许提款，不再分 S；先设 `endedAt`。
+10. `expire`/`onBreach`：先设 `endedAt`；`onBreach` 仅 RTMToken 可调，W 剩余余额用 `rtm.controllerTransfer` 给 winner；Arena 发 `ContestSettled`（不要与 Token 的 `Breach` 同名）。
+11. 删除 Arena 里的 `controllerTransfer` helper；所有结算直接 `rtm.controllerTransfer(from,to,amount)`。Treasury 用 SafeERC20，并提供 `approveSpender(token, spender, amount)`（owner）。
+12. `pause/unpause`：`_elapsed` 与 `accrue` 必须扣除**进行中**的暂停时间；暂停冻结罚款与挖矿时钟。
+13. `mintForTest`：Arena 构造器带 `testnet` 不可变标志，只有 `testnet=true` 可调用；主网 false，唯一增发是 `accrue`。测试网部署脚本传 true。
+14. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款。
 
 - [ ] **步骤 1：扩展测试（先写失败端到端）**
 

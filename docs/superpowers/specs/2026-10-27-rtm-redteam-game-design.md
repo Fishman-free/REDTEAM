@@ -106,6 +106,7 @@ if (isActiveTarget(from)) {
 - **检测规则即结算规则**：用户要求的"检测到守方向攻方转移即结束比赛"由代币在转账交易内原子完成：注销 W → 把 W 全部余额经控制器划给获胜攻方 → 记录 `Breach` 事件。没有链下裁判窗口，没有竞态。
 - 入金不受限；**任何转出**（包括转给其他比赛的靶钱包）仅两个合法去向：该场注册攻方，或 Arena 的 `controllerTransfer`。比赛结束（破/到期/弃权）即注销，恢复普通钱包。
 - **零金额转账不构成攻破**：活跃靶的任何 0 值转出同样 revert，防止用 0 RTM 触发"攻破"白拿奖池。
+- **注册与受控钱包**：`registerTarget` 拒绝 minter 自身与已注册靶；重复注册必须先 `unregisterTarget`。Token 维护"曾注册为靶"的受控钱包集合，`controllerTransfer` 只能划转受控钱包（含已注销的 W），不能移动任意用户余额；非靶 `unregisterTarget` 为幂等 no-op。
 - **结算/退款/赎回走独立的 `controllerTransfer(from, to, amount)`（仅 minter 可调）**：它绕过靶策略并在必要时注销靶，是 Arena 移动 W 资金的唯一入口；`from` 与 `to` 均不得为零地址。Arena 不得依赖 `transferFrom` + allowance 移动 W 资金；靶钱包自行向 Arena 转账同样 revert（即使 Arena 被误登记为攻方），防止被诱导"转账到 Arena"绕过结算、留下无靶的活跃比赛。
 - 守方向"非该场攻方"转账（比如守方换小号想私下转走）被代币 revert——这就是"测试币标记"的实现。
 - 挖矿赛与普通赛共用同一套逻辑，defender = 平台金库地址。
@@ -130,12 +131,13 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 
 ### 3.6 红队挖矿（持续发币 + RSI 难度递增）
 
-1. 平台部署自有智能体（DefensePackage v1）开**挖矿赛**：defender = 金库，无到期时间，奖池由铸币补充。
-2. 任何人 `accrue(contestId)`：每满 E（2h）线性铸 `E_rate` RTM 进 W，任何人可触发（免 keeper）。
-3. 矿工按攻方规则加入、罚款（挖矿赛罚款归金库，覆盖平台自付推理费）、付费发消息。
+1. 平台部署自有智能体（DefensePackage v1）开**挖矿赛**：defender = 金库，无到期时间，奖池由铸币补充；创建时同时设定矿工质押比例 r（默认 10%）。
+2. 任何人 `accrue(contestId)`：每满 E（2h）线性铸 `E_rate` RTM 进 W，任何人可触发（免 keeper）；暂停期间冻结铸币时钟。
+3. 矿工按攻方规则加入、罚款（挖矿赛罚款归金库，覆盖平台自付推理费）、付费发消息。**手续费与罚款基数 = 加入时 W 余额**（不是创建时的 0），因此挖矿赛不存在"0 手续费"漏洞；每个攻方加入时快照该基数。
 4. 攻破后：平台收集该赛全部记录 → `rsi_export` 导出 findings → 离线跑修复闭环（复用 `campaign_repair.repair_round` 修复门禁 + `role_memory` 技能沉淀）→ 产出新 DefensePackage → 开新挖矿赛。
 5. **难度递增不靠人工调参**：同一攻击模式沉淀为技能后，对旧版本有效、对新版本无效，矿工需要真正的增量攻击；难度由历史攻破率和承受消息数在排行榜上可见。
 6. **减半机制删除**：RTMToken 不再有 `yearBudget`/`mintedByYear`；总供给无上限，速率由 `E_rate` 单点控制（可经治理调整）。
+7. **测试网注水与主网增发隔离**：Arena 的 `mintForTest` 仅在 `testnet=true` 部署可用（水龙头/测试初始余额）；主网部署 `testnet=false`，唯一增发路径是挖矿 `accrue`。
 
 ### 3.7 数据市场
 
@@ -169,33 +171,47 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 ### 4.1 RTMToken.sol（重写）
 
 - ERC-20（`_update` 覆写）+ `Ownable`。无预铸。minter = Arena（部署时绑定，同旧版约束：minter 必须有代码）。
-- 靶注册表：`registerTarget(W, contestId)` / `unregisterTarget(W)` 仅 Arena 可调；`contestId` 不得为 `bytes32(0)`（非靶哨兵）。
+- 靶注册表：`registerTarget(W, contestId)` / `unregisterTarget(W)` 仅 Arena 可调；`contestId` 不得为 `bytes32(0)`（非靶哨兵）；拒绝 minter 自身与已注册靶；注册时把 W 记入 `isControlledWallet`。
 - 攻方集合查询 `isRegisteredAttacker(contestId, addr)` 委托 Arena。
 - `onBreach` 回调（仅 Arena）：结束比赛并控制器划转（CEI 顺序：先状态后转账）。
-- `controllerTransfer(from, to, amount)` 仅 minter：结算/退款/赎回的唯一资金划转入口，绕过靶策略并在必要时注销靶；`from`/`to` 不得为零地址，Arena 不得依赖 allowance 的 `transferFrom` 移动 W 资金。
+- `controllerTransfer(from, to, amount)` 仅 minter：结算/退款/赎回的唯一资金划转入口，绕过靶策略并在必要时注销靶；`from`/`to` 不得为零地址、amount 不得为 0、`from` 必须是 `isControlledWallet`（曾注册为靶的 W），因此不能划转任意用户余额；Arena 不得依赖 allowance 的 `transferFrom` 移动 W 资金。
 - 铸币：`mint(to, amount)` 仅 minter，无年份预算（**减半删除**）；`miningRate` 等参数放 Arena。
 - 事件：`TargetRegistered/TargetUnregistered/Breach`；错误：`TargetTransferRestricted/NotMinter/...`。
 - 不变量：靶活跃期间 W 的任何转出仅两个去向（注册攻方→触发 onBreach；Arena→控制器划转）；否则转账 revert。
 
 ### 4.2 Arena.sol（新，核心）
 
-状态：`contests{defender, wallet W, S, r, D, start, end, state(live/ended), attackerCount, prizePaid, penaltyPaidOut, msgPaidCount[], pausedTotal, lastPauseAt}`；`attackers{stake s, joinedAt, pausedAtJoin, deliveredCount, withdrawn}`；挖矿赛标记与 `E_rate`。
+状态：
 
-函数：
-- `createContest(S, D, r)`：守方 approve 后调用；`transferFrom` 拉入 W；同交易注册靶。挖矿赛版本 `createMiningContest(E_rate)` 仅平台操作员。
-- `join(contestId)`：`transferFrom(s = r·S)`；每地址一次；50 人上限；记录 joinedAt 与暂停快照。
-- `attack(contestId, msgHash)`：付费 f=0.5%×S 转 Treasury；发 `AttackPaid(attacker, msgHash, seq)`；内容不上链（链下 runner 凭 txHash+hash 对账）。
-- `markDelivered(attacker, contestId)`（runner 操作员）：递增 deliveredCount（弃权分配权重）。
-- `collectPenalties(contestId)`（守方）：按各攻方 `remaining − 已付` 差额结算（pull）。
-- `pause()/unpause()`（平台）：累计 pausedTotal，冻结所有时钟。
-- `reportDefenderFault(contestId)`（runner 操作员）：S 按各攻方 deliveredCount 加权分配；攻方可提 `s − 已被守方拉走的部分`；发 `DefenderFault` 事件。
-- `onBreach(contestId, winner)`（由 RTMToken 回调）：settle——W 余额控制器划给 winner；注销靶；发 `Breach(contestId, winner, amount)`。
-- `expire(contestId)`：到期未破，W 余额划回守方；攻方提剩余。
-- `withdrawMyStake(attacker, contestId)`：pull 提款（ended 后）；对**所有攻方**（含获胜者）开放，返回 `s − 已罚没`，不与奖金互斥。
-- `accrue(contestId)`：挖矿赛按 `floor(elapsed/E)×E_rate − 已铸` 铸币进 W。
-- `refundUnserved(attacker, contestId, seq)`（runner 操作员）：平台未能送达的付费消息按 seq 退手续费（幂等，防重复退）。
+```
+Contest { defender, wallet W, stake S, stakeBps r, start, end, endedAt,
+          state(None/Live/Ended), isMining, attackerCount,
+          pausedTotal, lastPauseAt, miningRate, miningMinted }
+Attacker { stake s, base(加入时 S 或 W 余额), joinedAt, pausedAtJoin,
+           attackCount, delivered, penaltyTaken, stakeWithdrawn,
+           waived, joined }
+paidFee[contestId][attacker][msgHash]
+```
 
-安全：`ReentrancyGuard`；全部 checks-effects-interactions；靶划转走控制器而非直接 transfer（避免靶注册中途被绕过）；任何路径资金只增不减、可全额追回（除已被守方拉走的罚款）。
+函数（2026-10-27 实现契约修订，**以此为准**）：
+
+- `createContest(defender, wallet, S, D, r)` **仅 operator**：平台在资格测试通过后调用（W 由平台生成并托管）。校验 wallet 非零、非 minter、非已注册靶；`transferFrom(defender → W, S)`；同交易 `registerTarget(W, id)`。**守方不能自行传入任意 wallet**——这是防止"把受害者地址注册为靶后用 expire 扫走余额"的关键。
+- `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；无 S；记录 `stakeBps=r`；`end=type(uint64).max`。
+- `join(id)`：`base = isMining ? rtm.balanceOf(W) : S`；`s = base·r/10000`；记录 `base` 作为该攻方的 `feeBase`；`transferFrom(s → Arena)`；每地址一次、50 人上限、暂停快照。
+- `attack(id, msgHash)`：仅 Live 且未暂停；`seq = ++attackCount`；`fee = feeBase·0.5%`；`paidFee[id][msg][msgHash]` 记录并拒绝重复 hash；fee 转 Treasury；发 `AttackPaid`。挖矿赛的 feeBase 是加入时 W 余额，不允许为 0 费率。
+- `markDelivered(id, attacker)`（operator）：要求已加入且 `delivered < attackCount`；`delivered++`。
+- `refundUnserved(id, attacker, msgHash)`（operator）：只按 `paidFee` 记录的金额退款（Treasury 先 `approveSpender(Arena)`），清零记录，幂等；未送达消息才可退。
+- `collectPenalties(id)`：`accrued = s − s·(3/4)^k`（k 以 `endedAt` 冻结）；`due = accrued − penaltyTaken`；normal 转给 defender，mining 转给 Treasury；可重复调用拉差额。
+- `pause/unpause`（operator）：累计 pausedTotal，冻结罚款与挖矿时钟；`_elapsed` 必须扣除**进行中**的暂停（`lastPauseAt != 0` 时加上 `now − lastPauseAt`）。
+- `reportDefenderFault(id)`（operator）：设置 `endedAt`；normal 按各攻方 delivered 分配 S（无 delivered 则 S 退 defender）；mining 不再分 S，仅结束并允许攻方提款；弃权路径**豁免未拉取罚款**（`waived=true`），攻方提 `s − penaltyTaken − stakeWithdrawn`，已拉走罚款不追回。
+- `onBreach(id, winner)`（仅 RTMToken）：设置 `endedAt`；W 剩余余额 `controllerTransfer` 给 winner；Arena 发 `ContestSettled` 事件（避免与 Token 的 `Breach` 同名重复计数）。
+- `expire(id)`：任何人可调；到期后设置 `endedAt`、`unregisterTarget`、把 W 余额 `controllerTransfer` 给 defender。
+- `withdrawStake(id)`：仅 Ended；normal（到期/攻破）`amount = s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后 `collectPenalties`；fault（waived）`amount = s − penaltyTaken − stakeWithdrawn`；对获胜者同样开放，不与奖金互斥。
+- `accrue(id)`：挖矿赛有效时间扣除暂停；`due = floor(effective/E)·E_rate − miningMinted`；mint 到 W；任何人可触发。
+- **测试网注水**：Arena 构造器带 `testnet` 不可变标志；`mintForTest` 仅当 `testnet=true` 可用；主网 `false`，唯一增发仍是 `accrue`。
+- `_pow75(k)` 用平方-乘实现 O(log k)，**禁止 O(k) 循环**（挖矿赛 k 无上界）。
+
+安全：`ReentrancyGuard`；全部 checks-effects-interactions；结算只动 RTMToken 的受控钱包（`isControlledWallet`），Arena 不持有任意用户资金；所有外部转账在状态更新后；Arena 的 `controllerTransfer` 直接调用 Token 的 `controllerTransfer`，不使用 `transferFrom` + allowance。
 
 ### 4.3 Faucet.sol（测试网）
 
@@ -214,7 +230,8 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 
 ### 4.5 Treasury.sol（新）
 
-- 收集消息手续费、数据销售款、挖矿赛罚款；`withdraw(owner)`；升级路线：owner 换多签。
+- 收集消息手续费、数据销售款、挖矿赛罚款；`withdraw(token, to, amount)`（owner）；升级路线：owner 换多签。
+- `approveSpender(token, spender, amount)`（owner）：允许 Arena 从 Treasury 精确退还未送达消息费（`refundUnserved`），额度由平台控制。
 
 ### 4.6 保留与归档
 
@@ -230,7 +247,9 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 5. pause：时钟冻结（暂停期间 elapsed 不增），恢复后继续。
 6. 不变式 fuzz：任何操作序列下 Σ托管资金可全额追回；controller-sweep 仅 Arena 可触发；无重入路径。
 7. 边界：50 人上限、每地址一次、消息费精确、D 上下限、r 上下限。
-8. 挖矿：accrue 线性、重复 accrue 幂等、并发挖矿赛上限 K。
+8. 挖矿：accrue 线性、重复 accrue 幂等、暂停冻结、手续费基数=加入时 W 余额、并发挖矿赛上限 K；`testnet=false` 时 `mintForTest` revert。
+9. 注册与结算边界：`createContest` 非 operator revert；wallet 不能是 minter/已注册靶；重复注册 revert；`controllerTransfer` 只能划受控钱包；零金额/零地址拒绝；`unregisterTarget` 非靶幂等。
+10. 记账与冻结：`endedAt` 后时间旅行不再增加罚款；到期未拉取罚款仍可由 defender 收取；弃权豁免未拉取罚款；`penaltyTaken`/`stakeWithdrawn` 双账本不重复提款；`refundUnserved` 只按 `paidFee` 精确退且幂等。
 
 ---
 
@@ -257,7 +276,7 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 
 要点：
 - `channel=external` 永不打开 execution release（runtime 语义已保证，直接沿用）。
-- 资格测试 = 一轮 owner channel + `requests_execution=True` 的转账演练，必须成功才允许 `createContest`。
+- 资格测试 = 一轮 owner channel + `requests_execution=True` 的转账演练，必须成功才允许 `createContest`。`createContest` 由平台 operator 在资格测试后调用（守方只负责 approve S）；守方不能自行指定任意 wallet。
 - runner 操作员密钥独用于 `reportDefenderFault`/`markDelivered`/`publish`；pause 由运维多签流程触发。
 - 消息处理为同步收费、异步执行的短队列；runner 故障时消息可退费（链上 `refundUnserved`）。
 
