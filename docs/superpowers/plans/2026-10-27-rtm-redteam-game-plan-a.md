@@ -1697,7 +1697,7 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 > - custody 以 `Custody(vault_path, master_key_hex, scrypt_n=2**15)` 实例化，不沿用下方草稿的模块级全局 `VAULT_PATH`：AES-256-GCM + scrypt、AAD=entry_id、vault `{version,entries}`、临时文件 + fsync + `os.replace` 原子写、目录 0700/文件 0600 best effort、进程级 `RLock`，错误与日志不含 secret。
 > - chain 从 `contracts/artifacts/src/<Name>.sol/<Name>.json` 加载五个 ABI（缺文件提示先 `npx hardhat compile`）；`load_addresses` 只校验当前 `chainId` 与 treasury/arena/rtm/faucet/dataMarket 五个字段并 checksum，忽略旧字段；`ChainClient` 构造不联网，`verify_chain()` 才调用 `eth_chain_id` 比对。
 > - config 以 `Settings` dataclass 从环境变量 + `addresses.json` 解析并校验（不读取私钥）；keystore entry 只是引用名。
-> - **访问审计未实现**：任务 10 的 custody 不提供审计日志/表（规格 §6 的“访问审计”留待任务 12/14 在每次 `Custody.load/store/delete` 处记录，见对应任务修订）；不得把任务 10 描述为已完成审计。
+> - **custody 与审计边界**：任务 10 只提供 `Custody`（`store/load/delete`），不内置审计日志/表；任务 12/14 通过一个薄审计包装记录每次 `Custody.load/store/delete` 的结构化元数据（时间、action、entry_id、结果/调用上下文），绝不记录 secret；不得把任务 10 描述为已完成审计。
 
 **文件：**
 - 创建：`platform/pyproject.toml`、`platform/redteam_platform/{__init__.py,config.py,custody.py,chain.py}`
@@ -1790,7 +1790,7 @@ def test_wrong_master_key_fails(tmp_path, monkeypatch):
 
 - [ ] **步骤 3：config.py（白名单）与 chain.py（web3 连接）**
 
-`config.py`：`MODEL_ALLOWLIST = {"glm": {"base_url": "https://<glm-endpoint>/v1", "model": "glm-5.3"}, "qwen": {...}}`（具体端点以部署时环境为准，从 env 覆盖）；`CONTRACTS_JSON` 指向 `contracts/deploy/addresses.json`；`OPERATOR_KEY`（env，keystore 引用）。
+`config.py`：`MODEL_ALLOWLIST = {"glm": {"base_url": "https://<glm-endpoint>/v1", "model": "glm-5.3"}, "qwen": {...}}`（具体端点以部署时环境为准，从 env 覆盖）；`CONTRACTS_JSON` 指向 `contracts/deploy/addresses.json`；`OPERATOR_KEY_ENTRY`（env，keystore 引用名）。
 
 `chain.py`：`w3 = Web3(Web3.HTTPProvider(os.environ["CHAIN_RPC"]))`；`load_contracts() -> dict` 按 addresses.json 返回 web3.py Contract 对象（ABI 从 `contracts/artifacts/` 读取）。
 
@@ -2037,12 +2037,12 @@ git commit -m "feat(platform): hosted agent runner with real transfer tool"
 
 - `AgentSession` 增加 `is_mining` 与 `data_consent`：
   - 普通攻方 `dataConsent=true` 才持久化消息、回复、工具轨迹、snapshot；
-  - `dataConsent=false` 只做内存处理，**不写日志/证据/持久存储，不进入数据集**；
+  - `dataConsent=false` 只做内存处理，**不写日志/证据/持久存储，不进入数据集**（仅指攻方数据内容；custody 访问元数据审计不受此限，见下条）；
   - 矿工 `joinMining` 强制 `acceptData=true`，数据无条件持久化，**仅用于 RSI，不进入 DataMarket**。
 - 挖矿 `Breach`/`MiningSettled` 后 runner 立即停止该赛并拒绝新消息；`retireMining` 同样停服。普通用户赛不受影响。
 - 挖矿 fault/停赛走 `retireMining`，普通赛 fault 走 `reportDefenderFault`；不要对 mining 调旧 `reportDefenderFault` 分支。
 - runner/API 必须支持 `join(bytes32,uint256,bool)` 与 `joinMining(bytes32,bool)`，不得再引用 `approveSale`。
-- **custody 访问审计（未在任务 10 实现，规格 §6；不得声称已做）**：runner 在会话初始化与 `transfer_rtm` 工具路径中通过 `Custody.load()` 解密 W 私钥/守方 BYOK Key 时，必须写结构化审计事件 `{ts, actor(contest/runner), entry_id, wallet_address, purpose(qualification/message/transfer), result}`；只记录 entry 名与地址，绝不记录 secret 或明文私钥。runner 审计日志/表是任务 13/15 查询审计的落点。
+- **custody 访问审计（薄包装，规格 §6）**：任务 10 的 `Custody` 本身不写审计；任务 12 通过一个薄审计包装调用 `Custody.load/store/delete`，记录结构化元数据 `{ts, action, entry_id, result, context}`（runner 场景 context 含 contest/runner、wallet_address、purpose），只记录 entry 名/地址/结果，绝不记录 secret、明文私钥或攻方消息/回复/工具轨迹。`dataConsent=false` 的“不写日志/证据/持久存储”仅指攻方数据内容；custody 访问元数据审计属于平台安全审计，**不受此限制，仍可写**。审计日志由该包装落盘；v1 不提供审计查询 API（查询/运维接口留给任务 19/后续运维），不要声称由 indexer 或 FastAPI 提供审计查询。
 
 ---
 
@@ -2088,6 +2088,7 @@ git commit -m "feat(platform): event indexer and leaderboards"
 - 挖矿榜只统计 `MiningSettled` 的成功攻破次数与固定 1 RTM；不要用 `miningRate`/`accrue`/时间奖池。
 - 普通攻方数据是否可售由 `DataConsentRecorded` + `Arena.dataConsent` 判断；`publish` 只对普通赛。
 - `MiningRetired` 计入版本退役/未攻破统计，不增发。
+- 本任务只做链事件索引与排行榜，不承担 custody 访问审计；审计由任务 12/14 的薄包装落盘，v1 无审计查询接口。
 
 ---
 
@@ -2137,7 +2138,7 @@ git commit -m "feat(platform): faucet signer, data service, rsi export"
 - `publish` 只允许普通赛；`buyOwn`/`buyFromAttacker` 交付切片按规格 §4.4。
 - `rsi_export` 读取矿工数据（消息/回复/工具轨迹/snapshot），仅用于 RSI；不得导出到 DataMarket。
 - 新增 `MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded` 索引支持（与任务 13 对齐）。
-- **custody 访问审计（未在任务 10 实现，规格 §6；不得声称已做）**：`faucet_signer` 每次 `Custody.load(faucet_signer_entry)` 后签发票据，必须记录结构化审计事件 `{ts, entry_id, recipient, chain_id, ticket_count, result}`；`data_service`/`rsi_export` 只处理已落盘数据、不读取托管私钥，因此不产生 custody 访问；若后续经 data_service 取用 BYOK Key，必须复用同一审计表。审计不含 secret。
+- **custody 访问审计（薄包装，规格 §6）**：任务 14 复用任务 12 的同一薄审计包装记录 `Custody.load/store/delete` 的 `{ts, action, entry_id, result, context}`；`faucet_signer` 每次 `Custody.load(faucet_signer_entry)` 签票时 context 含 recipient/chain_id/ticket_count；`data_service`/`rsi_export` 只处理已落盘数据、不读取托管私钥，因此不产生 custody 访问；若后续经 data_service 取用 BYOK Key，必须复用同一包装。绝不记录 secret。`dataConsent=false` 的不落盘限制仅针对攻方数据内容，不豁免 custody 访问元数据审计。
 
 ---
 
@@ -2174,10 +2175,10 @@ def test_full_flow(client, fake_chain):
 - `GET /leaderboards`、`GET /contests`、`GET /contests/{id}`
 - `POST /faucet/ticket`（captcha → EIP-712 票据）
 - `POST /data/{contestId}/deliver`（监听 DataSold 后的下载授权；只对 dataConsent=true 的普通攻方数据/守方自有数据）
-- `POST /mining/contests`（**Treasury owner/多签/平台金库服务先预打款**：生成新 W 并 `treasury.withdraw(rtm, W, 1 RTM)`；**operator 只调用 `createMiningContest(wallet, defenseHash)`**。若 API 代执行预打款，必须使用 owner 权限并做 custody 审计，不能把 withdraw 权限交给 operator。**不新增 Treasury operator 拨款函数**；如需新增另开任务）
+- `POST /mining/contests`（**Treasury owner/多签/平台金库服务先预打款**：生成新 W 并 `treasury.withdraw(rtm, W, 1 RTM)`；**operator 只调用 `createMiningContest(wallet, defenseHash)`**。若 API 代执行预打款，必须使用 owner 权限并做 custody 审计（走任务 12/14 薄包装），不能把 withdraw 权限交给 operator。**不新增 Treasury operator 拨款函数**；如需新增另开任务）
 - `POST /mining/join-intent`（展示数据收集条款，返回 `joinMining(id,true)` 参数；无 approveSale）
 
-启动：`uvicorn platform.api:app`（`.env`：CHAIN_RPC/PLATFORM_MASTER_KEY/OPERATOR_KEY/FAUCET_SIGNER_KEY）。
+启动：`uvicorn redteam_platform.api:app`（`.env`：CHAIN_RPC/PLATFORM_MASTER_KEY/OPERATOR_KEY_ENTRY/FAUCET_SIGNER_ENTRY）。
 
 - [ ] **步骤 3：运行测试并 Commit**
 
@@ -2190,9 +2191,10 @@ git commit -m "feat(platform): FastAPI entrypoint for the contest game"
 ### 实现修订（2026-10-27 复审，join 同意/挖矿预打款）
 
 - 普通攻方 join 必须带 `data_consent`（true/false），不可撤回；矿工 `joinMining` 只能 `acceptData=true`，UI/条款先展示数据收集说明。
-- 挖矿赛创建前由 **Treasury owner/多签/平台金库服务**（不是 operator）`treasury.withdraw(rtm, W, 1 RTM)` 预打款，operator 只 `createMiningContest`；不要从 Treasury `transferFrom`，不要设 mining allowance。API 若代执行预打款，必须 owner 权限 + custody 审计。预打款前校验 hash/K；create revert 后 1 RTM 留在 W，用 W 私钥/owner 转回 Treasury。
+- 挖矿赛创建前由 **Treasury owner/多签/平台金库服务**（不是 operator）`treasury.withdraw(rtm, W, 1 RTM)` 预打款，operator 只 `createMiningContest`；不要从 Treasury `transferFrom`，不要设 mining allowance。API 若代执行预打款，必须 owner 权限 + custody 审计（任务 12/14 薄包装）。预打款前校验 hash/K；create revert 后 1 RTM 留在 W，用 W 私钥/owner 转回 Treasury。
 - DataMarket 无 `approveSale`；`buyFromAttacker` 由链上读取 `Arena.dataConsent`，未同意 `NotConsented`。
 - leaderboard/indexer 必须消费 `MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded`；挖矿榜按固定 1 RTM/成功攻破，不按时间。
+- v1 不提供 custody 审计查询 API；custody 访问审计由任务 12/14 的薄包装落盘，查询/运维接口留到任务 19 或后续运维，不新增未定义表/路由。
 
 ---
 
@@ -2291,7 +2293,7 @@ git commit -m "feat(dapp): React+wagmi dApp with contest, faucet, leaderboard pa
 ```bash
 cd infra/besu-testnet && docker compose up -d
 cd ../../contracts && DEPLOY_ALLOW_REDEPLOY=1 npx hardhat run deploy/deploy-testnet.js --network besu-testnet
-cd ../platform && uvicorn platform.api:app &  # + stub model server
+cd ../platform && uvicorn redteam_platform.api:app &  # + stub model server
 python -m pytest tests/e2e_testnet.py --run-e2e -v
 ```
 
