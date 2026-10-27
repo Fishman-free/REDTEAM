@@ -198,13 +198,13 @@ paidFee[contestId][attacker][msgHash]
 
 - `createContest(defender, wallet, S, D, r)` **仅 operator**：平台在资格测试通过后调用（W 由平台生成并托管）。校验 wallet 非零、非 minter、非已注册靶；`transferFrom(defender → W, S)`；同交易 `registerTarget(W, id)`。**守方不能自行传入任意 wallet**——这是防止"把受害者地址注册为靶后用 expire 扫走余额"的关键。
 - `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；无 S；记录 `stakeBps=r`；`end=type(uint64).max`。
-- `join(id)`：`base = isMining ? rtm.balanceOf(W) : S`；`s = base·r/10000`；记录 `base` 作为该攻方的 `feeBase`；`transferFrom(s → Arena)`；每地址一次、50 人上限、暂停快照。
-- `attack(id, msgHash)`：仅 Live 且未暂停；`seq = ++attackCount`；`fee = feeBase·0.5%`；`paidFee[id][msg][msgHash]` 记录并拒绝重复 hash；fee 转 Treasury；发 `AttackPaid`。挖矿赛的 feeBase 是加入时 W 余额，不允许为 0 费率。
+- `join(id)`：仅 Live 且 `now < end`；`base = isMining ? rtm.balanceOf(W) : S`；`s = base·r/10000`；记录 `base` 作为该攻方的 `feeBase`；`transferFrom(s → Arena)`；每地址一次、50 人上限、暂停快照。
+- `attack(id, msgHash)`：仅 Live、`now < end` 且未暂停；`seq = ++attackCount`；`fee = feeBase·0.5%`；`usedMsg[id][msg][msgHash]` 永久防重（退款后也不可复用），`paidFee` 记录可退金额；fee 转 Treasury；发 `AttackPaid`。挖矿赛的 feeBase 是加入时 W 余额，不允许为 0 费率。
 - `markDelivered(id, attacker)`（operator）：要求已加入且 `delivered < attackCount`；`delivered++`。
 - `refundUnserved(id, attacker, msgHash)`（operator）：只按 `paidFee` 记录的金额退款（Treasury 先 `approveSpender(Arena)`），清零记录，幂等；未送达消息才可退。
 - `collectPenalties(id)`：`accrued = s − s·(3/4)^k`（k 以 `endedAt` 冻结）；`due = accrued − penaltyTaken`；normal 转给 defender，mining 转给 Treasury；可重复调用拉差额。
 - `pause/unpause`（operator）：累计 pausedTotal，冻结罚款与挖矿时钟；`_elapsed` 必须扣除**进行中**的暂停（`lastPauseAt != 0` 时加上 `now − lastPauseAt`）。
-- `reportDefenderFault(id)`（operator）：设置 `endedAt`；normal 按各攻方 delivered 分配 S（无 delivered 则 S 退 defender）；每个 share 为 0 时跳过，不得调用零额划转；mining 不再分 S，仅结束并允许攻方提款；弃权路径**豁免未拉取罚款**（`waived=true`），攻方提 `s − penaltyTaken − stakeWithdrawn`，已拉走罚款不追回。
+- `reportDefenderFault(id)`（operator）：仅 Live 且 `now < end`；设置 `endedAt`；normal 按各攻方 delivered 分配 S（无 delivered 则 S 退 defender）；每个 share 为 0 时跳过，不得调用零额划转；mining 不再分 S，但要把 W 中已铸余额 `controllerTransfer` 回 Treasury 并结束；弃权路径**豁免未拉取罚款**（`waived=true`），攻方提 `s − penaltyTaken − stakeWithdrawn`，已拉走罚款不追回。
 - `onBreach(id, winner)`（仅 RTMToken）：若 `block.timestamp >= end` 则 revert `ContestExpired`（整笔靶转账原子回滚），防止到期后诱导 W 转给攻方；否则设置 `endedAt`、把 W 剩余余额 `controllerTransfer` 给 winner；Arena 发 `ContestSettled` 事件（避免与 Token 的 `Breach` 同名重复计数）。
 - `expire(id)`：任何人可调；到期后设置 `endedAt`、`unregisterTarget`；W 余额 >0 时 `controllerTransfer` 给 defender，余额为 0 时仍正常结束（不得调用零额划转）。
 - `withdrawStake(id)`：仅 Ended；normal（到期/攻破）`amount = s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后 `collectPenalties`；fault（waived）`amount = s − penaltyTaken − stakeWithdrawn`；对获胜者同样开放，不与奖金互斥。

@@ -576,11 +576,11 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 2. `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；记录 `stakeBps=r`；`end=max`。
 3. `Attacker` 记账字段：`stake, base(feeBase), joinedAt, pausedAtJoin, attackCount, delivered, penaltyTaken, stakeWithdrawn, waived, joined`。`base` 在 join 时快照（normal=S，mining=W 余额）；`s=base·r/10000`。
 4. `Contest` 增加 `endedAt`；**所有结束路径**（breach/expire/fault）设置 `endedAt`，`_elapsed` 用 `min(now, end, endedAt)` 冻结时间；`_pow75(k)` 用平方-乘 O(log k)，禁止 O(k) 循环。
-5. `attack`：`seq=++attackCount`；`fee=feeBase·0.5%`；`paidFee[id][attacker][msgHash]` 记录并拒绝重复 hash；fee 转 Treasury；暂停中 revert。挖矿赛费率不得为 0。
+5. `join`/`attack`/`reportDefenderFault` 都必须要求 `now < end`（到期后、expire 前的窗口不允许新加入、付费消息或改判弃权）；`attack` 用 `usedMsg` 永久防重（退款后同一 hash 不可复用），`paidFee` 只用于精确退款。`seq=++attackCount`；`fee=feeBase·0.5%`；fee 转 Treasury；暂停中 revert。挖矿赛费率不得为 0。
 6. `markDelivered`：仅 operator；要求已加入且 `delivered < attackCount`。
 7. `refundUnserved`：仅按 `paidFee` 精确退款（Treasury 需 `approveSpender(Arena)`），清零记录、幂等；删除占位行。
 8. 罚款记账：`accrued = s − s·(3/4)^k`；`collectPenalties` 的 `due = accrued − penaltyTaken`；`withdrawStake` 用 `stakeWithdrawn` 独立记账。normal 到期/攻破：攻击方提 `s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后收取；fault：`waived=true`，提 `s − penaltyTaken − stakeWithdrawn`（未拉取罚款豁免，已拉走不退）。
-9. `reportDefenderFault`：仅 operator；normal 按 delivered 分 S（无 delivered 退 defender）；mining 只结束并允许提款，不再分 S；先设 `endedAt`。
+9. `reportDefenderFault`：仅 operator、仅 `now < end`；normal 按 delivered 分 S（无 delivered 退 defender）；mining 不分 S，但把 W 中已铸余额 `controllerTransfer` 回 Treasury；先设 `endedAt`。
 10. `expire`/`onBreach`：先设 `endedAt`；`onBreach` 仅 RTMToken 可调，且必须 `require(block.timestamp < c.end, ContestExpired)`——到期后诱导 W 转账会整笔回滚，不能领取奖池；W 剩余余额 >0 时用 `rtm.controllerTransfer` 给 winner；Arena 发 `ContestSettled`（不要与 Token 的 `Breach` 同名）。**所有 controllerTransfer 调用点都必须跳过 0 金额**（Token 会拒绝 amount=0）：expire 零余额仍要结束、fault 的 share=0 跳过、onBreach rest=0 跳过。
 11. 删除 Arena 里的 `controllerTransfer` helper；所有结算直接 `rtm.controllerTransfer(from,to,amount)`。Treasury 用 SafeERC20，并提供 `approveSpender(token, spender, amount)`（owner）。
 12. `pause/unpause`：`_elapsed` 与 `accrue` 必须扣除**进行中**的暂停时间；暂停冻结罚款与挖矿时钟。
