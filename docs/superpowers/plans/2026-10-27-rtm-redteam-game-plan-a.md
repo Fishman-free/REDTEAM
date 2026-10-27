@@ -1378,7 +1378,7 @@ git commit -m "feat(contracts): faucet with EIP-712 tickets and data market with
 - 常量按规格命名 `platformShareBps = 7000`；`dataPriceBps = 1000`、`attackerDataPrice = 1 ether` 为全局 owner 可调参数；本轮不做按场价格覆盖、EIP-712 代提交或退款。
 - 分账：平台 70% → Treasury，提供方 30%；`buyOwn` 中 30% 退回 defender（净付 70%），事件按实际金额记录；先置已购标记再 `_split`，合约不托管资金。
 
-（实现结果：新增 15 个测试；`cd contracts && npm test` 全量 320 passing。）
+（实现结果：新增 17 个测试；`cd contracts && npm test` 全量 322 passing。）
 
 ---
 
