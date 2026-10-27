@@ -583,9 +583,12 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 9. `reportDefenderFault`：仅 operator、仅 `now < end`；normal 按 delivered 分 S（无 delivered 退 defender）；mining 不分 S，但把 W 中已铸余额 `controllerTransfer` 回 Treasury；先设 `endedAt`。
 10. `expire`/`onBreach`：先设 `endedAt`；`onBreach` 仅 RTMToken 可调，且必须 `require(block.timestamp < c.end, ContestExpired)`——到期后诱导 W 转账会整笔回滚，不能领取奖池；W 剩余余额 >0 时用 `rtm.controllerTransfer` 给 winner；Arena 发 `ContestSettled`（不要与 Token 的 `Breach` 同名）。**所有 controllerTransfer 调用点都必须跳过 0 金额**（Token 会拒绝 amount=0）：expire 零余额仍要结束、fault 的 share=0 跳过、onBreach rest=0 跳过。
 11. 删除 Arena 里的 `controllerTransfer` helper；所有结算直接 `rtm.controllerTransfer(from,to,amount)`。Treasury 用 SafeERC20，并提供 `approveSpender(token, spender, amount)`（owner）。
-12. `pause/unpause`：`_elapsed` 与 `accrue` 必须扣除**进行中**的暂停时间；暂停冻结罚款与挖矿时钟。
-13. `mintForTest`：Arena 构造器带 `testnet` 不可变标志，只有 `testnet=true` 可调用；主网 false，唯一增发是 `accrue`。测试网部署脚本传 true。
-14. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等且已送达不可退、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款、零余额 expire、零 share fault、W 不得复用为普通钱包、Arena deployed bytecode < 24576、markDelivered 到期后拒绝、非 operator fault 拒绝、testnet=false 时 accrue 仍可铸币。
+12. `pause/unpause`：`_elapsed` 与 `accrue` 必须扣除**进行中**的暂停时间；暂停冻结罚款与挖矿时钟；`pause` 仅 `now < end`。
+13. `join(id, maxStake)`：计算 s 后要求 `s <= maxStake`（挖矿 base 可被捐赠/accrue 放大，防滑点/资金锁定）。
+14. 挖矿硬上限：`MAX_MINING_RATE=100e18`（RTM/epoch）、`MAX_ACTIVE_MINING=3`、`activeMiningCount`；create 校验并 +1，`_end` 释放。
+15. 只读接口：`contestInfo(id)` 返回完整 Contest 字段；`ContestCreated` 增加 `stakeBps`/`miningRate`；treasury 不可变且构造拒绝自身/无代码；initialize 校验 `rtm.arena()==this`。
+16. `mintForTest`：Arena 构造器带 `testnet` 不可变标志，只有 `testnet=true` 可调用；主网 false，唯一增发是 `accrue`。测试网部署脚本传 true。
+17. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等且已送达不可退、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款、零余额 expire、零 share fault、W 不得复用为普通钱包、Arena deployed bytecode < 24576、markDelivered 到期后拒绝、非 operator fault 拒绝、testnet=false 时 accrue 仍可铸币、join maxStake 滑点、挖矿 rate/K 上限、contestInfo 可读。
 
 - [ ] **步骤 1：扩展测试（先写失败端到端）**
 

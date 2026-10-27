@@ -72,7 +72,8 @@
 | 消息费 | f | 0.5% × S | 每条消息付给平台金库 |
 | 消息长度 | — | 1000 字符 | 超长拒绝 |
 | 每赛攻方上限 | — | 50 | gas 与状态上界 |
-| 挖矿铸币速率 | E_rate | 1.5–2 RTM/epoch（初值建议） | 每场活跃挖矿赛每 2h epoch 线性铸 E_rate，无总量上限、无减半；P0 仿真锚点见 §6/§11，需按真实推理账单与并发上限复核 |
+| 挖矿铸币速率 | E_rate | 1.5–2 RTM/epoch（初值建议），单场上限 100 RTM/epoch | 每场活跃挖矿赛每 2h epoch 线性铸 E_rate，无总量上限、无减半；P0 仿真锚点见 §6/§11，需按真实推理账单与并发上限复核 |
+| 挖矿赛并发上限 | K | 3 | 同时活跃的挖矿赛上限；结束时释放名额 |
 | 数据售价 | — | dataPriceBps × S | bps 由平台设置 |
 
 ### 3.3 罚款数学（链上惰性计算）
@@ -139,6 +140,7 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 5. **难度递增不靠人工调参**：同一攻击模式沉淀为技能后，对旧版本有效、对新版本无效，矿工需要真正的增量攻击；难度由历史攻破率和承受消息数在排行榜上可见。
 6. **减半机制删除**：RTMToken 不再有 `yearBudget`/`mintedByYear`；总供给无上限，速率由 `E_rate` 单点控制（可经治理调整）。
 7. **测试网注水与主网增发隔离**：Arena 的 `mintForTest` 仅在 `testnet=true` 部署可用（水龙头/测试初始余额）；主网部署 `testnet=false`，唯一增发路径是挖矿 `accrue`。
+8. **增发与并发硬上限**：`createMiningContest` 要求 `E_rate ≤ 100 RTM/epoch` 且活跃挖矿赛 `< 3`（首期常量，治理可后续调整）；这样即使 operator 热键泄露，也不能无限增发或无限开赛。
 
 ### 3.7 数据市场
 
@@ -197,8 +199,8 @@ paidFee[contestId][attacker][msgHash]
 函数（2026-10-27 实现契约修订，**以此为准**）：
 
 - `createContest(defender, wallet, S, D, r)` **仅 operator**：平台在资格测试通过后调用（W 由平台生成并托管）。校验 wallet 非零、非 minter、非已注册靶；`transferFrom(defender → W, S)`；同交易 `registerTarget(W, id)`。**守方不能自行传入任意 wallet**——这是防止"把受害者地址注册为靶后用 expire 扫走余额"的关键。
-- `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；无 S；记录 `stakeBps=r`；`end=type(uint64).max`。
-- `join(id)`：仅 Live 且 `now < end`；`base = isMining ? rtm.balanceOf(W) : S`；`s = base·r/10000`；记录 `base` 作为该攻方的 `feeBase`；`transferFrom(s → Arena)`；每地址一次、50 人上限、暂停快照。
+- `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；无 S；记录 `stakeBps=r`；`end=type(uint64).max`；校验 `E_rate ≤ 100 RTM/epoch` 且 `activeMiningCount < 3`，成功后计数 +1，`_end` 时释放。
+- `join(id, maxStake)`：仅 Live 且 `now < end`；`base = isMining ? rtm.balanceOf(W) : S`；`s = base·r/10000`；`s ≤ maxStake`（挖矿赛 base 可被捐赠/accrue 放大，必须由调用方给滑点上限）；记录 `base` 作为该攻方的 `feeBase`；`transferFrom(s → Arena)`；每地址一次、50 人上限、暂停快照。
 - `attack(id, msgHash)`：仅 Live、`now < end` 且未暂停；`seq = ++attackCount`；`fee = feeBase·0.5%`；`usedMsg[id][msg][msgHash]` 永久防重（退款后也不可复用），`paidFee` 记录可退金额；fee 转 Treasury；发 `AttackPaid`。挖矿赛的 feeBase 是加入时 W 余额，不允许为 0 费率。
 - `markDelivered(id, attacker, msgHash)`（operator）：仅 Live 且 `now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达、`paidFee > 0`（已退款不可标记）；置 `deliveredMsg=true`、`delivered++`。
 - `refundUnserved(id, attacker, msgHash)`（operator）：只按 `paidFee` 记录的金额退款（Treasury 先 `approveSpender(Arena)`），清零记录，幂等；**`deliveredMsg` 为 true 的已送达消息不得退款**。
@@ -211,6 +213,9 @@ paidFee[contestId][attacker][msgHash]
 - `accrue(id)`：挖矿赛有效时间扣除暂停；`due = floor(effective/E)·E_rate − miningMinted`；mint 到 W；任何人可触发。
 - **测试网注水**：Arena 构造器带 `testnet` 不可变标志；`mintForTest` 仅当 `testnet=true` 可用；主网 `false`，唯一增发仍是 `accrue`。
 - `_pow75(k)` 用平方-乘实现 O(log k)，**禁止 O(k) 循环**（挖矿赛 k 无上界）。
+
+- **只读接口**：`contestInfo(id)` 返回 defender/wallet/S/r/start/end/endedAt/state/isMining/attackerCount/paused/miningRate/miningMinted；`activeMiningCount` 公开；`ContestCreated` 事件包含 `stakeBps` 与 `miningRate`，便于 dApp/审计无信任读取。
+- **部署加固**：treasury 为不可变地址，构造时拒绝零地址/自身/无代码；`initialize` 同时校验 `rtm.minter()==this` 与 `rtm.arena()==this`。
 
 安全：`ReentrancyGuard`；全部 checks-effects-interactions；结算只动 RTMToken 的受控钱包（`isControlledWallet`），Arena 不持有任意用户资金；所有外部转账在状态更新后；Arena 的 `controllerTransfer` 直接调用 Token 的 `controllerTransfer`，不使用 `transferFrom` + allowance。
 
