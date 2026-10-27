@@ -3,17 +3,18 @@
  * DataMarket 数据市场单测（任务 7）。
  *
  * 关键约束：
- * - 只有 platform operator 能 publish，且比赛必须 Ended、root 非零、一次性；
+ * - 只有 platform operator 能 publish，且比赛必须 Ended、普通赛、root 非零、一次性；
+ *   挖矿赛数据仅用于 RSI，永不发布；
  * - 价格与身份全部以 Arena 为准：buyOwn 用 S × dataPriceBps，
  *   buyFromAttacker 用全局 attackerDataPrice，买家不能传 stake；
- * - 只有 defender 能购买；攻方数据还需该场注册攻方按 (contest, attacker, buyer)
- *   精确授权；
+ * - 只有 defender 能购买；攻方数据以 Arena.dataConsent（join 时一次性同意）
+ *   为唯一事实源，不存在 approveSale/逐买家授权；
  * - 每份数据每人一次性；成交 70% Treasury / 30% 数据提供方。
  */
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 const { time } = require('@nomicfoundation/hardhat-network-helpers');
-const { deployGame, makeContest, joinAs, RTM } = require('./arena.helpers');
+const { deployGame, makeContest, makeMining, joinAs, RTM } = require('./arena.helpers');
 
 const ROOT = ethers.id('dataset-root');
 const ROOT2 = ethers.id('dataset-root-2');
@@ -34,17 +35,19 @@ describe('DataMarket 数据市场', function () {
     await market.connect(game.owner).setOperator(game.operator.address);
   });
 
-  /** 建一场已结束的普通比赛，并让 attacker 注册为攻方。 */
-  async function createEndedContest({ wallet, attacker = game.attackerA } = {}) {
+  /** 建一场已结束的普通比赛，并让 attacker 注册为攻方（dataConsent 默认 true）。 */
+  async function createEndedContest({ wallet, attacker = game.attackerA, dataConsent = true } = {}) {
     const contest = wallet ? await makeContest(game, { wallet }) : await makeContest(game);
-    await joinAs(game, attacker, contest.id);
+    await joinAs(game, attacker, contest.id, undefined, dataConsent);
     await time.increaseTo(contest.end);
     await game.arena.expire(contest.id);
     return contest;
   }
 
-  it('固定参数：platformShareBps = 7000；operator 可发布已结束比赛的数据根', async function () {
+  it('固定参数：platformShareBps = 7000；operator 可发布已结束比赛的数据根；无 approveSale 路径', async function () {
     expect(await market.platformShareBps()).to.equal(7000n);
+    expect(market.approveSale).to.equal(undefined);
+    expect(market.saleApproved).to.equal(undefined);
 
     const contest = await createEndedContest();
     await expect(market.connect(game.operator).publish(contest.id, ROOT))
@@ -87,27 +90,10 @@ describe('DataMarket 数据市场', function () {
       .to.be.revertedWithCustomError(market, 'AlreadyBought');
   });
 
-  it('攻方数据：仅按买家绑定 approveSale 后才能由 defender 购买，70/30 分账且一次性', async function () {
+  it('攻方数据：join 时 dataConsent=true 即可直接购买（无 approveSale），70/30 分账且一次性', async function () {
     const contest = await createEndedContest();
     await market.connect(game.operator).publish(contest.id, ROOT);
-
-    // 未授权 -> NotApproved。
-    await expect(
-      market.connect(game.defender).buyFromAttacker(contest.id, game.attackerA.address)
-    ).to.be.revertedWithCustomError(market, 'NotApproved');
-
-    // 授权给其他买家，不能顺带授权 defender。
-    await expect(market.connect(game.attackerA).approveSale(contest.id, game.outsider.address))
-      .to.emit(market, 'SaleApproved')
-      .withArgs(contest.id, game.attackerA.address, game.outsider.address);
-    await expect(
-      market.connect(game.defender).buyFromAttacker(contest.id, game.attackerA.address)
-    ).to.be.revertedWithCustomError(market, 'NotApproved');
-
-    // 精确授权 defender 后可成交。
-    await expect(market.connect(game.attackerA).approveSale(contest.id, game.defender.address))
-      .to.emit(market, 'SaleApproved')
-      .withArgs(contest.id, game.attackerA.address, game.defender.address);
+    expect(await game.arena.dataConsent(contest.id, game.attackerA.address)).to.equal(true);
 
     const price = await market.attackerDataPrice();
     expect(price).to.equal(RTM(1));
@@ -142,6 +128,19 @@ describe('DataMarket 数据市场', function () {
     ).to.be.revertedWithCustomError(market, 'AlreadyBought');
   });
 
+  it('攻方数据：join 时 dataConsent=false -> NotConsented', async function () {
+    const contest = await createEndedContest({ dataConsent: false });
+    await market.connect(game.operator).publish(contest.id, ROOT);
+    expect(await game.arena.dataConsent(contest.id, game.attackerA.address)).to.equal(false);
+
+    await expect(
+      market.connect(game.defender).buyFromAttacker(contest.id, game.attackerA.address)
+    ).to.be.revertedWithCustomError(market, 'NotConsented');
+    expect(
+      await market.boughtAttacker(contest.id, game.attackerA.address, game.defender.address)
+    ).to.equal(false);
+  });
+
   it('非 defender 调 buyOwn/buyFromAttacker -> NotDefender', async function () {
     const contest = await createEndedContest();
     await market.connect(game.operator).publish(contest.id, ROOT);
@@ -151,20 +150,6 @@ describe('DataMarket 数据市场', function () {
     await expect(
       market.connect(game.attackerB).buyFromAttacker(contest.id, game.attackerA.address)
     ).to.be.revertedWithCustomError(market, 'NotDefender');
-  });
-
-  it('approveSale：非注册攻方 NotAttacker；buyer 为零地址 ZeroAddress', async function () {
-    const contest = await createEndedContest();
-
-    await expect(market.connect(game.outsider).approveSale(contest.id, game.defender.address))
-      .to.be.revertedWithCustomError(market, 'NotAttacker');
-    await expect(market.connect(game.attackerA).approveSale(contest.id, ethers.ZeroAddress))
-      .to.be.revertedWithCustomError(market, 'ZeroAddress');
-
-    await market.connect(game.attackerA).approveSale(contest.id, game.defender.address);
-    expect(
-      await market.saleApproved(contest.id, game.attackerA.address, game.defender.address)
-    ).to.equal(true);
   });
 
   it('buyFromAttacker：未在该场注册的攻方 -> NotAttacker', async function () {
@@ -190,6 +175,19 @@ describe('DataMarket 数据市场', function () {
     await market.connect(game.operator).publish(ended.id, ROOT);
     await expect(market.connect(game.operator).publish(ended.id, ROOT2))
       .to.be.revertedWithCustomError(market, 'AlreadyPublished');
+  });
+
+  it('publish：挖矿赛即使已结束（state=2）也拒绝 -> NotNormalContest', async function () {
+    const mining = await makeMining(game);
+    // 退役后 state=Ended，但仍是挖矿赛；数据仅用于 RSI，不得发布。
+    await game.arena.connect(game.operator).retireMining(mining.id);
+    const info = await game.arena.contestInfo(mining.id);
+    expect(info.state).to.equal(2n);
+    expect(info.isMining).to.equal(true);
+
+    await expect(market.connect(game.operator).publish(mining.id, ROOT))
+      .to.be.revertedWithCustomError(market, 'NotNormalContest');
+    expect(await market.datasetRoot(mining.id)).to.equal(ethers.ZeroHash);
   });
 
   it('setOperator：非 owner 拒绝、零地址拒绝、轮换后权限随之转移', async function () {
@@ -247,8 +245,7 @@ describe('DataMarket 数据市场', function () {
     expect(await game.rtm.balanceOf(game.treasury.target))
       .to.equal(treasuryBefore + (ownPrice * 7000n) / 10000n);
 
-    // buyFromAttacker 使用更新后的 2 RTM。
-    await market.connect(game.attackerA).approveSale(contest.id, game.defender.address);
+    // buyFromAttacker 使用更新后的 2 RTM（attacker 已在 join 时同意）。
     await game.rtm.connect(game.defender).approve(market.target, RTM(2));
     const attackerBefore = await game.rtm.balanceOf(game.attackerA.address);
     await expect(

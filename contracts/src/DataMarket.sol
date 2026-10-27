@@ -24,14 +24,17 @@ interface IArena {
 
     function contestInfo(bytes32 id) external view returns (ContestInfo memory);
     function isRegisteredAttacker(bytes32 id, address who) external view returns (bool);
+    function dataConsent(bytes32 id, address who) external view returns (bool);
 }
 
 /// @title DataMarket —— 比赛数据市场
-/// @notice 平台 operator 发布已结束比赛的数据根；守方可购买自己的数据或
-///         经该场注册攻方同意的进攻数据。成交额 70% 归 Treasury，30% 归数据提供方。
+/// @notice 平台 operator 发布已结束普通比赛的数据根；守方可购买自己的数据或
+///         该场注册攻方在加入时已一次性同意出售的进攻数据。成交额 70% 归 Treasury，
+///         30% 归数据提供方。挖矿赛数据仅用于 RSI，不发布、不出售。
 /// @dev 安全约束：
 ///      - 买家不能自行传入 stake/身份，S 与 defender 全部从 Arena 读取；
-///      - 攻方数据授权精确绑定 (contestId, attacker, buyer)，不可复用为全场授权；
+///      - 攻方数据是否可售以 Arena.dataConsent 为唯一事实源：同意在 join 时一次性
+///        给出，本合约不保存逐买家授权，也不存在 approveSale 路径；
 ///      - 每份数据每地址仅可购买一次；先置已购标记再分账（CEI），合约不托管资金。
 contract DataMarket is Ownable {
     using SafeERC20 for IERC20;
@@ -51,19 +54,12 @@ contract DataMarket is Ownable {
 
     /// @notice contestId => 数据集 Merkle 根（0 表示未发布）。
     mapping(bytes32 => bytes32) public datasetRoot;
-    /// @notice contestId => 攻方 => 买家 => 是否同意出售。
-    mapping(bytes32 => mapping(address => mapping(address => bool))) public saleApproved;
     /// @notice contestId => 守方 => 是否已购买己方数据。
     mapping(bytes32 => mapping(address => bool)) public boughtOwn;
     /// @notice contestId => 攻方 => 买家 => 是否已购买该攻方数据。
     mapping(bytes32 => mapping(address => mapping(address => bool))) public boughtAttacker;
 
     event DatasetPublished(bytes32 indexed contestId, bytes32 root);
-    event SaleApproved(
-        bytes32 indexed contestId,
-        address indexed attacker,
-        address indexed buyer
-    );
     event DataSold(
         address indexed buyer,
         address indexed seller,
@@ -77,7 +73,7 @@ contract DataMarket is Ownable {
 
     error NotPublished();
     error NotDefender();
-    error NotApproved();
+    error NotConsented();
     error AlreadyBought();
     error NotOperator();
     error ZeroAddress();
@@ -127,32 +123,27 @@ contract DataMarket is Ownable {
     }
 
     // ------------------------------------------------------------------
-    // 数据集发布 / 出售授权
+    // 数据集发布
     // ------------------------------------------------------------------
 
-    /// @notice 仅 operator：发布已结束比赛的数据根，一次性。
+    /// @notice 仅 operator：发布已结束普通比赛的数据根，一次性。
+    /// @dev 挖矿赛数据强制留存但仅用于 RSI，永不发布、不出售。
     function publish(bytes32 contestId, bytes32 root) external onlyOperator {
         if (root == bytes32(0)) revert ZeroRoot();
         // Arena.State.Ended == 2；未结束或未知比赛一律拒绝。
-        if (arena.contestInfo(contestId).state != 2) revert NotEnded();
+        IArena.ContestInfo memory info = arena.contestInfo(contestId);
+        if (info.state != 2) revert NotEnded();
+        if (info.isMining) revert NotNormalContest();
         if (datasetRoot[contestId] != bytes32(0)) revert AlreadyPublished();
         datasetRoot[contestId] = root;
         emit DatasetPublished(contestId, root);
-    }
-
-    /// @notice 注册攻方同意把自己的进攻数据卖给指定买家；按 (contest, attacker, buyer) 绑定。
-    function approveSale(bytes32 contestId, address buyer) external {
-        if (buyer == address(0)) revert ZeroAddress();
-        if (!arena.isRegisteredAttacker(contestId, msg.sender)) revert NotAttacker();
-        saleApproved[contestId][msg.sender][buyer] = true;
-        emit SaleApproved(contestId, msg.sender, buyer);
     }
 
     // ------------------------------------------------------------------
     // 购买
     // ------------------------------------------------------------------
 
-    /// @notice 守方购买自己被攻破（或已结束）比赛的数据。
+    /// @notice 守方购买自己被攻破（或已结束）比赛的数据；自有数据无需攻方同意。
     /// @dev 价格 = S × dataPriceBps / 10000；seller = buyer = defender，
     ///      因此 30% 退回守方自己，净付 70%。不得优化掉这笔转账。
     function buyOwn(bytes32 contestId) external {
@@ -168,14 +159,15 @@ contract DataMarket is Ownable {
         emit DataSold(msg.sender, msg.sender, contestId, amount, platformCut);
     }
 
-    /// @notice 守方购买某位注册攻方的进攻数据，需该攻方精确授权 msg.sender。
+    /// @notice 守方购买某位注册攻方的进攻数据；该攻方必须在 join 时已一次性同意。
+    /// @dev 同意状态只读 Arena.dataConsent，DataMarket 不保存任何同意副本。
     function buyFromAttacker(bytes32 contestId, address attacker) external {
         if (datasetRoot[contestId] == bytes32(0)) revert NotPublished();
         IArena.ContestInfo memory info = arena.contestInfo(contestId);
         if (msg.sender != info.defender) revert NotDefender();
         if (info.isMining) revert NotNormalContest();
         if (!arena.isRegisteredAttacker(contestId, attacker)) revert NotAttacker();
-        if (!saleApproved[contestId][attacker][msg.sender]) revert NotApproved();
+        if (!arena.dataConsent(contestId, attacker)) revert NotConsented();
         if (boughtAttacker[contestId][attacker][msg.sender]) revert AlreadyBought();
 
         uint256 amount = attackerDataPrice;
