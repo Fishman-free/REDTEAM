@@ -581,13 +581,15 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 7. `refundUnserved`：仅按 `paidFee` 精确退款（Treasury 需 `approveSpender(Arena)`），清零记录、幂等；删除占位行。
 8. 罚款记账：`accrued = s − s·(3/4)^k`；`collectPenalties` 的 `due = accrued − penaltyTaken`；`withdrawStake` 用 `stakeWithdrawn` 独立记账。normal 到期/攻破：攻击方提 `s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后收取；fault：`waived=true`，提 `s − penaltyTaken − stakeWithdrawn`（未拉取罚款豁免，已拉走不退）。
 9. `reportDefenderFault`：仅 operator；normal 按 delivered 分 S（无 delivered 退 defender）；mining 只结束并允许提款，不再分 S；先设 `endedAt`。
-10. `expire`/`onBreach`：先设 `endedAt`；`onBreach` 仅 RTMToken 可调，W 剩余余额用 `rtm.controllerTransfer` 给 winner；Arena 发 `ContestSettled`（不要与 Token 的 `Breach` 同名）。
+10. `expire`/`onBreach`：先设 `endedAt`；`onBreach` 仅 RTMToken 可调，且必须 `require(block.timestamp < c.end, ContestExpired)`——到期后诱导 W 转账会整笔回滚，不能领取奖池；W 剩余余额 >0 时用 `rtm.controllerTransfer` 给 winner；Arena 发 `ContestSettled`（不要与 Token 的 `Breach` 同名）。**所有 controllerTransfer 调用点都必须跳过 0 金额**（Token 会拒绝 amount=0）：expire 零余额仍要结束、fault 的 share=0 跳过、onBreach rest=0 跳过。
 11. 删除 Arena 里的 `controllerTransfer` helper；所有结算直接 `rtm.controllerTransfer(from,to,amount)`。Treasury 用 SafeERC20，并提供 `approveSpender(token, spender, amount)`（owner）。
 12. `pause/unpause`：`_elapsed` 与 `accrue` 必须扣除**进行中**的暂停时间；暂停冻结罚款与挖矿时钟。
 13. `mintForTest`：Arena 构造器带 `testnet` 不可变标志，只有 `testnet=true` 可调用；主网 false，唯一增发是 `accrue`。测试网部署脚本传 true。
-14. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款。
+14. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款、零余额 expire、零 share fault、W 不得复用为普通钱包（文档/部署检查）。
 
 - [ ] **步骤 1：扩展测试（先写失败端到端）**
+
+**注意：下方测试代码块是修订前的草稿，`createContest` 的签名/调用方已过时（现为 operator-only 的 5 参数版本），不得照抄。** 建议把 Arena/Treasury 测试放在新文件 `contracts/test/arena.test.js`，`rtm-game.test.js` 保留 RTMToken 测试。
 
 在 `rtm-game.test.js` 增加完整生命周期用例（节选核心断言，工程师按此风格补全）：
 

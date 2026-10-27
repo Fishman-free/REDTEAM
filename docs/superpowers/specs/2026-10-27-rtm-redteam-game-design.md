@@ -107,6 +107,7 @@ if (isActiveTarget(from)) {
 - 入金不受限；**任何转出**（包括转给其他比赛的靶钱包）仅两个合法去向：该场注册攻方，或 Arena 的 `controllerTransfer`。比赛结束（破/到期/弃权）即注销，恢复普通钱包。
 - **零金额转账不构成攻破**：活跃靶的任何 0 值转出同样 revert，防止用 0 RTM 触发"攻破"白拿奖池。
 - **注册与受控钱包**：`registerTarget` 拒绝 minter 自身与已注册靶；重复注册必须先 `unregisterTarget`。Token 维护"曾注册为靶"的受控钱包集合，`controllerTransfer` 只能划转受控钱包（含已注销的 W），不能移动任意用户余额；非靶 `unregisterTarget` 为幂等 no-op。
+- **W 的生命周期**：W 是平台托管、**单场比赛专用**的钱包；结算后余额归零，不得交付给用户复用为普通钱包（否则永久受控权会变成后门）。Arena 只能结算受控 W，且所有零额划转必须跳过而不是调用 `controllerTransfer(amount=0)`。
 - **结算/退款/赎回走独立的 `controllerTransfer(from, to, amount)`（仅 minter 可调）**：它绕过靶策略并在必要时注销靶，是 Arena 移动 W 资金的唯一入口；`from` 与 `to` 均不得为零地址。Arena 不得依赖 `transferFrom` + allowance 移动 W 资金；靶钱包自行向 Arena 转账同样 revert（即使 Arena 被误登记为攻方），防止被诱导"转账到 Arena"绕过结算、留下无靶的活跃比赛。
 - 守方向"非该场攻方"转账（比如守方换小号想私下转走）被代币 revert——这就是"测试币标记"的实现。
 - 挖矿赛与普通赛共用同一套逻辑，defender = 平台金库地址。
@@ -203,9 +204,9 @@ paidFee[contestId][attacker][msgHash]
 - `refundUnserved(id, attacker, msgHash)`（operator）：只按 `paidFee` 记录的金额退款（Treasury 先 `approveSpender(Arena)`），清零记录，幂等；未送达消息才可退。
 - `collectPenalties(id)`：`accrued = s − s·(3/4)^k`（k 以 `endedAt` 冻结）；`due = accrued − penaltyTaken`；normal 转给 defender，mining 转给 Treasury；可重复调用拉差额。
 - `pause/unpause`（operator）：累计 pausedTotal，冻结罚款与挖矿时钟；`_elapsed` 必须扣除**进行中**的暂停（`lastPauseAt != 0` 时加上 `now − lastPauseAt`）。
-- `reportDefenderFault(id)`（operator）：设置 `endedAt`；normal 按各攻方 delivered 分配 S（无 delivered 则 S 退 defender）；mining 不再分 S，仅结束并允许攻方提款；弃权路径**豁免未拉取罚款**（`waived=true`），攻方提 `s − penaltyTaken − stakeWithdrawn`，已拉走罚款不追回。
-- `onBreach(id, winner)`（仅 RTMToken）：设置 `endedAt`；W 剩余余额 `controllerTransfer` 给 winner；Arena 发 `ContestSettled` 事件（避免与 Token 的 `Breach` 同名重复计数）。
-- `expire(id)`：任何人可调；到期后设置 `endedAt`、`unregisterTarget`、把 W 余额 `controllerTransfer` 给 defender。
+- `reportDefenderFault(id)`（operator）：设置 `endedAt`；normal 按各攻方 delivered 分配 S（无 delivered 则 S 退 defender）；每个 share 为 0 时跳过，不得调用零额划转；mining 不再分 S，仅结束并允许攻方提款；弃权路径**豁免未拉取罚款**（`waived=true`），攻方提 `s − penaltyTaken − stakeWithdrawn`，已拉走罚款不追回。
+- `onBreach(id, winner)`（仅 RTMToken）：若 `block.timestamp >= end` 则 revert `ContestExpired`（整笔靶转账原子回滚），防止到期后诱导 W 转给攻方；否则设置 `endedAt`、把 W 剩余余额 `controllerTransfer` 给 winner；Arena 发 `ContestSettled` 事件（避免与 Token 的 `Breach` 同名重复计数）。
+- `expire(id)`：任何人可调；到期后设置 `endedAt`、`unregisterTarget`；W 余额 >0 时 `controllerTransfer` 给 defender，余额为 0 时仍正常结束（不得调用零额划转）。
 - `withdrawStake(id)`：仅 Ended；normal（到期/攻破）`amount = s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后 `collectPenalties`；fault（waived）`amount = s − penaltyTaken − stakeWithdrawn`；对获胜者同样开放，不与奖金互斥。
 - `accrue(id)`：挖矿赛有效时间扣除暂停；`due = floor(effective/E)·E_rate − miningMinted`；mint 到 W；任何人可触发。
 - **测试网注水**：Arena 构造器带 `testnet` 不可变标志；`mintForTest` 仅当 `testnet=true` 可用；主网 `false`，唯一增发仍是 `accrue`。
