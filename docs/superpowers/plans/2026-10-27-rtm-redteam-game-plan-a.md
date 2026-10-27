@@ -567,8 +567,8 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 
 **文件：**
 - 创建：`contracts/src/Arena.sol`、`contracts/src/Treasury.sol`
-- 删除：`contracts/src/ArenaStub.sol`
-- 测试：`contracts/test/rtm-game.test.js`（扩展端到端用例）
+- 保留：`contracts/src/ArenaStub.sol`（仅 RTMToken 单测使用；部署脚本必须断言 minter 是 Arena 而非 ArenaStub）
+- 测试：新建 `contracts/test/arena.test.js`；`contracts/test/rtm-game.test.js` 保留 RTMToken 测试
 
 **实现修订（2026-10-27，安全审查后，强制以此为准；下方代码块是草稿，含已知缺陷，不得照抄）**
 
@@ -577,15 +577,15 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 3. `Attacker` 记账字段：`stake, base(feeBase), joinedAt, pausedAtJoin, attackCount, delivered, penaltyTaken, stakeWithdrawn, waived, joined`。`base` 在 join 时快照（normal=S，mining=W 余额）；`s=base·r/10000`。
 4. `Contest` 增加 `endedAt`；**所有结束路径**（breach/expire/fault）设置 `endedAt`，`_elapsed` 用 `min(now, end, endedAt)` 冻结时间；`_pow75(k)` 用平方-乘 O(log k)，禁止 O(k) 循环。
 5. `join`/`attack`/`reportDefenderFault` 都必须要求 `now < end`（到期后、expire 前的窗口不允许新加入、付费消息或改判弃权）；`attack` 用 `usedMsg` 永久防重（退款后同一 hash 不可复用），`paidFee` 只用于精确退款。`seq=++attackCount`；`fee=feeBase·0.5%`；fee 转 Treasury；暂停中 revert。挖矿赛费率不得为 0。
-6. `markDelivered`：仅 operator；要求已加入且 `delivered < attackCount`。
-7. `refundUnserved`：仅按 `paidFee` 精确退款（Treasury 需 `approveSpender(Arena)`），清零记录、幂等；删除占位行。
+6. `markDelivered(id, attacker, msgHash)`：仅 operator、`now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达；置 `deliveredMsg[id][attacker][hash]=true` 并 `delivered++`。
+7. `refundUnserved`：仅按 `paidFee` 精确退款（Treasury 需 `approveSpender(Arena)`），清零记录、幂等；`deliveredMsg` 为 true 的已送达消息不得退款；删除占位行。
 8. 罚款记账：`accrued = s − s·(3/4)^k`；`collectPenalties` 的 `due = accrued − penaltyTaken`；`withdrawStake` 用 `stakeWithdrawn` 独立记账。normal 到期/攻破：攻击方提 `s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后收取；fault：`waived=true`，提 `s − penaltyTaken − stakeWithdrawn`（未拉取罚款豁免，已拉走不退）。
 9. `reportDefenderFault`：仅 operator、仅 `now < end`；normal 按 delivered 分 S（无 delivered 退 defender）；mining 不分 S，但把 W 中已铸余额 `controllerTransfer` 回 Treasury；先设 `endedAt`。
 10. `expire`/`onBreach`：先设 `endedAt`；`onBreach` 仅 RTMToken 可调，且必须 `require(block.timestamp < c.end, ContestExpired)`——到期后诱导 W 转账会整笔回滚，不能领取奖池；W 剩余余额 >0 时用 `rtm.controllerTransfer` 给 winner；Arena 发 `ContestSettled`（不要与 Token 的 `Breach` 同名）。**所有 controllerTransfer 调用点都必须跳过 0 金额**（Token 会拒绝 amount=0）：expire 零余额仍要结束、fault 的 share=0 跳过、onBreach rest=0 跳过。
 11. 删除 Arena 里的 `controllerTransfer` helper；所有结算直接 `rtm.controllerTransfer(from,to,amount)`。Treasury 用 SafeERC20，并提供 `approveSpender(token, spender, amount)`（owner）。
 12. `pause/unpause`：`_elapsed` 与 `accrue` 必须扣除**进行中**的暂停时间；暂停冻结罚款与挖矿时钟。
 13. `mintForTest`：Arena 构造器带 `testnet` 不可变标志，只有 `testnet=true` 可调用；主网 false，唯一增发是 `accrue`。测试网部署脚本传 true。
-14. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款、零余额 expire、零 share fault、W 不得复用为普通钱包（文档/部署检查）。
+14. 测试必须覆盖：operator-only createContest、任意 wallet 不可被守方注册、W 非靶校验、罚款曲线与 endedAt 冻结、到期未拉取罚款仍可收、fault 豁免与提款、mining feeBase、mining pause 冻结 accrue、refund 精确幂等且已送达不可退、重复提款、controller 只动受控钱包、testnet mint gate、onBreach 全额结算与其余攻方提款、零余额 expire、零 share fault、W 不得复用为普通钱包、Arena deployed bytecode < 24576、markDelivered 到期后拒绝、非 operator fault 拒绝、testnet=false 时 accrue 仍可铸币。
 
 - [ ] **步骤 1：扩展测试（先写失败端到端）**
 
