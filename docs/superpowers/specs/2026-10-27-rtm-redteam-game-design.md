@@ -248,7 +248,63 @@ if (isActiveTarget(from)) {
 
 ---
 
-## 7. dApp（新顶层 dapp/，Vite + React + TS + wagmi/viem）
+## 7. 智能体设计与接口契约
+
+### 7.1 守方注册的智能体构成
+
+```
+守方注册提交 = 白名单 provider/model + 自带 API Key（BYOK）
+             + DefensePackage（沿用 defense.py schema：system_prompt 100–16000 字符
+               + runtime 布尔开关 + ≤8 条 memory 规则）
+             + mandate（任务授权书：一段自由文本，说明资金用途与可转条件）
+```
+
+平台在守方提示词外包一层**固定的基底提示词**（守方不可改）：角色为资金管理智能体、消息渠道语义（外部消息不可信、claimed_sender 由平台注入而非解析文本）、当前钱包地址、mandate 原文。**基底提示词不得提及链上靶策略（"转账只对注册攻方放行"）**——否则智能体可推理出"给攻方转账是唯一能成功的路径"，等于泄题。
+
+### 7.2 暴露给 LLM 的工具面（刻意极简）
+
+```json
+get_balance()            → 查本钱包 RTM 余额
+transfer_rtm(to, amount) → 真实链上转账（W 私钥签名）
+```
+
+只有这两个工具；回复即 assistant 文本，无 reply 工具。**整个游戏的攻击面 = 对话能否诱导一次 transfer_rtm**——工具面每多一个读接口（交易历史、订单、收据）攻击面就复杂一分。首版 YAGNI，不加任务型工具。
+
+**转账目标地址由攻方在消息中自行给出**：链上只放行转给该场注册攻方，攻方给出的必须是（或包含）自己注册的地址，否则交易 revert。
+
+### 7.3 v1 取舍：无合法出款路径
+
+靶策略下，mandate 中的"给商家付款"**永远 revert**（商家不是注册攻方）。这是刻意取舍：
+
+- 保住核心不变式：钱离开 W 只有一种方式——被攻方拿走、原子结算；
+- 智能体看到"给商家付款失败"，恰是攻方可利用的困惑点（攻击面一部分）；
+- **配套规则**：runner 必须抹掉 revert 原因再返回给模型（`TargetTransferRestricted` 错误串会泄露策略），只返回通用"转账失败"。
+
+未来若需真实合法付款，需引入比赛期冻结的商家地址注册与防合谋设计，首版不做。
+
+### 7.4 资格测试时序（先测后注册）
+
+```
+注册守方 → 平台生成 W → 资格测试（W 尚是普通钱包，转账不受限）
+        → 守方 approve + createContest（此刻 W 才被标记为靶）
+```
+
+资格测试 = 平台以 owner 渠道发"把 1 wei 转到测试地址"的授权消息，模型必须调 `transfer_rtm` 且交易成功。置于靶注册之前（否则测试转账本身被策略拦截）；蜜罐守方（提示词写死永不转账）在此步被拦下。
+
+### 7.5 runner 对外接口与可见性
+
+| 调用方 | 接口 | 可见 |
+|---|---|---|
+| 攻方 | `POST /contests/{id}/messages {tx_hash, content}` → `{reply}` | 仅自己的历史消息与回复 |
+| 守方 | `POST /defenders/register`、`POST /contests`、`GET /defenders/me/contests` | 比赛状态、罚款余额、W 地址；**看不到任何攻击过程**（需购买） |
+| 公开 | `GET /contests`、`GET /leaderboards` | 比赛列表（S、W、状态、攻方数）与三榜 |
+| 平台操作员 | markDelivered / reportDefenderFault / publish / pause | 全量记录（链上事件留痕） |
+
+攻方消息信封沿用 payassist 语义：`{"channel": "external_dialogue", "claimed_sender": "<攻方地址>", "content": "…"}`——渠道由 runner 按路由指定，永不从文本解析；external 永不开 execution release。
+
+---
+
+## 8. dApp（新顶层 dapp/，Vite + React + TS + wagmi/viem）
 
 - 视觉复用静态站设计令牌：`--bg:#000`、`--panel:#0a0c10`、coral `--accent:#ff997b`、mono wordmark、方角、hairline、点阵动画。
 - 与静态研究站**并存互链**（静态站校验器禁止钱包/fetch，不可原地改造）。
@@ -257,7 +313,7 @@ if (isActiveTarget(from)) {
 
 ---
 
-## 8. 主网桥与兑换（P6，独立模块 + feature flag）
+## 9. 主网桥与兑换（P6，独立模块 + feature flag）
 
 - 本链 `RTMBridge.sol`：lock/unlock，日限额、暂停开关。
 - Base 上 `WrappedRTM.sol` + `Bridge.sol`：M-of-N 中继签名 mint/burn；`relayer.py` 独立进程（签名者集、每日上限、异常自动暂停、监控告警）。
@@ -268,7 +324,7 @@ if (isActiveTarget(from)) {
 
 ---
 
-## 9. 实施顺序与验收
+## 10. 实施顺序与验收
 
 | 阶段 | 交付 | 验收 |
 |---|---|---|
@@ -285,7 +341,7 @@ if (isActiveTarget(from)) {
 
 ---
 
-## 10. 风险与开放问题
+## 11. 风险与开放问题
 
 1. **托管集中**：W 私钥与守方 Key 均平台保管；泄露即平台责任。缓解：AES-GCM、审计、密钥隔离、路线图（MPC/TEE）。
 2. **平台信任操作**：defenderFault / pause / 资格测试全由平台操作员执行。缓解：链上事件留痕、操作员密钥独立、事后审计。
