@@ -284,6 +284,12 @@ N*：按 p_market 计算攻方 EV，取满足 EV≥0 的最大 N（上限 50）
 
 同时输出：每行 `p_market`、`N*`、攻方预期 EV、攻方真实 EV（按 p_def）、守方 EV（按 p_def）、对称情形（p_def=p_market）的守方 EV。断言：自攻自守恒负；N* 有界；存在 `p_def < p_market` 使守方 EV>0；`p_def=p_market` 时守方 EV<0。
 
+质量要求（审查补强）：
+- `self_check()` 必须用**当前实际扫描**的 p_market/rows 验证闭式阈值，而不是硬编码默认集合；若 `applicable=True` 则 `checked>0`。
+- N* 均衡标志必须在报告阶段用返回的 `N*` 独立复算 `EV(N*)≥0` 且 `EV(N*+1)<0`（`N*` 触顶 50 时标注 cap-bound，不声称内部均衡）。
+- 自检包含默认参数 golden 值（至少 `F≈4.841618`、`N*=[0,1,1,2]`、`EV(p=0.01,N=1)≈1.468813`、`ratio_threshold(p=0.05)≈0.02987428`）。
+- 所有数值型 CLI 参数做有限性校验；要求 `fee_rate×S + llm_cost > 0`（零成本配置不在模型范围内）。
+
 - [ ] **步骤 2：运行仿真验证**
 
 运行：`python tools/sim/mechanism_sim.py`
@@ -358,6 +364,50 @@ contract ArenaStub {
     function mint(address, uint256) external pure {} // not used
 }
 ```
+
+**测试实现要求（替代上面的占位断言）**：任务 3 阶段 Arena 尚不存在，必须让占位合约承担"minter + 攻方登记 + 回调记录"三个职责，写出真正可执行的靶策略单测，不得引用任务 4 的 `deployGame`：
+
+```solidity
+contract ArenaStub {
+    mapping(bytes32 => mapping(address => bool)) public attackers;
+    bytes32 public lastBreachContest;
+    address public lastBreachWinner;
+    uint256 public breachCalls;
+
+    function setAttacker(bytes32 contestId, address who, bool ok) external {
+        attackers[contestId][who] = ok;
+    }
+    function isRegisteredAttacker(bytes32 contestId, address who) external view returns (bool) {
+        return attackers[contestId][who];
+    }
+    function onBreach(bytes32 contestId, address winner) external {
+        lastBreachContest = contestId;
+        lastBreachWinner = winner;
+        breachCalls += 1;
+    }
+    function registerTarget(RTMToken rtm, address wallet, bytes32 contestId) external {
+        rtm.registerTarget(wallet, contestId);
+    }
+    function unregisterTarget(RTMToken rtm, address wallet) external {
+        rtm.unregisterTarget(wallet);
+    }
+    function mint(RTMToken rtm, address to, uint256 amount) external {
+        rtm.mint(to, amount);
+    }
+    function controllerSend(RTMToken rtm, address from, address to, uint256 amount) external {
+        rtm.controllerTransfer(from, to, amount); // 仅 minter；不需要 allowance
+    }
+}
+```
+
+测试用例至少覆盖：
+1. 无靶注册时普通转账/approve 不受限（stub 铸币给 a，a 转给 b 成功）；
+2. 注册靶后：靶转 outsider revert `TargetTransferRestricted`；靶转未登记的攻方 revert；
+3. 靶向**已登记攻方**转账：成功、余额到账、靶被注销、`onBreach` 恰好调用一次且 winner/contestId 正确、`Breach` 事件金额正确；
+4. 靶**自己** `transfer(arena, …)` revert（新增控制器调用方检查）；
+5. 只有 stub 调用 `controllerSend(rtm, target, to, amount)`（内部走 `controllerTransfer`）才放行且不需要 allowance，并注销靶；
+6. 注销后靶恢复普通钱包，可转给任意第三方；
+7. `mint`、`controllerTransfer`、`registerTarget` 非 Arena 调用分别 revert `NotMinter` / `NotArena` / `NotArena`。
 
 - [ ] **步骤 2：运行测试验证失败**
 
@@ -445,16 +495,25 @@ contract RTMToken is ERC20, Ownable {
         emit MiningMinted(to, amount);
     }
 
+    /// @notice 结算/退款/赎回的唯一划转入口（仅 Arena）。
+    /// @dev 绕过靶策略；若 from 仍是活跃靶，先注销再划转（CEI）。
+    ///      Arena 不得用 transferFrom + allowance 移动 W 资金。
+    function controllerTransfer(address from, address to, uint256 amount) external {
+        if (msg.sender != minter) revert NotArena();
+        if (to == address(0)) revert ZeroAddress();
+        bytes32 contestId = targetContest[from];
+        if (contestId != bytes32(0)) {
+            delete targetContest[from];
+            emit TargetUnregistered(from, contestId);
+        }
+        super._update(from, to, amount);
+    }
+
     /// @dev 靶策略核心：覆写 _update（ERC-20 内部转账/铸币/销毁统一入口）。
     function _update(address from, address to, uint256 value) internal override {
         bytes32 contestId = targetContest[from];
         if (contestId != bytes32(0)) {
-            if (to == minter) {
-                // 控制器划转（settle/赎回/退款）：先注销靶再放行，
-                // 防划转后仍受靶约束。
-                delete targetContest[from];
-                emit TargetUnregistered(from, contestId);
-            } else if (arena.isRegisteredAttacker(contestId, to)) {
+            if (arena.isRegisteredAttacker(contestId, to)) {
                 // 攻破：先注销（CEI），再转账，再回调结算。
                 delete targetContest[from];
                 emit TargetUnregistered(from, contestId);
@@ -462,9 +521,9 @@ contract RTMToken is ERC20, Ownable {
                 emit Breach(contestId, to, value);
                 arena.onBreach(contestId, to);
                 return;
-            } else {
-                revert TargetTransferRestricted(from, to);
             }
+            // 转给 Arena 地址也不例外：W 自转不是合法出口，必须走 controllerTransfer。
+            revert TargetTransferRestricted(from, to);
         }
         super._update(from, to, value);
     }

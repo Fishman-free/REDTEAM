@@ -54,8 +54,11 @@
         │              ▼                     ▼                  ▼
         │          到期未破               被攻破             守方弃权(Key失效)
         │     W余额划回守方         W余额全归获胜攻方      S按已送达消息条数分给攻方
-        └──   攻方提走剩余质押       其余攻方提剩余质押     攻方提走未罚没部分
+        └──   攻方提走剩余质押    所有攻方（含获胜者）   攻方提走未罚没部分
+                                    提走剩余质押
 ```
+
+**质押返还口径**：任何攻方（包括获胜者）都可在比赛结束后提走其未被罚没的剩余质押；获胜者额外获得 W 的全部余额。罚没只按 §3.3 的惰性公式扣减，不从奖金中二次扣除。
 
 ### 3.2 参数表（默认值；P0 仿真校准后定稿）
 
@@ -92,15 +95,17 @@ RTMToken 重写 ERC-20 `_update`：
 
 ```solidity
 if (isActiveTarget(from)) {
-    if (to == arena) { /* 控制器划转：settle/退款/赎回，放行 */ }
-    else if (isRegisteredAttacker(contestOf(from), to)) {
-        arena.onBreach(contestOf(from), to);   // 先效果后转账（CEI）
-    } else revert TargetTransferRestricted();  // 转给任何第三方直接失败
+    if (isRegisteredAttacker(contestOf(from), to)) {
+        unregister(from);                       // 先效果
+        _transfer(from, to, value);             // 再转账
+        arena.onBreach(contestOf(from), to);    // 后回调，Arena 清算剩余余额
+    } else revert TargetTransferRestricted();   // 转给任何第三方直接失败
 }
 ```
 
 - **检测规则即结算规则**：用户要求的"检测到守方向攻方转移即结束比赛"由代币在转账交易内原子完成：注销 W → 把 W 全部余额经控制器划给获胜攻方 → 记录 `Breach` 事件。没有链下裁判窗口，没有竞态。
 - 靶钱包之间互转、入金不受限；比赛结束（破/到期/弃权）即注销，恢复普通钱包。
+- **结算/退款/赎回走独立的 `controllerTransfer(from, to, amount)`（仅 minter 可调）**：它绕过靶策略并在必要时注销靶，是 Arena 移动 W 资金的唯一入口。Arena 不得依赖 `transferFrom` + allowance 移动 W 资金；靶钱包自行向 Arena 转账同样 revert（视同第三方），防止被诱导"转账到 Arena"绕过结算、留下无靶的活跃比赛。
 - 守方向"非该场攻方"转账（比如守方换小号想私下转走）被代币 revert——这就是"测试币标记"的实现。
 - 挖矿赛与普通赛共用同一套逻辑，defender = 平台金库地址。
 - 智能体违规转出的金额全额归获胜攻方（即 W 余额划转），不做单独的"没收/罚没"步骤：奖池本身就守方质押，转给攻方即赔付，链上无需也无法证明"双方是不是同一人"。
@@ -117,7 +122,7 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 
 1. **自攻自守（合谋）严格亏损**：守方收益 = 攻方罚款 + W 余额回流；攻方支出 = s 罚没 + 消息费。同一人兼任时，罚款从左口袋到右口袋，净变化 = −消息费 − 推理费（挖矿赛下新铸币不回流自己）。每条消息亏 0.5%×S + 推理费，无任何参数能让其为正。**不需要识破合谋，机制内生无利可图。**平台自攻自己的挖矿赛是例外情形：手续费与罚没在平台内部转移，净代币变化为零（而非负），其约束是声誉损失、RSI 成本与链上可审计性，而非负 EV。
 2. **守方参与条件（技能分化）**：守方 EV = S×P(存活) + Σ罚款 − S。若守方真实攻破概率低于攻击者据以入场的市场预期，罚款收入 > 期望失池，EV 为正；反之亏损。排行榜与历史存活记录让市场逐步修正预期——强守方的正 EV 是信息不对称下的超额收益，随声誉收敛而趋近 0，声誉本身构成额外回报。守方损失上界 = S + 推理费，且开赛前已知。
-3. **攻方参与条件**：攻方 EV = P_breach×(W余额) − s×(1−2^−k) − f×n − 推理费。P0 仿真扫描 P_breach、N（对手数稀释）、k 给出自由进入均衡人数 N*：当 N 超过 N* 时边际攻方 EV<0 自动退出市场，无需准入控制。
+3. **攻方参与条件**：攻方 EV = P_breach×(W余额) + s×keep^k − s − f×n − 推理费（获胜者也取回未罚没的剩余质押，奖金与质押返还并存）。P0 仿真扫描 P_breach、N（对手数稀释）、k 给出自由进入均衡人数 N*：当 N 超过 N* 时边际攻方 EV<0 自动退出市场，无需准入控制。
 4. **蜂蜜罐守方不可行**：守方不能提供"永不转账"智能体——资格测试要求主人授权转账成功；转账由平台托管的 runner 用 W 私钥执行，守方无法在链外拦截；BYOK 端点被平台白名单锁死，不能换假模型。
 5. **守方弃权无利可图**：Key 失效 → 与被破同结算（S 分给攻方），临阵撤 Key 不保 S。已在途罚款被守方拉走的部分不追回（链上不可逆），规格明示该不对称。
 6. **平台中性**：平台收入全部来自手续费与数据销售，不持彩池、不参与攻守，激励与任何一方的胜负脱钩。
@@ -166,6 +171,7 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 - 靶注册表：`registerTarget(W, contestId)` / `unregisterTarget(W)` 仅 Arena 可调。
 - 攻方集合查询 `isRegisteredAttacker(contestId, addr)` 委托 Arena。
 - `onBreach` 回调（仅 Arena）：结束比赛并控制器划转（CEI 顺序：先状态后转账）。
+- `controllerTransfer(from, to, amount)` 仅 minter：结算/退款/赎回的唯一资金划转入口，绕过靶策略并在必要时注销靶；Arena 不得依赖 allowance 的 `transferFrom` 移动 W 资金。
 - 铸币：`mint(to, amount)` 仅 minter，无年份预算（**减半删除**）；`miningRate` 等参数放 Arena。
 - 事件：`TargetRegistered/TargetUnregistered/Breach`；错误：`TargetTransferRestricted/NotMinter/...`。
 - 不变量：靶活跃期间 W 的任何转出仅两个去向（注册攻方→触发 onBreach；Arena→控制器划转）；否则转账 revert。
@@ -184,7 +190,7 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 - `reportDefenderFault(contestId)`（runner 操作员）：S 按各攻方 deliveredCount 加权分配；攻方可提 `s − 已被守方拉走的部分`；发 `DefenderFault` 事件。
 - `onBreach(contestId, winner)`（由 RTMToken 回调）：settle——W 余额控制器划给 winner；注销靶；发 `Breach(contestId, winner, amount)`。
 - `expire(contestId)`：到期未破，W 余额划回守方；攻方提剩余。
-- `withdrawMyStake(attacker, contestId)`：pull 提款（ended 后）。
+- `withdrawMyStake(attacker, contestId)`：pull 提款（ended 后）；对**所有攻方**（含获胜者）开放，返回 `s − 已罚没`，不与奖金互斥。
 - `accrue(contestId)`：挖矿赛按 `floor(elapsed/E)×E_rate − 已铸` 铸币进 W。
 - `refundUnserved(attacker, contestId, seq)`（runner 操作员）：平台未能送达的付费消息按 seq 退手续费（幂等，防重复退）。
 
