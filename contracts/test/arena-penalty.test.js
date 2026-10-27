@@ -607,4 +607,105 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
       'AttackPaid'
     );
   });
+
+  // ==================================================================
+  // 8. 罚没迭代上限 / D≤7d 不超时、不超 gas
+  // ==================================================================
+  describe('迭代上限与 gas 边界', function () {
+    it('正常比赛 D=7d：到期最大实际 k=83，expire/withdraw/collect 均不超 gas 上限', async function () {
+      const { arena, rtm, defender, outsider, attackerA } = game;
+      const s = (STAKE * BigInt(BPS)) / 10000n;
+      const { id, end } = await makeContest(game, { duration: 7n * DAY });
+      await joinAs(game, attackerA, id);
+
+      const joinedAt = (await arena.attackers(id, attackerA.address)).joinedAt;
+      // join 所在的区块必然晚于 contest.start（Hardhat 每笔 tx 递增时间），
+      // 因此 (end - joinedAt) 略小于 7d，向下取整最大实际 k = 83；
+      // k=84 只在不现实的“join 与 start 同秒”时序下才可达。
+      const maxK = (end - joinedAt) / EPOCH;
+      expect(maxK).to.equal(83n);
+
+      await time.increaseTo(end);
+      const remAtExpiry = await assertRemaining(
+        arena,
+        id,
+        attackerA.address,
+        s,
+        maxK,
+        'D=7d 到期'
+      );
+      const due = await arena.penaltyDue(id, attackerA.address);
+      expect(due).to.be.greaterThan(0n);
+      expect(due).to.equal(s - remAtExpiry);
+
+      const attackerBefore = await rtm.balanceOf(attackerA.address);
+      const defenderBeforeExpire = await rtm.balanceOf(defender.address);
+
+      const expireReceipt = await (await arena.connect(outsider).expire(id)).wait();
+      expect(await arena.contestState(id)).to.equal(2n);
+      // 到期时 S 从 W 退回 defender，作为后续罚款收入的基准。
+      expect(await rtm.balanceOf(defender.address)).to.equal(
+        defenderBeforeExpire + STAKE
+      );
+
+      const withdrawReceipt = await (await arena.connect(attackerA).withdrawStake(id))
+        .wait();
+      expect(await rtm.balanceOf(attackerA.address)).to.equal(
+        attackerBefore + remAtExpiry
+      );
+
+      const defenderBeforeCollect = await rtm.balanceOf(defender.address);
+      const collectReceipt = await (await arena.connect(defender).collectPenalties(id))
+        .wait();
+      expect(await rtm.balanceOf(defender.address)).to.equal(
+        defenderBeforeCollect + due
+      );
+      expect(await arena.penaltyDue(id, attackerA.address)).to.equal(0n);
+      // Arena 收到 s，随后付出 remaining + due = s，余额归零。
+      expect(await rtm.balanceOf(arena.target)).to.equal(0n);
+
+      // 实测远低于区块 gas limit；上限留足余量，只约束迭代算法不出现病态开销。
+      expect(expireReceipt.gasUsed).to.be.lessThan(200_000n);
+      expect(withdrawReceipt.gasUsed).to.be.lessThan(200_000n);
+      expect(collectReceipt.gasUsed).to.be.lessThan(500_000n);
+    });
+
+    it('挖矿赛 k=84：定点迭代不超时，collect gas 有界', async function () {
+      const { arena, rtm, treasury, outsider, attackerA } = game;
+      // rate=100 是 MAX_MINING_RATE 合法上限；只建一场，避免 MAX_ACTIVE_MINING=3 干扰。
+      const { id, rate } = await makeMining(game, { rate: RTM(100), stakeBps: BPS });
+      expect(rate).to.equal(RTM(100));
+
+      await time.increase(EPOCH);
+      await arena.accrue(id); // 有效 2h，W 余额 = rate = 100 RTM
+      await joinAs(game, attackerA, id); // base=100，s=10 RTM
+
+      const s = (await arena.attackers(id, attackerA.address)).stake;
+      expect(s).to.equal((rate * BigInt(BPS)) / 10000n);
+      expect(s).to.equal(RTM(10));
+
+      await time.increase(84n * EPOCH); // 自 joinedAt 起精确 84 个 epoch
+      const rem = await assertRemaining(
+        arena,
+        id,
+        attackerA.address,
+        s,
+        84n,
+        'mining k=84'
+      );
+      const due = await arena.penaltyDue(id, attackerA.address);
+      expect(due).to.equal(s - rem);
+
+      // 挖矿赛任何人都可收罚款，收款方为 Treasury。
+      const treasuryBefore = await rtm.balanceOf(treasury.target);
+      const collectReceipt = await (await arena.connect(outsider).collectPenalties(id))
+        .wait();
+      expect(await rtm.balanceOf(treasury.target)).to.equal(treasuryBefore + due);
+      expect(await arena.penaltyDue(id, attackerA.address)).to.equal(0n);
+
+      // 无 end 的挖矿赛此时仍 Live，无需 breach/expire。
+      expect(await arena.contestState(id)).to.equal(1n);
+      expect(collectReceipt.gasUsed).to.be.lessThan(500_000n);
+    });
+  });
 });
