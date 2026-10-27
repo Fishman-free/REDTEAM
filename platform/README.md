@@ -104,9 +104,12 @@ http；允许 path（如 `/v1`），拒绝 userinfo、query 与 fragment。`base
 `model/messages/tools/parallel_tool_calls=false/temperature=0/max_tokens`。
 
 错误分两类：HTTP 401/402/403/429/5xx 与 transport/timeout/connection 为
-`ModelError.kind == "infrastructure"`；其余 4xx、坏 JSON/schema、空 choices、
-响应模型不匹配、响应超过 2 MB 为 `"agent_protocol"`。具体异常均为
-`ModelUnavailable(ModelError)`；客户端不重试，重试/弃权由 runner 处理。
+`ModelError.kind == "infrastructure"`；3xx、其余 4xx、坏 JSON/schema、空 choices、
+响应模型不匹配、响应超过 2 MB 为 `"agent_protocol"`。客户端使用 no-redirect
+opener 拒绝跟随 3xx，因此不会把 `Authorization: Bearer <key>` 发往重定向目标。
+含 CR/LF/NUL 或其他控制字符的 api_key 在构造时以 `ValueError` 拒绝，错误消息
+不回显 key。具体异常均为 `ModelUnavailable(ModelError)`；客户端不重试，
+重试/弃权由 runner 处理。
 
 ```python
 from redteam_platform.byok import ByokClient, ModelError
@@ -135,8 +138,9 @@ cd platform
 
 测试不联网：chain 的 `verify_chain` 用假 provider 注入；custody 使用临时目录和
 较低的 scrypt 参数（`scrypt_n=2**14`，仅测试；生产默认 `2**15`）；BYOK 测试拦截
-`urllib.request.urlopen` 并注入假响应，覆盖 allowlist/URL 校验、请求体、错误分类、
-不重试与密钥泄漏断言。当前全套 **164 passed**（config/custody/chain 64 + BYOK 100）。
+低层 socket/`HTTPConnection.connect` 并注入假 transport / 假 HTTPS 响应，覆盖
+allowlist/URL 校验、请求体、错误分类、3xx 不跟随、api_key 控制字符、不重试与
+密钥泄漏断言。当前全套 **173 passed**（config/custody/chain 64 + BYOK 109）。
 
 ## 安全约定
 
