@@ -10,7 +10,7 @@
 | [test/](test/) / [tests/](tests/) | 合约/JS 测试与支付 Python 测试 |
 | [scenarios/](scenarios/) / [prompts/](prompts/) | 场景、可信采购输入、独立评估真相和提示词 |
 
-[PaymentAgent](src/PaymentAgent.sol) 约束付款；[ExperimentalToken](src/ExperimentalToken.sol) 提供预铸合成资产；[RewardSettlement](src/RewardSettlement.sol) 结算演示奖励。[RTMToken](src/RTMToken.sol) 与 [BountyVault](src/BountyVault.sol) 实现独立历史 ERC-20 发行与悬赏预算；旧 Arena 已有本地 RTM 证据桥，尚未接入当前 PayAssist campaign 或 payment-agent 演示，不是 Flower NFT，仍排除商业版。本版已合入 `6394fc2`：金库支持显式续期与可配置累计结算上限，禁用放弃所有权；付款操作与发票分别防重放，三个实验合约增加部署参数校验。累计上限默认不收紧，须由 owner 配置；过期续期仍受当前年预算限制，不保证兑付。两种奖励机制均保留，详见 [RTM 设计](../docs/references/research/RTM_BOUNTY_DESIGN.md)。
+[PaymentAgent](src/PaymentAgent.sol) 约束付款；[ExperimentalToken](src/ExperimentalToken.sol) 提供预铸合成资产；[RewardSettlement](src/RewardSettlement.sol) 结算演示奖励。旧 RTM 减半与 Bounty 体系已于 2026-10 归档（见 [archieve/contracts-2026-10/](../archieve/contracts-2026-10/)）；新攻守竞技场机制见 [设计规格](../docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md)（合约实现进行中）。本版已合入 `6394fc2`：金库支持显式续期与可配置累计结算上限，禁用放弃所有权；付款操作与发票分别防重放，三个实验合约增加部署参数校验。累计上限默认不收紧，须由 owner 配置；过期续期仍受当前年预算限制，不保证兑付。
 
 以下命令从 `contracts/` 执行，需要 Node.js 22 和 Python 3.11+：
 
