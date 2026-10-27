@@ -286,6 +286,77 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
         .withArgs(id, defender.address, due);
       expect(await rtm.balanceOf(defender.address)).to.equal(defBefore + due);
     });
+
+    it('暂停后加入：pausedAtJoin 快照排除此前暂停时长', async function () {
+      const { arena, operator, attackerA, attackerB } = game;
+      const s = (STAKE * BigInt(BPS)) / 10000n;
+      const { id } = await makeContest(game, { duration: DAY });
+      await joinAs(game, attackerA, id);
+
+      await time.increase(EPOCH); // A k=1
+
+      await arena.connect(operator).pause(id);
+      const pausedAt = BigInt(await time.latest());
+      await time.increase(6n * HOUR);
+      await arena.connect(operator).unpause(id);
+      const pausedFor = BigInt(await time.latest()) - pausedAt;
+
+      // B 在暂停结束后加入：pausedAtJoin 必须快照此前的全部暂停时长。
+      await joinAs(game, attackerB, id);
+      expect((await arena.attackers(id, attackerB.address)).pausedAtJoin).to.equal(
+        pausedFor
+      );
+
+      await time.increase(EPOCH); // A 有效 4h => k=2；B 有效 2h => k=1
+      const remA = await assertRemaining(arena, id, attackerA.address, s, 2n, 'A 跨暂停');
+      const remB = await assertRemaining(
+        arena,
+        id,
+        attackerB.address,
+        s,
+        1n,
+        'B 暂停后加入'
+      );
+      expect(remA).to.equal(expectedRemaining(s, 2n)); // 5.625 RTM
+      expect(remB).to.equal(expectedRemaining(s, 1n)); // 7.5 RTM
+      expect(remA).to.be.lessThan(remB);
+    });
+
+    it('多轮暂停累加：有效时长扣除全部暂停（k=3）', async function () {
+      const { arena, operator, attackerA } = game;
+      const s = (STAKE * BigInt(BPS)) / 10000n;
+      const { id } = await makeContest(game, { duration: DAY });
+      await joinAs(game, attackerA, id);
+
+      // 第一段：有效 2h => k=1。
+      await time.increase(EPOCH);
+      const rem1 = await assertRemaining(arena, id, attackerA.address, s, 1n, '第一段后');
+      expect(rem1).to.equal(expectedRemaining(s, 1n)); // 7.5 RTM
+
+      await arena.connect(operator).pause(id);
+      await time.increase(2n * HOUR); // 暂停 2h 不计入有效时长
+      expect(await arena.remainingStake(id, attackerA.address)).to.equal(rem1);
+      await arena.connect(operator).unpause(id);
+      expect(await arena.remainingStake(id, attackerA.address)).to.equal(rem1);
+
+      // 第二段：有效累计 4h => k=2。
+      await time.increase(EPOCH);
+      const rem2 = await assertRemaining(arena, id, attackerA.address, s, 2n, '第二段后');
+      expect(rem2).to.equal(expectedRemaining(s, 2n)); // 5.625 RTM
+      expect(rem2).to.be.lessThan(rem1);
+
+      await arena.connect(operator).pause(id);
+      await time.increase(4n * HOUR); // 暂停 4h 不计入有效时长
+      expect(await arena.remainingStake(id, attackerA.address)).to.equal(rem2);
+      await arena.connect(operator).unpause(id);
+      expect(await arena.remainingStake(id, attackerA.address)).to.equal(rem2);
+
+      // 第三段：有效累计 6h => k=3。
+      await time.increase(EPOCH);
+      const rem3 = await assertRemaining(arena, id, attackerA.address, s, 3n, '第三段后');
+      expect(rem3).to.equal(expectedRemaining(s, 3n)); // 4.21875 RTM
+      expect(rem3).to.be.lessThan(rem2);
+    });
   });
 
   // ==================================================================
