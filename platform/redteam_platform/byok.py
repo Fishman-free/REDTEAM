@@ -13,6 +13,10 @@ Faults are split into two classes because the runner treats them differently:
 * ``agent_protocol`` -- the backend replied, but the response was invalid or
   violated the protocol; this is not an infrastructure outage.
 
+Redirects are refused (a 3xx becomes an ``agent_protocol`` failure) so the
+``Authorization`` header cannot be forwarded to a different host.  API keys
+containing control characters are rejected before any request is built.
+
 No retries are performed here; the runner owns retry/abstention policy.
 """
 
@@ -39,6 +43,13 @@ INFRASTRUCTURE = "infrastructure"
 AGENT_PROTOCOL = "agent_protocol"
 _KINDS = frozenset({INFRASTRUCTURE, AGENT_PROTOCOL})
 _INFRASTRUCTURE_HTTP_CODES = frozenset({401, 402, 403, 429})
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so Authorization never reaches a redirect target."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class AllowlistError(ValueError):
@@ -212,7 +223,10 @@ class ByokClient:
 
         if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("api_key must be a non-empty string")
-        if any(ord(character) < 0x20 or ord(character) == 0x7F for character in api_key):
+        if any(
+            ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
+            for character in api_key
+        ):
             raise ValueError("api_key must not contain control characters")
 
         self.provider = provider
@@ -220,14 +234,22 @@ class ByokClient:
         self.model = entry["model"]
         self.timeout = _validate_timeout(timeout)
         self._api_key = api_key
+        # A custom opener replaces the default HTTPRedirectHandler, so a 3xx
+        # response becomes an HTTPError (classified as agent_protocol) and the
+        # bearer token is never forwarded to a redirect target.
+        self._opener = urllib.request.build_opener(_NoRedirect())
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(provider={self.provider!r}, model={self.model!r})"
 
     def _post(self, request: urllib.request.Request, timeout: float) -> Any:
-        """Send the request; split out so tests can inject a transport."""
+        """Send the request without following redirects.
 
-        return urllib.request.urlopen(request, timeout=timeout)
+        Split out so tests can inject a transport; the opener is also exposed
+        for tests that exercise the real no-redirect path.
+        """
+
+        return self._opener.open(request, timeout=timeout)
 
     def complete(
         self,

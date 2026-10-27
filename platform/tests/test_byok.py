@@ -1,10 +1,14 @@
 """Offline tests for the BYOK allowlisted model client.
 
-Every test blocks ``urllib.request.urlopen`` by default and installs a fake
-only where a request is expected, so the suite never opens a socket.
+Every test blocks low-level socket creation by default and installs a fake
+transport only where a request is expected, so the suite never opens a socket.
 """
 
+import email.message
+import http.client
+import io
 import json
+import socket
 import urllib.error
 import urllib.request
 
@@ -42,7 +46,8 @@ def no_network(monkeypatch):
     def blocked(*args, **kwargs):
         raise AssertionError("network access attempted in unit test")
 
-    monkeypatch.setattr(urllib.request, "urlopen", blocked)
+    monkeypatch.setattr(http.client.HTTPConnection, "connect", blocked)
+    monkeypatch.setattr(socket, "create_connection", blocked)
 
 
 class FakeResponse:
@@ -64,7 +69,7 @@ class FakeResponse:
 
 
 class Recorder:
-    """Fake urlopen that records requests and returns/raises a canned result."""
+    """Fake transport that records requests and returns/raises a canned result."""
 
     def __init__(self, *, payload=None, error=None):
         self.payload = payload
@@ -85,8 +90,55 @@ class Recorder:
 
 def install(monkeypatch, *, payload=None, error=None):
     recorder = Recorder(payload=payload, error=error)
-    monkeypatch.setattr(urllib.request, "urlopen", recorder)
+
+    def fake_post(self, request, timeout):
+        return recorder(request, timeout)
+
+    monkeypatch.setattr(ByokClient, "_post", fake_post)
     return recorder
+
+
+class FakeHTTPResponse:
+    """Minimal HTTP response used by the redirect tests (never read)."""
+
+    def __init__(self, url, code, msg, headers):
+        self.url = url
+        self.code = code
+        self.msg = msg
+        self.headers = headers
+        self.fp = io.BytesIO(b"")
+
+    def info(self):
+        return self.headers
+
+    def geturl(self):
+        return self.url
+
+    def read(self, size=-1):
+        return self.fp.read(size)
+
+    def close(self):
+        self.fp.close()
+
+
+class RedirectingHTTPSHandler(urllib.request.HTTPSHandler):
+    """Serve one 3xx response and fail if a redirect target is requested."""
+
+    handler_order = 100
+
+    def __init__(self, code, target):
+        super().__init__()
+        self.code = code
+        self.target = target
+        self.requests = []
+
+    def https_open(self, request):
+        self.requests.append(request)
+        if request.full_url != BASE_URL + "/chat/completions":
+            raise AssertionError("redirect target was requested")
+        headers = email.message.Message()
+        headers["Location"] = self.target
+        return FakeHTTPResponse(request.full_url, self.code, "Redirect", headers)
 
 
 def success_payload(**overrides):
@@ -289,9 +341,19 @@ def test_empty_api_key_is_rejected(api_key):
         ByokClient("glm", api_key, allowlist=ALLOW)
 
 
-def test_api_key_with_control_characters_is_rejected():
-    with pytest.raises(ValueError, match="api_key"):
-        ByokClient("glm", "sk-test\r\nInjected: 1", allowlist=ALLOW)
+@pytest.mark.parametrize(
+    "character",
+    ["\r", "\n", "\r\n", "\x00", "\x1b", "\x7f", "\x85"],
+)
+def test_api_key_with_control_characters_is_rejected_without_echo(character):
+    api_key = "sk-test" + character + "injected"
+
+    with pytest.raises(ValueError) as caught:
+        ByokClient("glm", api_key, allowlist=ALLOW)
+
+    assert "api_key" in str(caught.value)
+    assert api_key not in str(caught.value)
+    assert "sk-test" not in str(caught.value)
 
 
 def test_api_key_is_not_in_repr():
@@ -413,6 +475,46 @@ def test_complete_does_not_retry(monkeypatch):
         make_client().complete(MESSAGES, TOOLS)
 
     assert len(recorder.requests) == 1
+
+
+def test_client_opener_replaces_default_redirect_handler():
+    client = make_client()
+
+    redirect_handlers = [
+        handler
+        for handler in client._opener.handlers
+        if isinstance(handler, urllib.request.HTTPRedirectHandler)
+    ]
+
+    assert len(redirect_handlers) == 1
+    assert isinstance(redirect_handlers[0], byok._NoRedirect)
+
+
+@pytest.mark.parametrize("code", [302, 307])
+def test_redirect_is_rejected_without_following(code):
+    target = "https://redirect.example/steal"
+    handler = RedirectingHTTPSHandler(code, target)
+    client = make_client()
+    client._opener = urllib.request.build_opener(handler, byok._NoRedirect())
+
+    with pytest.raises(ModelUnavailable) as caught:
+        client.complete(MESSAGES, TOOLS)
+
+    exc = caught.value
+    assert exc.kind == "agent_protocol"
+    assert str(exc) == f"http {code}"
+    assert SECRET not in str(exc)
+    assert BASE_URL not in str(exc)
+    assert target not in str(exc)
+
+    # The redirect target must never be contacted, and the bearer token is
+    # only present on the single request to the allowlisted base URL.
+    assert len(handler.requests) == 1
+    request = handler.requests[0]
+    assert request.full_url == BASE_URL + "/chat/completions"
+    assert request.full_url != target
+    headers = {name.lower(): value for name, value in request.header_items()}
+    assert headers["authorization"] == "Bearer " + SECRET
 
 
 # -- transport faults -----------------------------------------------------
