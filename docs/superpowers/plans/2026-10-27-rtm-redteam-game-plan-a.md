@@ -140,6 +140,8 @@ git mv test/audit-poc.test.js ../archieve/contracts-2026-10/
 
 （此步在任务 3 完成后一并 commit 亦可；先改 README 中的删除说明，合约表行等任务 3 落地后补。）
 
+**执行记录（2026-10-27）**：整份 `audit-poc.test.js` 归档，但其中仅依赖现行 PaymentAgent/RewardSettlement/ExperimentalToken 的 6 个用例（L-01、L-02、非 operator 边界）已抽取到 `contracts/test/payment-audit-regressions.test.js` 继续运行；`archieve/manifest.json` 按既有约定追加 9 条 Git blob SHA-256 记录；活跃文档中的旧路径链接已同步。commits `f1ecd61` / `de052df` / `d9eaa86`，`npm test` 211 passing。
+
 - [ ] **步骤 5：Commit**
 
 ```bash
@@ -165,10 +167,11 @@ superseded by the red-team mining game spec of 2026-10-27"
 #!/usr/bin/env python3
 """RTM 攻守博弈参数仿真（规格 P0）。
 
-验证三件事：
-1. 存在双方正 EV 的参数域；
+验证四件事：
+1. 零和恒等式：EV_守 + ΣEV_攻 = −(手续费 + 推理费)；
 2. 自攻自守 EV 恒负；
-3. 自由进入均衡人数 N* 有界。
+3. 攻方自由进入均衡人数 N* 有界；
+4. 技能分化：真实 p_def 低于市场 p_market 的守方 EV>0，对称 p 下守方 EV<0。
 
 模型（每条攻击消息独立以概率 p_breach 攻破；p 随已承受消息数衰减体现防御强度）：
   攻方 EV = P(自己先攻破) * S - 时间罚没 - 消息费 - 推理费
@@ -248,23 +251,47 @@ def main():
                      "attacker_ev_at_N": round(attacker_ev(max(n_star,1), 1, prm), 2),
                      "self_play_ev_50msgs": round(self_play_ev(prm), 2)})
     print(json.dumps(rows, indent=2))
-    # 断言：自攻自守恒负；存在守方正 EV 域
+    # 断言：自攻自守恒负；强守方 EV>0；对称守方 EV<0（零和）
     assert all(row["self_play_ev_50msgs"] < 0 for row in rows)
-    assert any(row["defender_ev"] > 0 for row in rows), "no positive defender EV domain"
-    print("OK: self-play strictly negative; positive defender domain exists")
+    assert any(row["strong_defender_ev"] > 0 and row["N_star"] >= 1 for row in rows), \
+        "no positive strong-defender domain"
+    assert all(row["symmetric_defender_ev"] < 0 for row in rows), "symmetric free lunch"
+    print("OK: self-play negative; strong defenders profit; symmetric defenders lose")
 
 if __name__ == "__main__":
     main()
 ```
 
+**实现修订（2026-10-27，用户确认"技能分化"叙事）**：上方代码是初始草稿，存在两处必须修正的模型错误，实现时以本修订为准：
+
+- 草稿在更新 `p_any` **之后**才累加 `p_self`，会低估攻方胜率；应先取本轮之前的生存率。
+- 对称模型下不存在"双方正 EV"参数域（零和恒等式），删掉该断言，改为技能分化验证。
+
+必须实现的模型：
+
+```
+每轮 m=1..M，N 名攻方各发一条消息，单条攻破概率 p_m（市场预期 p_market 或真实 p_def）：
+  本轮前生存率 surv = Π_{j<m} (1 - p_j)^N
+  单个攻方的期望胜率 p_self = Σ_m surv_m × (1 - (1 - p_m)^N) / N
+  攻方 EV = p_self×S + s×keep^K − s − M×(fee_rate×S) − M×llm_cost
+  自攻自守 EV = −M×(fee_rate×S + llm_cost)          # 罚款与奖金都是内部转移
+守方 EV = N×F + S×P_survive − S                 # P0 全程持有近似
+  F = s×(1−keep^K)；README 必须说明该近似高估提前攻破路径的罚没收入，
+  因此强守方正 EV 是上界；主网参数定稿前再做按首次攻破时间结算的路径级仿真。
+N*：按 p_market 计算攻方 EV，取满足 EV≥0 的最大 N（上限 50）
+强度阈值：固定 p_market，对 p_def∈(0,p_market] 求守方 EV=0 的临界值
+```
+
+同时输出：每行 `p_market`、`N*`、攻方预期 EV、攻方真实 EV（按 p_def）、守方 EV（按 p_def）、对称情形（p_def=p_market）的守方 EV。断言：自攻自守恒负；N* 有界；存在 `p_def < p_market` 使守方 EV>0；`p_def=p_market` 时守方 EV<0。
+
 - [ ] **步骤 2：运行仿真验证**
 
 运行：`python tools/sim/mechanism_sim.py`
-预期：输出 JSON 表 + `OK: self-play strictly negative; positive defender domain exists`。若守方正 EV 域不存在，调 `p_base` 扫描范围或 `decay`，把结论写进 README。
+预期：输出 JSON 表 + 一行 `OK:` 摘要，包含 N*、强守方 EV>0 的强度阈值、对称情形守方 EV<0、零和恒等式残差≈0。若找不到强守方正 EV 域，扩大 p_market 扫描或调整 M/fee/llm_cost，把结论写进 README；**不得**通过伪造参数让"双方正 EV"成立。
 
 - [ ] **步骤 3：写 tools/sim/README.md**
 
-内容：模型假设、默认参数取值依据（引用仿真输出）、`E_rate` 初值建议（如 `p_base≈0.01` 时每 2h 铸 `S×r×2` 数量级使挖矿期望产出与普通赛罚款同量级）、运行命令。
+内容：模型假设（含 p_market / p_def 的信息不对称解释）、零和恒等式的推导、默认参数取值依据（引用仿真输出）、强守方 EV>0 的强度阈值、对称情形守方为负的结论、`E_rate` 初值建议（例如使挖矿赛每 2h 的期望产出与普通赛罚款同量级）、运行命令。**明确写清：机制不承诺攻守双方同时正 EV；强守方的正 EV 来自市场低估窗口。**
 
 - [ ] **步骤 4：Commit**
 
