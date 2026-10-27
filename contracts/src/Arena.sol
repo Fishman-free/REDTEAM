@@ -36,6 +36,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     uint32 public constant MIN_STAKE_BPS = 200; // 2%
     uint32 public constant MAX_STAKE_BPS = 2000; // 20%
     uint256 public constant PRECISION = 1e18;
+    uint256 public constant MAX_MINING_RATE = 100e18; // 100 RTM / epoch
+    uint32 public constant MAX_ACTIVE_MINING = 3;
 
     enum State {
         None,
@@ -73,10 +75,28 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         bool joined;
     }
 
+    /// @notice 后端/前端读取的核心比赛参数快照。
+    struct ContestInfo {
+        address defender;
+        address wallet;
+        uint256 stake;
+        uint32 stakeBps;
+        uint64 start;
+        uint64 end;
+        uint64 endedAt;
+        uint8 state;
+        bool isMining;
+        uint32 attackerCount;
+        bool paused;
+        uint256 miningRate;
+        uint256 miningMinted;
+    }
+
     RTMToken public rtm;
-    address public treasury;
+    address public immutable treasury;
     address public operator;
     bool public immutable testnet;
+    uint32 public activeMiningCount;
 
     mapping(bytes32 => Contest) internal contests;
     mapping(bytes32 => address[]) public contestAttackers;
@@ -94,7 +114,9 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         address wallet,
         uint256 stake,
         uint64 end,
-        bool isMining
+        bool isMining,
+        uint32 stakeBps,
+        uint256 miningRate
     );
     event Joined(bytes32 indexed id, address indexed attacker, uint256 stake);
     event AttackPaid(
@@ -149,6 +171,9 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     error NotDefender();
     error InvalidWallet(address wallet);
     error BaseZero();
+    error StakeTooHigh(uint256 stake, uint256 maxStake);
+    error TooManyMiningContests();
+    error InvalidTreasury();
     error ContestExpired(bytes32 id);
     error TestnetOnly();
 
@@ -159,6 +184,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
 
     constructor(address initialOwner, address treasury_, bool testnet_) Ownable(initialOwner) {
         if (treasury_ == address(0)) revert ZeroAddress();
+        if (treasury_ == address(this) || treasury_.code.length == 0) revert InvalidTreasury();
         treasury = treasury_;
         testnet = testnet_;
     }
@@ -173,6 +199,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (address(rtm) != address(0)) revert AlreadyInitialized();
         if (address(rtm_) == address(0) || address(rtm_).code.length == 0) revert InvalidRTM();
         if (rtm_.minter() != address(this)) revert InvalidRTM();
+        if (address(rtm_.arena()) != address(this)) revert InvalidRTM();
         rtm = rtm_;
     }
 
@@ -222,7 +249,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         // S 直达托管靶钱包 W；守方必须预先 approve 本合约。
         rtm.transferFrom(defender, wallet, stake);
         rtm.registerTarget(wallet, id);
-        emit ContestCreated(id, defender, wallet, stake, c.end, false);
+        emit ContestCreated(id, defender, wallet, stake, c.end, false, stakeBps, 0);
     }
 
     /// @notice 平台创建挖矿赛：W 为挖矿钱包，收益 = 每 epoch 铸 miningRate。
@@ -233,8 +260,9 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         returns (bytes32 id)
     {
         if (address(rtm) == address(0)) revert NotInitialized();
-        if (miningRate == 0) revert BadParams();
+        if (miningRate == 0 || miningRate > MAX_MINING_RATE) revert BadParams();
         if (stakeBps < MIN_STAKE_BPS || stakeBps > MAX_STAKE_BPS) revert BadParams();
+        if (activeMiningCount >= MAX_ACTIVE_MINING) revert TooManyMiningContests();
         _checkWallet(wallet, treasury, false);
 
         id = _contestId(treasury, wallet);
@@ -249,9 +277,12 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         c.isMining = true;
         c.miningRate = miningRate;
         contestList.push(id);
+        activeMiningCount += 1;
 
         rtm.registerTarget(wallet, id);
-        emit ContestCreated(id, treasury, wallet, 0, type(uint64).max, true);
+        emit ContestCreated(
+            id, treasury, wallet, 0, type(uint64).max, true, stakeBps, miningRate
+        );
     }
 
     function _contestId(address defender, address wallet) internal view returns (bytes32) {
@@ -277,8 +308,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     // 攻方动作
     // ------------------------------------------------------------------
 
-    /// @notice 加入比赛并质押 s = base * stakeBps / 10000。
-    function join(bytes32 id) external nonReentrant {
+    /// @notice 加入比赛并质押 s = base * stakeBps / 10000；maxStake 为滑点上限。
+    function join(bytes32 id, uint256 maxStake) external nonReentrant {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
         if (block.timestamp >= c.end) revert ContestExpired(id);
@@ -291,6 +322,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (base == 0) revert BaseZero();
         uint256 s = (base * c.stakeBps) / 10_000;
         if (s == 0) revert BadParams();
+        if (s > maxStake) revert StakeTooHigh(s, maxStake);
 
         a.stake = s;
         a.base = base;
@@ -365,6 +397,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function pause(bytes32 id) external onlyOperator {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
+        if (block.timestamp >= c.end) revert ContestExpired(id);
         if (c.lastPauseAt != 0) revert PausedNow(id);
         c.lastPauseAt = uint64(block.timestamp);
         emit Paused(id);
@@ -487,6 +520,10 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         _finalizePause(c, at);
         c.state = State.Ended;
         c.endedAt = uint64(at);
+        if (c.isMining) {
+            // 每个挖矿赛只会 _end 一次；checked 减法防止计数下溢。
+            activeMiningCount -= 1;
+        }
         rtm.unregisterTarget(c.wallet);
     }
 
@@ -658,5 +695,25 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
 
     function contestState(bytes32 id) external view returns (uint8) {
         return uint8(contests[id].state);
+    }
+
+    /// @notice 返回后端/前端需要的比赛核心参数。
+    function contestInfo(bytes32 id) external view returns (ContestInfo memory) {
+        Contest storage c = contests[id];
+        return ContestInfo({
+            defender: c.defender,
+            wallet: c.wallet,
+            stake: c.stake,
+            stakeBps: c.stakeBps,
+            start: c.start,
+            end: c.end,
+            endedAt: c.endedAt,
+            state: uint8(c.state),
+            isMining: c.isMining,
+            attackerCount: c.attackerCount,
+            paused: c.lastPauseAt != 0,
+            miningRate: c.miningRate,
+            miningMinted: c.miningMinted
+        });
     }
 }
