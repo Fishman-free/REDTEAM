@@ -27,3 +27,11 @@ build/
 
 # Preserved machine-local leftovers from the repository reorganization.
 /archieve/local-residue/
+
+# Local Besu testnet state, generated network files and validator keys.
+# Never commit validator keys, chain data or generated genesis artifacts.
+infra/*/data/
+infra/*/keydir/
+infra/*/networkFiles/
+infra/*/qbftConfig.json
+infra/*/key.priv

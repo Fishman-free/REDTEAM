@@ -1,0 +1,22 @@
+services:
+  besu-validator:
+    image: ${BESU_IMAGE:-hyperledger/besu:25.10.0}
+    container_name: rtm-besu-validator
+    command:
+      - --config-file=/opt/besu/config.toml
+      - --min-gas-price=0
+      - --tx-pool-enable-balance-check=false
+      - --rpc-http-api=ETH,NET,WEB3,QBFT,DEBUG
+      - --host-allowlist=*
+      - --rpc-http-cors-origins=all
+    volumes:
+      - ./networkFiles/genesis.json:/opt/besu/genesis.json:ro
+      - ./config.toml:/opt/besu/config.toml:ro
+      - ./keydir/key:/opt/besu/key:ro
+      - ./data:/opt/besu/data
+    ports:
+      # Host ports are overridable so a busy 8545/30303 on a dev machine does
+      # not force the testnet to stop. The defaults match the runbook.
+      - "127.0.0.1:${BESU_RPC_PORT:-8545}:8545"
+      - "127.0.0.1:${BESU_P2P_PORT:-30303}:30303"
+    restart: unless-stopped

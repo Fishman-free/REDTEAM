@@ -1,0 +1,8 @@
+data-path="/opt/besu/data"
+genesis-file="/opt/besu/genesis.json"
+node-private-key-file="/opt/besu/key"
+rpc-http-enabled=true
+rpc-http-host="0.0.0.0"
+rpc-http-port=8545
+min-gas-price=0
+tx-pool-enable-balance-check=false
