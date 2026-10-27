@@ -40,7 +40,7 @@ REDTEAM 的核心资产是"经过实战检验的智能体安全能力"。每一�
 |---|---|---|
 | 守方 | 用户（自带智能体） | 平台自有智能体 |
 | 攻方 | 普通攻方，质押 s = r·S | 矿工，无质押 |
-| 奖池 | 守方质押 S | 平台从 Treasury 预打款 1 RTM 到新 W；Treasury 保留 3 RTM 工作资金 |
+| 奖池 | 守方质押 S | 平台从 Treasury 预打款 1 RTM 到新 W；Treasury 工作资金共 3 RTM（含活跃 W 预打款） |
 | 发行 | 无增发 | 每次成功攻破 +1 RTM |
 | 罚款 | 25%/2h，归守方 | 无罚款、无剩余质押提款 |
 | 数据 | join 时 opt-in，可售 | 强制留存，仅 RSI，不售 |
@@ -75,7 +75,7 @@ REDTEAM 的核心资产是"经过实战检验的智能体安全能力"。每一�
 ### 4.1 一场挖矿赛的构成
 
 1. **平台是守方**：平台把自己研发的支付智能体（带 DefensePackage 防御包）上链，其普通钱包 W 作为靶；每个防御版本对应一个 `defenseHash`。每场挖矿赛必须使用**全新 W**（未注册为靶、从未受控、预打款前余额为 0），旧 W 永久受控、不可复用。
-2. **奖池固定 1 RTM**：平台先为每场生成全新 W，由 owner/后端调用 `Treasury.withdraw(rtm, W, 1 RTM)` 预打款；随后 operator 调用 `createMiningContest(wallet, defenseHash)`，合约只校验 W 余额恰为 1 RTM。没有 `accrue()`，没有每 2 小时增长，没有铸币速率参数；**不消耗 Treasury allowance**。Treasury 保留 3 RTM 工作资金（K=3），refund allowance 仅服务 `refundUnserved`。
+2. **奖池固定 1 RTM**：平台先为每场生成全新 W，由 **Treasury owner/多签/平台金库服务**（不是 operator）调用 `Treasury.withdraw(rtm, W, 1 RTM)` 预打款；随后 operator 只调用 `createMiningContest(wallet, defenseHash)`，合约只校验 W 余额恰为 1 RTM。没有 `accrue()`，没有每 2 小时增长，没有铸币速率参数；**不消耗 Treasury allowance**。预打款前先校验 hash/K；若 create revert，1 RTM 留在新 W，用 W 私钥/owner 转回 Treasury。Treasury 工作资金共 3 RTM（含活跃 W 预打款，不含手续费/退款准备金），不按“余额低于 3”补款。
 3. **矿工无质押**：`joinMining(id, acceptData)` 加入，`acceptData` 必须为 true（数据强制留存，仅用于 RSI）；每个地址一次，最多 50 人。矿工不需要 approve RTM，没有罚款，没有 `withdrawStake`，没有 `collectPenalties`。
 4. **消息费 0.005 RTM/条**：每条攻击消息付 `1 RTM × 0.5% = 0.005 RTM` 给 Treasury。矿工需要少量 tRTM，测试网可从水龙头领取。
 5. **攻破=挖中**：矿工说服智能体向自己转账 → RTMToken 只把本次 `value` 转给该矿工并回调 `Arena.onBreach`；Arena 把 W 剩余余额 `controllerTransfer` 给 winner 完成扫尾（合计 W 的全部余额，正常为 1 RTM）。Arena 立即结束本场、把 `defenseHash` 标记 retired，并向 Treasury 补铸 1 RTM 以补偿平台预打款。净增发 = 1 RTM/次成功攻破。
@@ -123,7 +123,8 @@ REDTEAM 的核心资产是"经过实战检验的智能体安全能力"。每一�
 | **用户层守方** | 质押 S（50 RTM）+ 自付 AI 推理费 | 攻方罚款（每 2h 罚攻方剩余质押 25%）+ 到期赎回 S + 守住声誉 | S + 推理费 | 真实强度高于市场预期：罚款收入 > 被破概率 × S |
 | **用户层攻方** | 质押 s=r·S + 每条消息 0.5%×S + 自备模型成本 | 攻破得 W 钱包余额；join 同意数据者另有 30% 数据分成 | s + 全部消息费 + 推理费 | P(攻破)×奖池 + 数据收入 > 时间罚没 + 消息费 + 推理费 |
 | **挖矿层矿工** | **无质押**；0.005 RTM/条消息费 + 自备模型成本；数据强制留存 | 成功攻破固定 1 RTM | 消息费 + 推理费（无质押罚没） | P(攻破)×1 RTM > 消息费 + 推理费 |
-| **平台** | 服务器 + 挖矿赛推理费 + RSI 成本 + Treasury 3 RTM 工作资金（逐场预打款 1 RTM 到新 W） | 用户层消息费 + 数据销售 70%；挖矿层 Treasury 逐场净额为零，外部矿工攻破时平台 RTM 收益为 0；平台自挖时平台净增 +1 RTM | 运营成本；平台自挖会产生增发风险 | 用户层与胜负脱钩；挖矿层靠版本迭代与成本控制 |
+| **平台（普通层）** | 服务器 + 运营成本 | 用户层消息费 + 数据销售 70% | 运营成本 | 与普通层胜负脱钩 |
+| **平台（挖矿消息费）** | Treasury 工作资金共 3 RTM（含活跃 W 预打款）、推理/RSI 成本 | **0.005 RTM × 矿工消息数**；外部矿工攻破时固定 1 RTM 奖励净额为 0（预打款 1 → 补铸 1）；平台自挖时净增 +1 RTM | 推理/RSI 成本；自挖增发风险 | 挖矿消息费收入 > 推理/RSI 成本 |
 | **数据买家** | 数据价 dataPriceBps×S 或 attackerDataPrice | 攻击数据（用于防御修复或攻击研究） | 数据价 | 数据价值 > 价格 |
 
 **关键设计：每一方的损失都有硬上界，且上界在入场前就是已知数。**矿工没有质押，最大损失就是已付消息费 + 推理费；普通攻方最大损失是 s + 消息费 + 推理费；守方最大损失是 S + 推理费。
@@ -184,7 +185,7 @@ EV_守 + ΣEV_攻 = −(消息费 + 推理费)
 矿工 EV = P(攻破) × 1 RTM − 0.005 × 消息条数 − 推理费
 ```
 
-当 EV < 0，弱矿工退出；当版本被攻破，平台立即停赛并换新版本，P(攻破) 下降。挖矿层的发行量只由成功攻破次数决定，不由时间或参与人数决定；平台承担推理/RSI 成本，并用 Treasury 3 RTM 工作资金逐场预打款。
+当 EV < 0，弱矿工退出；当版本被攻破，平台立即停赛并换新版本，P(攻破) 下降。挖矿层的发行量只由成功攻破次数决定，不由时间或参与人数决定；平台用 Treasury 工作资金（共 3 RTM，含活跃 W 预打款）逐场预打款，收入为 0.005 RTM × 矿工消息数，需扣除推理/RSI 成本。
 
 ### 5.5 声誉机制：排行榜是第二货币
 
@@ -217,7 +218,7 @@ EV_守 + ΣEV_攻 = −(消息费 + 推理费)
 1. **挖矿赛获胜者地址分布**：若平台关联地址频繁获胜 → 疑似自导自演；在挖矿层这不只是声誉问题，而是 **+1 RTM 净增发**，必须公开审计。
 2. **每枚 RTM 消耗的攻击消息数**：持续上升 = 防御真的在变强（难度上升的客观证据）；骤降 = 疑似放水或漏洞回退。
 3. **守方净收入分布**：若长期全员净负 → 普通层参与崩塌前兆，需要调整罚款率/消息费。
-4. **Treasury 工作资金/预打款/补铸/退回对账**：Treasury 应保留 3 RTM 工作资金（K=3）；每场创建前应有 1 RTM 从 Treasury 预打款到新 W；每次成功攻破应有 1 RTM 补铸回 Treasury；未攻破退役应有 W 余额退回。Treasury 逐场净额应为零，任何偏差可审计；refund allowance 与挖矿资金分离。
+4. **Treasury 工作资金/预打款/补铸/退回对账**：挖矿工作资金不变量为 `Treasury 工作资金余额 + Σ活跃 W 预打款 = 3 RTM`（不含手续费/退款准备金）；3 场活跃时 Treasury 余额可为 0，不按余额补款。每场创建前应有 1 RTM 从 Treasury 预打款到新 W；成功攻破补铸 1 RTM、未攻破退回 W 余额。Treasury 固定奖励逐场净额为零；`refundAllowance` 只是权限、不是独立资金，退款从同一余额扣且仅用已收手续费。
 
 ---
 
@@ -241,7 +242,7 @@ EV_守 + ΣEV_攻 = −(消息费 + 推理费)
 
 - **事件驱动，不是时间驱动**：只有矿工真的攻破平台智能体，才新增 1 RTM；未攻破不增发。时间 t 不进入供给公式。
 - **无总量上限、无年度预算、无减半、无时间发行速率**：但也不会"躺赚通胀"——没有攻破就没有新币。
-- **逐场 Treasury 净额为零**：Treasury 保留 3 RTM 工作资金；每场创建前平台 `withdraw` 1 RTM 到新 W；成功攻破时 Arena 补铸 1 RTM 回 Treasury；未攻破退役时 W 余额退回 Treasury。外部矿工攻破时平台 RTM 收益为 0，平台承担推理与 RSI 成本；平台自挖则平台净增 +1 RTM。
+- **逐场 Treasury 固定奖励净额为零**：挖矿工作资金（不含手续费/退款准备金）满足 `Treasury 工作资金余额 + Σ活跃 W 预打款 = 3 RTM`；3 场活跃时 Treasury 工作资金余额可为 0，不按“余额低于 3”补款。每场创建前由 Treasury owner/多签/平台金库服务 `withdraw` 1 RTM 到新 W；成功攻破时 Arena 补铸 1 RTM 回 Treasury；未攻破退役时 W 余额退回 Treasury。外部矿工攻破时平台仍收取 0.005 RTM/条消息费，扣除推理/RSI 成本后才是平台净收入；平台自挖则平台净增 +1 RTM。
 - **直观数字例子（次数驱动，不是 24h 累积）**：
   - 24 小时内 0 次成功攻破 → 新增 0 RTM；
   - 24 小时内 3 次成功攻破 → 新增 3 RTM；
@@ -254,9 +255,10 @@ EV_守 + ΣEV_攻 = −(消息费 + 推理费)
 
 ### 6.3 创世分配
 
-- 平台金库保留少量创世 RTM，**唯一用途**是在 Base 的 Uniswap V2 上为 wRTM/USDC 池播种流动性（让矿工挖到的币有去处），不用于团队抛售；
+- 平台金库保留少量创世 RTM，**唯一用途**是在 Base 的 Uniswap V2 上为 wRTM/USDC 池播种流动性（让矿工挖到的币有去处），不用于团队抛售；**挖矿 3 RTM 工作资金不从该流动性桶支出**（见下）；
 - 无私募、无预挖给个人。
-- 测试网 tRTM 由 `mintForTest` 注水：Faucet 领取额度 + Treasury 3 RTM 工作资金。Treasury 的 `approveSpender` allowance 仅用于 `refundUnserved`，与挖矿预打款分离；主网 `testnet=false` 无 `mintForTest` 路径。
+- 测试网 tRTM 由 `mintForTest` 注水：Faucet 领取额度 + Treasury 3 RTM 工作资金（不额外 mint 1M 给 Treasury）。`approveSpender` 只是权限、不是独立资金；`refundUnserved` 从同一 Treasury 余额扣且仅用已收手续费，默认授权 0、按需提高。主网 `testnet=false` 无 `mintForTest` 路径。
+- **主网 3 RTM 工作资金来源**：来自平台运营资金/自有 RTM 份额或早期手续费积累，**不新增创世流动性桶、不从 Uniswap 流动性池直接取、不通过 `mintForTest`**。若创世分配没有运营份额，平台必须先从市场/自有份额取得 3 RTM；未到位时不能创建挖矿赛。
 
 ---
 
@@ -284,8 +286,9 @@ Base 上 wRTM ──Uniswap V2──▶ USDC / ETH
 | 罚款率 | 25%/epoch | 治理 | 仅普通赛；24h 后攻方剩约 3.2% |
 | 普通赛消息手续费 | 0.5% × S | 治理 | 进 Treasury |
 | 挖矿消息手续费 | 0.005 RTM/条（0.5% × 1 RTM） | 合约常量 | 进 Treasury；矿工无质押 |
-| MINING_REWARD | 1 RTM/次成功攻破 | 合约常量 | 平台逐场从 Treasury 预打款 1 RTM 到新 W；攻破补铸，未攻破退回；Treasury 保留 3 RTM 工作资金 |
-| refundAllowance | 部署/运营设定 | owner | **仅**用于 `refundUnserved`，与挖矿工作资金分离 |
+| MINING_REWARD | 1 RTM/次成功攻破 | 合约常量 | 平台逐场从 Treasury 预打款 1 RTM 到新 W；攻破补铸，未攻破退回；Treasury 工作资金共 3 RTM（含活跃 W 预打款） |
+| refundAllowance | 默认 0，按已收手续费提高 | owner | **只是权限、不是独立资金**；`refundUnserved` 从同一 Treasury 余额扣，仅用已收手续费 |
+| treasuryMiningFund | 3 RTM | 平台运营资金/自有份额 | `Treasury 工作资金余额 + Σ活跃 W 预打款 = 3 RTM`；3 场活跃时 Treasury 余额可为 0 |
 | r（普通攻方质押比例） | 10% | 每场守方在 [2%,20%] 自选 | 仅用户攻防层 |
 | 挖矿赛并发上限 K | 3 | 合约常量 | 最多 3 场活跃；攻破/退役释放 |
 | defenseHash 退役 | 永久 | 合约 | 同一 hash 不能开第二场；无冷却期 |

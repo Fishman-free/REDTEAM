@@ -575,7 +575,7 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 - 测试：新建 `contracts/test/arena.test.js`；`contracts/test/rtm-game.test.js` 保留 RTMToken 测试
 
 > **旧挖矿修订作废（2026-10-27 复审，强制阅读）**：本节“实现修订”第 2、8、9、10、12、13、14、15、16、17 条含旧挖矿契约，已被《挖矿层修订（2026-10-27）》R2 取代，**禁止照抄**。普通赛第 1、3、4、5、6、7、11 条仍有效；第 1 条需补 `!rtm.isControlledWallet(W)` 校验。逐条对应：
-> - 第 2 条：旧 `createMiningContest(wallet,E_rate,r)`/`stakeBps`/`end=max` → 新 `createMiningContest(wallet,defenseHash)`；平台先用 `Treasury.withdraw` 把新 W 预打款到恰好 1 RTM，create 只校验余额、不耗 allowance。
+> - 第 2 条：旧 `createMiningContest(wallet,E_rate,r)`/`stakeBps`/`end=max` → 新 `createMiningContest(wallet,defenseHash)`；Treasury owner/多签/平台金库服务先用 `Treasury.withdraw` 把新 W 预打款到恰好 1 RTM，operator 只 create；create 只校验余额、不耗 allowance。
 > - 第 3 条：字段保留，但新增 `dataConsent`；挖矿赛 `stake=0`、`base=1e18`。
 > - 第 8 条：挖矿罚款/`collectPenalties`/`withdrawStake`/剩余质押 → 删除；矿工无质押。
 > - 第 9 条：mining `reportDefenderFault` 退奖池 → 新 `retireMining`（W 余额回 Treasury、不铸造、hash retired）。
@@ -591,7 +591,7 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 
 1. `createContest(defender, wallet, S, D, r)` **仅 operator**：平台完成资格测试后调用；校验 wallet 非零/非 minter/非已注册靶/`!rtm.isControlledWallet(W)`；`transferFrom(defender→W, S)`；同交易注册靶。守方只 approve S，不能自行传任意 wallet（否则可注册受害者并扫余额）。
 2. **【旧挖矿，R2 取代】** `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；记录 `stakeBps=r`；`end=max`。新签名与预打款见 R2。
-3. `Attacker` 记账字段：`stake, base(feeBase), joinedAt, pausedAtJoin, attackCount, delivered, penaltyTaken, stakeWithdrawn, waived, joined`。`base` 在 join 时快照（normal=S，mining=W 余额）；`s=base·r/10000`。
+3. `Attacker` 记账字段：`stake, base(feeBase), joinedAt, pausedAtJoin, attackCount, delivered, penaltyTaken, stakeWithdrawn, waived, joined, dataConsent`。普通赛 `base=S`、`s=base·r/10000`；挖矿赛 `base=1 RTM`、`stake=0`（无质押、无罚款）。
 4. `Contest` 增加 `endedAt`；**所有结束路径**（breach/expire/fault）设置 `endedAt`，`_elapsed` 用 `min(now, end, endedAt)` 冻结时间；`_pow75(k)` 用平方-乘 O(log k)，禁止 O(k) 循环。
 5. `join`/`attack`/`reportDefenderFault` 都必须要求 `now < end`（到期后、expire 前的窗口不允许新加入、付费消息或改判弃权）；`attack` 用 `usedMsg` 永久防重（退款后同一 hash 不可复用），`paidFee` 只用于精确退款。`seq=++attackCount`；`fee=feeBase·0.5%`；fee 转 Treasury；暂停中 revert。挖矿赛费率不得为 0。
 6. `markDelivered(id, attacker, msgHash)`：仅 operator、`now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达、`paidFee > 0`（已退款不可标记）；置 `deliveredMsg[id][attacker][hash]=true` 并 `delivered++`。
@@ -1600,12 +1600,12 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 1. **Arena 构造器**：实际签名为 `(address initialOwner, address treasury, bool testnet)`；草稿漏了第三个参数。测试网必须传 `testnet=true`，否则 `mintForTest` 不可用。
 2. **注水方法**：草稿的 `arena.mintFor(...)` 不存在；实际为 `mintForTest(to, amount)`（仅 `testnet=true`）。
 3. **DataMarket operator**：草稿漏了 `market.setOperator(operator)`；不加则 `publish` 永远 revert `NotOperator`。
-4. **Treasury allowance**：草稿漏了 `treasury.approveSpender(rtm, arena, treasuryAllowance)`；**该 allowance 仅用于 `refundUnserved`**，不用于挖矿预置。挖矿 W 由平台 `Treasury.withdraw` 预打款（见 R4）。
+4. **Treasury allowance**：草稿漏了 `treasury.approveSpender(rtm, arena, refundAllowance)`；**该 allowance 只是权限、不是独立资金**，仅用于 `refundUnserved`，默认 0、按已收手续费授权；不用于挖矿预置。挖矿 W 由 Treasury owner/多签/平台金库服务 `Treasury.withdraw` 预打款（见 R4）。
 5. **chainId 守卫**：部署前 `await provider.getNetwork()` 必须为 `48850`（`0xbed2`），否则直接抛错，防止把 RPC 误指向本机 Anvil 8545。网络名使用 `besu-testnet`。
 6. **等待部署/交易**：每个 `deploy()` 后 `waitForDeployment()`；`initialize`/`setOperator`/`mintForTest`/`approveSpender`/`transferOwnership` 等每笔 tx 都 `wait()` 并检查 receipt 状态。
 7. **owner 顺序**：草稿把 Treasury/Arena/RTM/Faucet/DataMarket 直接部署给 `platform`；实际先全部 owner=deployer 完成 wiring，再按需（`PLATFORM_ADDRESS` 非零且 != deployer）逐个 `transferOwnership(platform)` 并等待。默认 platform=deployer，不转移。
-8. **环境变量**：`PLATFORM_ADDRESS`、`OPERATOR_ADDRESS`、`FAUCET_SIGNER_ADDRESS` 默认 deployer；`FAUCET_DRIP_RTM` 默认 200、`FAUCET_FUND_RTM` 默认 1000000、`TREASURY_ALLOWANCE_RTM` 默认 1000000（**refund 专用，不是挖矿 allowance**）；地址用 `getAddress` 校验且拒绝零地址，金额 `parseEther` 且拒绝 0。
-9. **地址登记**：写脚本同目录 `addresses.json`（`__dirname`），字段为 network、chainId、rpc、deployer、platform、operator、ticketSigner、treasury、arena、rtm、faucet、dataMarket、faucetDrip、faucetFunding、treasuryAllowance、deployedAt；不含私钥。写文件前断言 minter/arena/rtm/testnet/operator/signer/drip/五个 owner/余额/totalSupply/allowance/`activeMiningCount()==0`，失败退出码 1。**R4 会新增 `miningReward/miningFeeBps/treasuryMiningFund`，并把 `treasuryAllowance` 明确为 refund 专用。**
+8. **环境变量**：`PLATFORM_ADDRESS`、`OPERATOR_ADDRESS`、`FAUCET_SIGNER_ADDRESS` 默认 deployer；`FAUCET_DRIP_RTM` 默认 200、`FAUCET_FUND_RTM` 默认 1000000、`TREASURY_ALLOWANCE_RTM` **默认 0**（refund 权限默认 0，按已收手续费由 owner 按需授权，不是挖矿 allowance，也不是独立资金）；地址用 `getAddress` 校验且拒绝零地址，金额 `parseEther` 且拒绝 0。
+9. **地址登记**：写脚本同目录 `addresses.json`（`__dirname`），字段为 network、chainId、rpc、deployer、platform、operator、ticketSigner、treasury、arena、rtm、faucet、dataMarket、faucetDrip、faucetFunding、refundAllowance、treasuryMiningFund、deployedAt；不含私钥。写文件前断言 minter/arena/rtm/testnet/operator/signer/drip/五个 owner/余额/totalSupply/refundAllowance/`activeMiningCount()==0`，失败退出码 1。**R4 使用 `miningReward/miningFeeBps/treasuryMiningFund=3 RTM/refundAllowance=0`；`refundAllowance` 只是权限。**
 10. **重部署保护**：`addresses.json` 已存在时部署前报错，除非 `DEPLOY_ALLOW_REDEPLOY=1`（旧地址会被覆盖）。
 11. **本机环境**：8545 被其他项目占用，部署用 `BESU_TESTNET_RPC=http://127.0.0.1:8546`；`keydir/key` 自带 `0x` 前缀，Hardhat 也接受无前缀私钥，命令用 `tr -d '\r\n'` 注入且不打印、不落盘。
 12. **实测（2026-10-27，地址已作废）**：chainId 48850；五合约地址 Treasury `0x4B6648955b5938F9BE2bc35d3dD9300a4062f611`、Arena `0x3a8df899d27801D0b37db9dF8A29Aa27B6610111`、RTM `0xF08F681A58aB71E9FaC4B9E55DE4b29e309C46d7`、Faucet `0x042Bc6dfbc08ECe0Db7901b1d2D65a1F9ede35b3`、DataMarket `0x9446F32556dE6E053F6E22205d7300f0ED1d28Fb`；脚本全部 assert 通过，独立 `eth_getCode`/`eth_call` 复核通过；`npx hardhat compile` 成功，`npm test` 322 passing。**这些地址是旧 ABI 部署，已作废；R4 覆盖 `addresses.json`，不要用于新挖矿接口。**
@@ -1630,7 +1630,7 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 - 删除：`accrue`、`E_rate`、`miningRate`、`miningMinted`、`MAX_MINING_RATE`；挖矿赛 `stakeBps`、矿工罚款、矿工 `collectPenalties`/`withdrawStake`/剩余质押提款。
 - `Contest` 增加 `defenseHash`，删除 `miningRate/miningMinted`；新增 `retiredDefenseHash`、`activeDefenseHash`、`activeMiningCount`。
 - `Attacker` 增加 `dataConsent`；`base` 普通赛=S、挖矿赛=1e18；`stake` 挖矿赛=0。
-- `createMiningContest(address wallet, bytes32 defenseHash)` only operator：W 新/非靶/未受控；平台先用 `Treasury.withdraw(rtm, W, 1e18)` 预打款，create 只校验 `balanceOf(W)==1e18`（不符 revert `WrongPrizeBalance`）；hash 非零/未 retired/无 active 同 hash；K<3；注册靶，记录 `isMining/defenseHash`，无 stakeBps/rate。**不消耗 Treasury allowance**；Treasury 保留 3 RTM 工作资金。
+- `createMiningContest(address wallet, bytes32 defenseHash)` only operator：W 新/非靶/未受控；**Treasury owner/多签/平台金库服务**（不是 operator）先用 `Treasury.withdraw(rtm, W, 1e18)` 预打款，create 只校验 `balanceOf(W)==1e18`（不符 revert `WrongPrizeBalance`）；hash 非零/未 retired/无 active 同 hash；K<3；注册靶，记录 `isMining/defenseHash`，无 stakeBps/rate。**不消耗 Treasury allowance**；工作资金不变量 `Treasury 工作资金余额 + Σ活跃 W 预打款 = 3e18`。预打款前先校验 hash/K；create revert 时 1 RTM 留在 W，用 W 私钥/owner 转回 Treasury。
 - `join(bytes32 id, uint256 maxStake, bool dataConsent)`：仅普通赛；记录 `dataConsent`；事件带该字段。
 - `joinMining(bytes32 id, bool acceptData)`：仅挖矿赛；`acceptData=true` 否则 `DataConsentRequired`；无质押、无 transferFrom、每地址一次、≤50；记录 `stake=0/base=1e18/dataConsent=true`；发 `MiningJoined` + `DataConsentRecorded`。
 - `attack`：普通赛 0.5%×S；挖矿赛 0.5%×1 RTM=0.005 RTM；进 Treasury；矿工需 tRTM（Faucet）。
@@ -1655,12 +1655,13 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 
 **任务 9 的旧地址（Treasury `0x4B66…`、Arena `0x3a8d…`、RTM `0xF08F…`、Faucet `0x042B…`、DataMarket `0x9446…`）与旧 ABI 全部作废。**
 
-- 部署脚本按 R2/R3 新 ABI 重部署；测试网 `arena.mintForTest(faucet, faucetFunding)` + `arena.mintForTest(treasury, 3 RTM)`，`totalSupply = faucetFunding + 3 RTM`；`approveSpender(rtm, arena, refundAllowance)` **仅用于 `refundUnserved`**，不设 mining allowance。
-- 每场创建前平台调用 `treasury.withdraw(rtm, W, 1 RTM)` 预打款到新 W，再 `createMiningContest`；成功攻破补铸回 1 RTM，未攻破 `retireMining` 退回。
-- `addresses.json` 更新五合约地址并新增 `miningReward/miningFeeBps/treasuryMiningFund`；断言 `activeMiningCount()==0`、Treasury RTM 余额 ≥3、refund allowance、totalSupply、`rtm.minter()==arena` 等。
+- 部署脚本按 R2/R3 新 ABI 重部署；测试网 `arena.mintForTest(faucet, faucetFunding)` + `arena.mintForTest(treasury, 3 RTM)`，`totalSupply = faucetFunding + 3 RTM`，**不额外 mint 1M 给 Treasury**；`approveSpender(rtm, arena, refundAllowance)` **refundAllowance 默认 0、只是权限、不是独立资金**；不设 mining allowance。
+- 每场创建前由 **Treasury owner/多签/平台金库服务**（不是 operator）`treasury.withdraw(rtm, W, 1 RTM)` 预打款到新 W，再由 operator `createMiningContest`；成功攻破补铸回 1 RTM，未攻破 `retireMining` 退回。预打款前先校验 hash/K；create revert 时 1 RTM 留在 W，用 W 私钥/owner 转回 Treasury。**不新增 Treasury operator 拨款函数**；API 若代执行必须 owner 权限 + custody 审计。
+- `addresses.json` 更新五合约地址并新增 `miningReward/miningFeeBps/treasuryMiningFund=3 RTM/refundAllowance=0`；断言 `activeMiningCount()==0`、Treasury 工作资金余额 == 3 RTM（部署时无活跃赛）、refundAllowance == 0、totalSupply、`rtm.minter()==arena` 等。3 场活跃时 Treasury 工作资金余额可为 0，不按“余额低于 3”补款。
 - 重部署命令必须带 `DEPLOY_ALLOW_REDEPLOY=1`（`addresses.json` 已存在时默认拒绝覆盖）。
 - 更新 platform `contracts.ts/chain.py`、dApp `ADDRESSES`、README/runbook；旧地址不得继续使用。
-- 用新 hash 开一场挖矿赛做烟测：`treasury.withdraw(rtm, W, 1 RTM)`→`createMiningContest`→joinMining→0.005/条→Token 转 value + Arena 扫尾→Treasury +1 补铸、hash retired；再测 retireMining 退回不铸。
+- 用新 hash 开一场挖矿赛做烟测：Treasury owner 服务 `treasury.withdraw(rtm, W, 1 RTM)`→operator `createMiningContest`→joinMining→0.005/条→Token 转 value + Arena 扫尾→Treasury +1 补铸、hash retired；再测 retireMining 退回不铸。
+- 主网 3 RTM 工作资金来自平台运营资金/自有份额/早期手续费，不新增创世流动性桶、不从流动性池取、不能用 `mintForTest`；若创世没有运营份额，先从市场/自有份额取得；未到位不能创建挖矿赛。
 - 重部署保护：`DEPLOY_ALLOW_REDEPLOY=1`，不提交私钥。
 
 ### 受影响任务一览
@@ -1670,7 +1671,7 @@ git commit -m "feat(contracts): testnet deployment script with address registry"
 | 任务 4 Arena | 普通赛部分保留；挖矿部分按 R2 重写，旧代码块与第 2/8/9/10/12/13/14/15/16/17 条禁止照抄 |
 | 任务 5 罚款曲线 | 普通赛测试与普通 k=84 罚款上限测试保留；删除挖矿 accrue/线性测试 |
 | 任务 7 DataMarket | Faucet 保留；DataMarket 按 R3 改造，删除 approveSale/saleApproved/NotApproved 与逐买家授权键 |
-| 任务 9 部署 | 旧地址/旧 ABI 作废；R4 重建，refundAllowance 与挖矿工作资金分离 |
+| 任务 9 部署 | 旧地址/旧 ABI 作废；R4 重建，refundAllowance 仅是权限、与挖矿工作资金共用同一 Treasury 余额 |
 | 任务 12 runner | 普通 dataConsent 语义；矿工数据仅 RSI；挖矿 fault 走 retireMining；joinMining/dataConsent |
 | 任务 13 indexer | 增加 MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded；矿工榜固定奖励/攻破率 |
 | 任务 14 数据服务/RSI | bundle 仅同意攻方+守方自有；矿工数据不进 DataMarket；rsi_export 读矿工数据 |
@@ -1958,6 +1959,8 @@ class WalletTools:
 
 - [ ] **步骤 3：实现 runner.py（多轮循环复用 payassist 语义）**
 
+> **本节代码块为旧草稿；以本节末尾“实现修订（2026-10-27 复审，数据同意/挖矿停服）”为准。**
+
 ```python
 # platform/platform/runner.py
 """每场比赛一个 AgentSession：攻方隔离线程、max_steps=10、每消息 ≤1000 字符、
@@ -2041,6 +2044,8 @@ git commit -m "feat(platform): hosted agent runner with real transfer tool"
 - 测试：`platform/tests/test_indexer.py`
 
 - [ ] **步骤 1：失败测试**
+
+> **本节代码块为旧草稿；以本节末尾“实现修订（2026-10-27 复审，挖矿/同意事件）”为准。**
 
 ```python
 def test_leaderboards_from_events():
@@ -2159,7 +2164,7 @@ def test_full_flow(client, fake_chain):
 - `GET /leaderboards`、`GET /contests`、`GET /contests/{id}`
 - `POST /faucet/ticket`（captcha → EIP-712 票据）
 - `POST /data/{contestId}/deliver`（监听 DataSold 后的下载授权；只对 dataConsent=true 的普通攻方数据/守方自有数据）
-- `POST /mining/contests`（operator：先生成新 W，`treasury.withdraw(rtm, W, 1 RTM)` 预打款，再 `createMiningContest(wallet, defenseHash)`）
+- `POST /mining/contests`（**Treasury owner/多签/平台金库服务先预打款**：生成新 W 并 `treasury.withdraw(rtm, W, 1 RTM)`；**operator 只调用 `createMiningContest(wallet, defenseHash)`**。若 API 代执行预打款，必须使用 owner 权限并做 custody 审计，不能把 withdraw 权限交给 operator。**不新增 Treasury operator 拨款函数**；如需新增另开任务）
 - `POST /mining/join-intent`（展示数据收集条款，返回 `joinMining(id,true)` 参数；无 approveSale）
 
 启动：`uvicorn platform.api:app`（`.env`：CHAIN_RPC/PLATFORM_MASTER_KEY/OPERATOR_KEY/FAUCET_SIGNER_KEY）。
@@ -2175,7 +2180,7 @@ git commit -m "feat(platform): FastAPI entrypoint for the contest game"
 ### 实现修订（2026-10-27 复审，join 同意/挖矿预打款）
 
 - 普通攻方 join 必须带 `data_consent`（true/false），不可撤回；矿工 `joinMining` 只能 `acceptData=true`，UI/条款先展示数据收集说明。
-- 挖矿赛创建前平台先 `treasury.withdraw(rtm, W, 1 RTM)`，再 `createMiningContest`；不要从 Treasury `transferFrom`，不要设 mining allowance。
+- 挖矿赛创建前由 **Treasury owner/多签/平台金库服务**（不是 operator）`treasury.withdraw(rtm, W, 1 RTM)` 预打款，operator 只 `createMiningContest`；不要从 Treasury `transferFrom`，不要设 mining allowance。API 若代执行预打款，必须 owner 权限 + custody 审计。预打款前校验 hash/K；create revert 后 1 RTM 留在 W，用 W 私钥/owner 转回 Treasury。
 - DataMarket 无 `approveSale`；`buyFromAttacker` 由链上读取 `Arena.dataConsent`，未同意 `NotConsented`。
 - leaderboard/indexer 必须消费 `MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded`；挖矿榜按固定 1 RTM/成功攻破，不按时间。
 
@@ -2267,7 +2272,7 @@ git commit -m "feat(dapp): React+wagmi dApp with contest, faucet, leaderboard pa
 5. 普通赛时间维度（罚款/到期）测试网无时间旅行：用小 D（6h），改用 Hardhat 复刻（`contracts/test/e2e-full.test.js`）；挖矿赛无 EPOCH/accrue，不需要时间旅行；
 6. stub 模型触发 `transfer_rtm` → Breach 事件 → winner 余额断言；
 7. 守方 `buyOwn` → DataSold → 下载校验；`buyFromAttacker` 仅对 dataConsent=true 的攻方可成交，false 时 `NotConsented`；
-8. 挖矿：平台 `treasury.withdraw(rtm, W, 1 RTM)` 预打款 → `createMiningContest` → `joinMining(id,true)` → 0.005/条 → Token 转 value + Arena 扫尾 → 固定 1 RTM + 补铸 1 RTM → `retireMining` 退回不铸；`rsi_export` 只产出矿工 findings JSON。
+8. 挖矿：Treasury owner 服务 `treasury.withdraw(rtm, W, 1 RTM)` 预打款 → operator `createMiningContest` → `joinMining(id,true)` → 0.005/条 → Token 转 value + Arena 扫尾 → 固定 1 RTM + 补铸 1 RTM → `retireMining` 退回不铸；`rsi_export` 只产出矿工 findings JSON。
 
 任务 9 的旧部署地址已作废；e2e 必须使用 R4 重新生成的 `addresses.json`。
 
