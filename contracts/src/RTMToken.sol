@@ -11,7 +11,9 @@ interface IRTMArena {
 }
 
 /// @title RTMToken —— 靶钱包转账策略 + Arena 独占铸币
-/// @notice "REDTEAM" (RTM)。发币由 Arena 红队挖矿线性注入（无减半、无总量上限）。
+/// @notice "REDTEAM" (RTM)。无预铸、无减半、无总量上限；主网唯一常规增发是
+///         每次挖矿赛成功攻破时 Arena 固定补铸 1 RTM 回 Treasury（补偿预打款），
+///         测试网另有 Arena.mintForTest 注水。
 /// @dev "标记"语义：活跃靶钱包（守方智能体的钱包 W）的转出只有两个合法去向——
 ///      该场注册攻方（触发 Arena.onBreach 原子结算）或 Arena 的
 ///      `controllerTransfer` 控制器划转。controllerTransfer 仅接受曾注册为靶的
@@ -87,7 +89,7 @@ contract RTMToken is ERC20, Ownable {
         return targetContest[wallet] != bytes32(0);
     }
 
-    /// @notice 挖矿铸币：仅 Arena。无年份预算，无总量上限。
+    /// @notice 铸币：仅 Arena。用于挖矿攻破固定补铸与测试网注水，无年份预算。
     function mint(address to, uint256 amount) external {
         if (msg.sender != minter) revert NotMinter();
         if (to == address(0)) revert ZeroAddress();

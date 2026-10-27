@@ -124,23 +124,26 @@ async function makeContest(game, opts = {}) {
 }
 
 /**
- * 由 operator 创建挖矿赛。
- * opts: wallet (signer 或 address), rate, stakeBps
+ * 由 operator 创建挖矿赛：先给全新 W 预置恰好 1 RTM（testnet mintForTest），
+ * 再 createMiningContest(wallet, defenseHash)。返回 id/hash 等。
+ * opts: wallet (signer 或 address), defenseHash
  */
 async function makeMining(game, opts = {}) {
-  const wallet = addressOf(opts.wallet ?? game.w);
-  const rate = opts.rate ?? RTM(2);
-  const stakeBps = opts.stakeBps ?? BPS;
+  const wallet = opts.wallet
+    ? addressOf(opts.wallet)
+    : ethers.Wallet.createRandom().address;
+  const defenseHash =
+    opts.defenseHash ?? ethers.hexlify(ethers.randomBytes(32));
+  await game.arena.mintForTest(wallet, RTM(1));
   const tx = await game.arena
     .connect(game.operator)
-    .createMiningContest(wallet, rate, stakeBps);
+    .createMiningContest(wallet, defenseHash);
   const receipt = await tx.wait();
   const ev = findEvent(receipt, game.arena, 'ContestCreated');
   return {
     id: ev.args.id,
     end: ev.args.end,
-    rate,
-    stakeBps,
+    defenseHash,
     wallet,
     tx,
     receipt
@@ -148,16 +151,20 @@ async function makeMining(game, opts = {}) {
 }
 
 /**
- * 攻方加入：自动 approve，默认以精确应质押额作为 maxStake 滑点上限。
- * maxStake 显式传入时优先使用（用于测试滑点拒绝）。
+ * 普通攻方加入：自动 approve，默认以精确应质押额作为 maxStake 滑点上限。
+ * maxStake 显式传入时优先使用（用于测试滑点拒绝）；dataConsent 默认 true。
  */
-async function joinAs(game, signer, id, maxStake) {
+async function joinAs(game, signer, id, maxStake, dataConsent = true) {
   const info = await game.arena.contestInfo(id);
-  const base = info.isMining ? await game.rtm.balanceOf(info.wallet) : info.stake;
-  const expected = (base * BigInt(info.stakeBps)) / 10000n;
+  const expected = (info.stake * BigInt(info.stakeBps)) / 10000n;
   const limit = maxStake === undefined ? expected : maxStake;
   await game.rtm.connect(signer).approve(game.arena.target, ethers.MaxUint256);
-  return game.arena.connect(signer).join(id, limit);
+  return game.arena.connect(signer).join(id, limit, dataConsent);
+}
+
+/** 矿工加入挖矿赛：无质押/无 approve，acceptData 默认 true。 */
+async function joinMiningAs(game, signer, id, acceptData = true) {
+  return game.arena.connect(signer).joinMining(id, acceptData);
 }
 
 /** 将字符串/bytes32 统一为 bytes32 消息 hash。 */
@@ -184,6 +191,7 @@ module.exports = {
   makeContest,
   makeMining,
   joinAs,
+  joinMiningAs,
   msgHash,
   attack,
   findEvent

@@ -12,6 +12,7 @@ interface IArena {
         address wallet;
         uint256 stake;
         uint32 stakeBps;
+        bytes32 defenseHash;
         uint64 start;
         uint64 end;
         uint64 endedAt;
@@ -19,8 +20,6 @@ interface IArena {
         bool isMining;
         uint32 attackerCount;
         bool paused;
-        uint256 miningRate;
-        uint256 miningMinted;
     }
 
     function contestInfo(bytes32 id) external view returns (ContestInfo memory);

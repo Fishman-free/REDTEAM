@@ -6,9 +6,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Treasury —— 平台收入归集
-/// @notice 消息手续费、数据销售平台分成、挖矿赛罚款的归集地址。
-/// @dev 平台资金只进不出，唯一出口是 owner 提现；退款场景由 owner
-///      精确授权 Arena 从本合约划转（refundUnserved）。
+/// @notice 消息手续费、数据销售平台分成、挖矿攻破补铸的归集地址。
+/// @dev 挖矿层没有罚款；每场挖矿赛创建前由 owner 预打款恰好 1 RTM 到新 W，
+///      攻破时 Arena 补铸 1 RTM 回本合约、未攻破退役时 W 余额退回本合约。
+///      平台资金唯一出口是 owner 提现；退款场景由 owner 精确授权 Arena
+///      从本合约划转（refundUnserved）。
 contract Treasury is Ownable {
     using SafeERC20 for IERC20;
 

@@ -9,19 +9,22 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {RTMToken, IRTMArena} from "./RTMToken.sol";
 
 /// @title Arena —— 攻守比赛全生命周期
-/// @notice 质押、惰性罚款（每 2h 保留 75%）、付费消息、攻破/到期/弃权结算、
-///         挖矿赛线性铸币，以及测试网注水。
+/// @notice 普通赛：质押、惰性罚款（每 2h 保留 75%）、付费消息、攻破/到期/弃权结算，
+///         以及测试网注水。挖矿赛：平台固定 1 RTM 奖励、无矿工质押、无罚款、
+///         攻破后补铸 1 RTM 并永久退役 defenseHash。
 /// @dev 信任模型：守方只 approve 质押，靶钱包 W 由平台在资格测试通过后提交，
 ///      因此守方无法把任意受害者地址注册为靶。Arena 是 RTMToken 唯一的 minter，
 ///      W 的资金只能通过 Token 的 controllerTransfer 或“转给本场攻方触发 onBreach”
 ///      两条路径离开。
 ///
 ///      资金分层：
-///      - 正常比赛 S 由 defender 直达 W（奖池）；
-///      - 攻方质押 s 托管在本合约；
+///      - 普通赛 S 由 defender 直达 W（奖池）；
+///      - 挖矿赛 W 由 Treasury owner/多签/平台金库服务预打款恰好 1 RTM，create 只校验余额；
+///      - 普通攻方质押 s 托管在本合约；矿工无质押；
 ///      - 消息手续费直达 Treasury；
-///      - 罚款从本合约按需支付（normal→defender，mining→treasury）；
-///      - 结算只动 W 的余额，且所有 controllerTransfer 均跳过 0 金额。
+///      - 罚款仅普通赛，从本合约按需支付给 defender；
+///      - 结算只动 W 的余额，且所有 controllerTransfer 均跳过 0 金额；
+///      - 挖矿攻破时 Arena 扫尾 W 余额给 winner 后补铸 1 RTM 回 Treasury。
 contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     using SafeERC20 for IERC20;
 
@@ -30,13 +33,14 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     uint256 public constant KEEP_NUM = 75; // 每 epoch 保留 75%
     uint256 public constant KEEP_DEN = 100;
     uint32 public constant MAX_ATTACKERS = 50;
-    uint256 public constant FEE_BPS = 50; // 消息费 = base * 0.5%
+    uint256 public constant FEE_BPS = 50; // 普通赛消息费 = S * 0.5%
+    uint256 public constant MINING_REWARD = 1e18; // 每次成功攻破固定 1 RTM
+    uint256 public constant MINING_FEE_BPS = 50; // 挖矿消息费 = 1 RTM * 0.5%
     uint64 public constant MIN_DURATION = 6 hours;
     uint64 public constant MAX_DURATION = 7 days;
     uint32 public constant MIN_STAKE_BPS = 200; // 2%
     uint32 public constant MAX_STAKE_BPS = 2000; // 20%
     uint256 public constant PRECISION = 1e18;
-    uint256 public constant MAX_MINING_RATE = 100e18; // 100 RTM / epoch
     uint32 public constant MAX_ACTIVE_MINING = 3;
 
     enum State {
@@ -50,6 +54,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         address wallet;
         uint256 stake;
         uint32 stakeBps;
+        bytes32 defenseHash;
         uint64 start;
         uint64 end;
         uint64 endedAt;
@@ -58,8 +63,6 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         uint32 attackerCount;
         uint256 pausedTotal;
         uint64 lastPauseAt;
-        uint256 miningRate;
-        uint256 miningMinted;
     }
 
     struct Attacker {
@@ -73,6 +76,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         uint256 stakeWithdrawn;
         bool waived;
         bool joined;
+        bool dataConsent;
     }
 
     /// @notice 后端/前端读取的核心比赛参数快照。
@@ -81,6 +85,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         address wallet;
         uint256 stake;
         uint32 stakeBps;
+        bytes32 defenseHash;
         uint64 start;
         uint64 end;
         uint64 endedAt;
@@ -88,8 +93,6 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         bool isMining;
         uint32 attackerCount;
         bool paused;
-        uint256 miningRate;
-        uint256 miningMinted;
     }
 
     RTMToken public rtm;
@@ -106,6 +109,10 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public usedMsg;
     /// @notice 已送达消息标记；已送达不可退款，且每条 hash 只能计一次送达。
     mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public deliveredMsg;
+    /// @notice defenseHash 永久退役标记（攻破或主动退役后均不可复用）。
+    mapping(bytes32 => bool) public retiredDefenseHash;
+    /// @notice defenseHash => 当前活跃挖矿赛 id（0 表示无活跃赛）。
+    mapping(bytes32 => bytes32) public activeDefenseHash;
     bytes32[] public contestList;
 
     event ContestCreated(
@@ -116,9 +123,21 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         uint64 end,
         bool isMining,
         uint32 stakeBps,
-        uint256 miningRate
+        bytes32 defenseHash
     );
-    event Joined(bytes32 indexed id, address indexed attacker, uint256 stake);
+    event Joined(
+        bytes32 indexed id,
+        address indexed attacker,
+        uint256 stake,
+        bool dataConsent
+    );
+    event MiningJoined(bytes32 indexed id, address indexed miner, uint256 base);
+    event DataConsentRecorded(
+        bytes32 indexed id,
+        address indexed attacker,
+        bool consented,
+        bool isMining
+    );
     event AttackPaid(
         bytes32 indexed id,
         address indexed attacker,
@@ -145,7 +164,13 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     event Expired(bytes32 indexed id, address indexed defender, uint256 returned);
     event ContestSettled(bytes32 indexed id, address indexed winner, uint256 amount);
     event StakeWithdrawn(bytes32 indexed id, address indexed attacker, uint256 amount);
-    event MiningAccrued(bytes32 indexed id, address indexed wallet, uint256 amount);
+    event MiningSettled(
+        bytes32 indexed id,
+        address indexed winner,
+        bytes32 defenseHash,
+        uint256 reward
+    );
+    event MiningRetired(bytes32 indexed id, bytes32 defenseHash, uint256 returned);
     event OperatorUpdated(address indexed operator);
 
     error ZeroAddress();
@@ -172,10 +197,18 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     error InvalidWallet(address wallet);
     error BaseZero();
     error StakeTooHigh(uint256 stake, uint256 maxStake);
-    error TooManyMiningContests();
     error InvalidTreasury();
     error ContestExpired(bytes32 id);
     error TestnetOnly();
+    error NotNormalContest();
+    error NotMiningContest();
+    error DataConsentRequired();
+    error HashRetired(bytes32 hash);
+    error HashAlreadyActive(bytes32 hash);
+    error MiningCapReached();
+    error WalletNotFresh(address wallet);
+    error WrongPrizeBalance(uint256 balance);
+    error ZeroHash();
 
     modifier onlyOperator() {
         if (msg.sender != operator) revert NotOperator();
@@ -211,7 +244,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     }
 
     /// @notice 测试网注水：仅 testnet=true 的部署可用。
-    /// @dev 主网 testnet=false 时唯一增发路径是 accrue。
+    /// @dev 主网 testnet=false 时唯一常规增发路径是挖矿攻破补铸 1 RTM。
     function mintForTest(address to, uint256 amount) external onlyOwner nonReentrant {
         if (!testnet) revert TestnetOnly();
         rtm.mint(to, amount);
@@ -221,7 +254,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     // 创建比赛
     // ------------------------------------------------------------------
 
-    /// @notice 平台在资格测试通过后创建正常比赛；守方只 approve，不能指定 W。
+    /// @notice 平台在资格测试通过后创建普通比赛；守方只 approve，不能指定 W。
     function createContest(
         address defender,
         address wallet,
@@ -250,39 +283,44 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         // S 直达托管靶钱包 W；守方必须预先 approve 本合约。
         rtm.transferFrom(defender, wallet, stake);
         rtm.registerTarget(wallet, id);
-        emit ContestCreated(id, defender, wallet, stake, c.end, false, stakeBps, 0);
+        emit ContestCreated(id, defender, wallet, stake, c.end, false, stakeBps, bytes32(0));
     }
 
-    /// @notice 平台创建挖矿赛：W 为挖矿钱包，收益 = 每 epoch 铸 miningRate。
-    function createMiningContest(address wallet, uint256 miningRate, uint32 stakeBps)
+    /// @notice 平台创建挖矿赛：W 已由 Treasury owner 预打款恰好 1 RTM。
+    /// @dev 不调用 Treasury.transferFrom、不消耗 allowance；create 只校验余额。
+    function createMiningContest(address wallet, bytes32 defenseHash)
         external
         onlyOperator
         nonReentrant
         returns (bytes32 id)
     {
         if (address(rtm) == address(0)) revert NotInitialized();
-        if (miningRate == 0 || miningRate > MAX_MINING_RATE) revert BadParams();
-        if (stakeBps < MIN_STAKE_BPS || stakeBps > MAX_STAKE_BPS) revert BadParams();
-        if (activeMiningCount >= MAX_ACTIVE_MINING) revert TooManyMiningContests();
-        _checkWallet(wallet, treasury, false);
+        if (defenseHash == bytes32(0)) revert ZeroHash();
+        if (retiredDefenseHash[defenseHash]) revert HashRetired(defenseHash);
+        if (activeDefenseHash[defenseHash] != bytes32(0)) {
+            revert HashAlreadyActive(defenseHash);
+        }
+        if (activeMiningCount >= MAX_ACTIVE_MINING) revert MiningCapReached();
+        _checkMiningWallet(wallet);
 
         id = _contestId(treasury, wallet);
         Contest storage c = contests[id];
         c.defender = treasury;
         c.wallet = wallet;
         c.stake = 0;
-        c.stakeBps = stakeBps;
+        c.stakeBps = 0;
+        c.defenseHash = defenseHash;
         c.start = uint64(block.timestamp);
         c.end = type(uint64).max;
         c.state = State.Live;
         c.isMining = true;
-        c.miningRate = miningRate;
         contestList.push(id);
         activeMiningCount += 1;
+        activeDefenseHash[defenseHash] = id;
 
         rtm.registerTarget(wallet, id);
         emit ContestCreated(
-            id, treasury, wallet, 0, type(uint64).max, true, stakeBps, miningRate
+            id, treasury, wallet, 0, type(uint64).max, true, 0, defenseHash
         );
     }
 
@@ -292,7 +330,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         );
     }
 
-    /// @dev 靶钱包 W 的准入校验。守方不能指定自己、平台角色、协议合约或已有靶。
+    /// @dev 普通赛靶钱包 W 的准入校验。守方不能指定自己、平台角色、协议合约或已有靶。
     function _checkWallet(address wallet, address defender, bool normal) internal view {
         if (wallet == address(0)) revert ZeroAddress();
         if (
@@ -305,21 +343,38 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (rtm.isControlledWallet(wallet)) revert BadParams();
     }
 
+    /// @dev 挖矿赛 W 必须是全新地址：非零、非平台角色、非活跃/历史靶，
+    ///      且已由 Treasury 预打款到恰好 MINING_REWARD。
+    function _checkMiningWallet(address wallet) internal view {
+        if (wallet == address(0)) revert ZeroAddress();
+        if (
+            wallet == address(this) || wallet == address(rtm) || wallet == treasury
+                || wallet == operator || wallet == msg.sender
+        ) revert InvalidWallet(wallet);
+        if (rtm.isTarget(wallet) || rtm.isControlledWallet(wallet)) {
+            revert WalletNotFresh(wallet);
+        }
+        uint256 balance = rtm.balanceOf(wallet);
+        if (balance != MINING_REWARD) revert WrongPrizeBalance(balance);
+    }
+
     // ------------------------------------------------------------------
-    // 攻方动作
+    // 攻方/矿工动作
     // ------------------------------------------------------------------
 
-    /// @notice 加入比赛并质押 s = base * stakeBps / 10000；maxStake 为滑点上限。
-    function join(bytes32 id, uint256 maxStake) external nonReentrant {
+    /// @notice 加入普通赛并质押 s = S * stakeBps / 10000；maxStake 为滑点上限。
+    /// @param consent join 时一次性选择的数据留存/出售同意，之后不可撤回。
+    function join(bytes32 id, uint256 maxStake, bool consent) external nonReentrant {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
+        if (c.isMining) revert NotNormalContest();
         if (block.timestamp >= c.end) revert ContestExpired(id);
         if (c.lastPauseAt != 0) revert PausedNow(id);
         Attacker storage a = attackers[id][msg.sender];
         if (a.joined) revert AlreadyJoined();
         if (c.attackerCount >= MAX_ATTACKERS) revert TooManyAttackers();
 
-        uint256 base = c.isMining ? rtm.balanceOf(c.wallet) : c.stake;
+        uint256 base = c.stake;
         if (base == 0) revert BaseZero();
         uint256 s = (base * c.stakeBps) / 10_000;
         if (s == 0) revert BadParams();
@@ -329,15 +384,42 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         a.base = base;
         a.joinedAt = uint64(block.timestamp);
         a.pausedAtJoin = c.pausedTotal;
+        a.dataConsent = consent;
         a.joined = true;
         c.attackerCount += 1;
         contestAttackers[id].push(msg.sender);
 
         rtm.transferFrom(msg.sender, address(this), s);
-        emit Joined(id, msg.sender, s);
+        emit Joined(id, msg.sender, s, consent);
+        emit DataConsentRecorded(id, msg.sender, consent, false);
+    }
+
+    /// @notice 加入挖矿赛：无质押、无 approve，数据强制留存。
+    /// @param acceptData 必须为 true；矿工数据仅用于 RSI，不进入 DataMarket。
+    function joinMining(bytes32 id, bool acceptData) external nonReentrant {
+        Contest storage c = contests[id];
+        if (c.state != State.Live) revert NotLive(id);
+        if (!c.isMining) revert NotMiningContest();
+        if (!acceptData) revert DataConsentRequired();
+        Attacker storage a = attackers[id][msg.sender];
+        if (a.joined) revert AlreadyJoined();
+        if (c.attackerCount >= MAX_ATTACKERS) revert TooManyAttackers();
+
+        a.stake = 0;
+        a.base = MINING_REWARD;
+        a.joinedAt = uint64(block.timestamp);
+        a.pausedAtJoin = c.pausedTotal;
+        a.dataConsent = true;
+        a.joined = true;
+        c.attackerCount += 1;
+        contestAttackers[id].push(msg.sender);
+
+        emit MiningJoined(id, msg.sender, MINING_REWARD);
+        emit DataConsentRecorded(id, msg.sender, true, true);
     }
 
     /// @notice 为一条待执行消息付费；费用进入 Treasury。
+    /// @dev 普通赛 fee = S * 0.5%；挖矿赛 fee = MINING_REWARD * 0.5% = 0.005 RTM。
     function attack(bytes32 id, bytes32 msgHash) external nonReentrant returns (uint256 seq) {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
@@ -349,7 +431,9 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (usedMsg[id][msg.sender][msgHash]) revert BadParams();
 
         seq = ++a.attackCount;
-        uint256 fee = (a.base * FEE_BPS) / 10_000;
+        uint256 fee = c.isMining
+            ? (MINING_REWARD * MINING_FEE_BPS) / 10_000
+            : (a.base * FEE_BPS) / 10_000;
         if (fee == 0) revert FeeZero();
         usedMsg[id][msg.sender][msgHash] = true;
         paidFee[id][msg.sender][msgHash] = fee;
@@ -395,6 +479,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     // 暂停
     // ------------------------------------------------------------------
 
+    /// @dev 两类比赛均可暂停以停止新消息；普通赛暂停冻结罚款时钟，
+    ///      挖矿赛暂停只影响 attack，不影响任何铸币/结算时钟。
     function pause(bytes32 id) external onlyOperator {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
@@ -413,7 +499,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     }
 
     // ------------------------------------------------------------------
-    // 惰性罚款
+    // 惰性罚款（仅普通赛）
     // ------------------------------------------------------------------
 
     /// @dev 暂停区间 [from, to] 与比赛窗口的交集。跨过 end 的暂停只计到 end，
@@ -449,7 +535,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     }
 
     /// @dev amount * (75/100)^k，1e18 定点平方-乘，O(log k)。
-    ///      挖矿赛 k 无上界，禁止 O(k) 循环。
+    ///      普通赛 k ≤ D/E ≤ 84，保留 O(log k) 实现。
     function _applyKeep(uint256 amount, uint256 k) internal pure returns (uint256) {
         uint256 base = (KEEP_NUM * PRECISION) / KEEP_DEN;
         uint256 factor = PRECISION;
@@ -463,11 +549,12 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         return Math.mulDiv(amount, factor, PRECISION);
     }
 
-    /// @notice 攻方当前可退质押（未加入返回 0）。
+    /// @notice 普通攻方当前可退质押（未加入/挖矿赛返回 0）。
     function remainingStake(bytes32 id, address who) public view returns (uint256) {
         Contest storage c = contests[id];
         Attacker storage a = attackers[id][who];
         if (!a.joined) return 0;
+        if (c.isMining) return 0;
         uint256 k = _elapsed(c, a) / EPOCH;
         return _applyKeep(a.stake, k);
     }
@@ -487,11 +574,12 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         return accrued > a.penaltyTaken ? accrued - a.penaltyTaken : 0;
     }
 
-    /// @notice 拉取罚款：normal 仅 defender，mining 任何人；重复调用只拉差额。
+    /// @notice 拉取罚款：仅普通赛、仅 defender；重复调用只拉差额。
     function collectPenalties(bytes32 id) external nonReentrant {
         Contest storage c = contests[id];
         if (c.state == State.None) revert ContestUnknown(id);
-        if (!c.isMining && msg.sender != c.defender) revert NotDefender();
+        if (c.isMining) revert NotNormalContest();
+        if (msg.sender != c.defender) revert NotDefender();
 
         address[] memory list = contestAttackers[id];
         uint256 total;
@@ -507,9 +595,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         }
         if (total == 0) revert NothingToWithdraw();
 
-        address recipient = c.isMining ? treasury : c.defender;
-        rtm.transfer(recipient, total);
-        emit PenaltiesCollected(id, recipient, total);
+        rtm.transfer(c.defender, total);
+        emit PenaltiesCollected(id, c.defender, total);
     }
 
     // ------------------------------------------------------------------
@@ -517,6 +604,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     // ------------------------------------------------------------------
 
     /// @dev 所有结束路径统一走这里：冻结暂停、写 endedAt、注销靶。
+    ///      挖矿赛额外释放并发名额并永久退役 defenseHash。
     function _end(Contest storage c, uint256 at) internal {
         _finalizePause(c, at);
         c.state = State.Ended;
@@ -524,13 +612,17 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (c.isMining) {
             // 每个挖矿赛只会 _end 一次；checked 减法防止计数下溢。
             activeMiningCount -= 1;
+            bytes32 hash = c.defenseHash;
+            retiredDefenseHash[hash] = true;
+            activeDefenseHash[hash] = bytes32(0);
         }
         rtm.unregisterTarget(c.wallet);
     }
 
-    /// @notice 到期结算：任何人可调；W 余额归 defender，零余额也正常结束。
+    /// @notice 普通赛到期结算：任何人可调；W 余额归 defender，零余额也正常结束。
     function expire(bytes32 id) external nonReentrant {
         Contest storage c = contests[id];
+        if (c.isMining) revert NotNormalContest();
         if (c.state != State.Live) revert NotLive(id);
         if (block.timestamp < c.end) revert NotExpired(id);
 
@@ -541,38 +633,39 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     }
 
     /// @notice RTMToken 攻破回调：W 被转给登记攻方时触发。
-    /// @dev Token 已先注销靶并转出触发金额；本函数把 W 剩余余额也划给 winner。
-    ///      `block.timestamp >= end` 时整笔回滚，防止到期后诱导转账领取奖池。
+    /// @dev Token 已先注销靶并转出本次 value；本函数把 W 剩余余额也划给 winner。
+    ///      普通赛 `block.timestamp >= end` 时整笔回滚，防止到期后诱导转账领取奖池。
+    ///      挖矿赛结束后补铸固定 1 RTM 回 Treasury，并发出 MiningSettled。
     function onBreach(bytes32 id, address winner) external override {
         if (msg.sender != address(rtm)) revert OnlyToken();
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
-        if (block.timestamp >= c.end) revert ContestExpired(id);
+        if (!c.isMining && block.timestamp >= c.end) revert ContestExpired(id);
         if (!attackers[id][winner].joined) revert NotJoined();
 
         _end(c, block.timestamp);
         uint256 rest = rtm.balanceOf(c.wallet);
         if (rest > 0) rtm.controllerTransfer(c.wallet, winner, rest);
-        emit ContestSettled(id, winner, rest);
+
+        if (c.isMining) {
+            // 补偿平台预打款：净增发固定 1 RTM/成功攻破。
+            rtm.mint(treasury, MINING_REWARD);
+            emit MiningSettled(id, winner, c.defenseHash, MINING_REWARD);
+        } else {
+            emit ContestSettled(id, winner, rest);
+        }
     }
 
-    /// @notice operator 报告守方弃权：结束比赛、豁免未拉取罚款、按 delivered 分配 S。
-    /// @dev mining 赛没有 S，仅结束并允许攻方提款。
+    /// @notice operator 报告普通赛守方弃权：结束比赛、豁免未拉取罚款、按 delivered 分配 S。
     function reportDefenderFault(bytes32 id) external onlyOperator nonReentrant {
         Contest storage c = contests[id];
+        if (c.isMining) revert NotNormalContest();
         if (c.state != State.Live) revert NotLive(id);
         if (block.timestamp >= c.end) revert ContestExpired(id);
         _end(c, block.timestamp);
 
         address[] memory list = contestAttackers[id];
         _waiveAll(id, list);
-
-        if (c.isMining) {
-            // 挖矿赛没有 S，但已铸余额必须清零，避免 W 结算后仍持仓。
-            _sweepWallet(c, treasury);
-            emit DefenderFault(id);
-            return;
-        }
 
         uint256 totalDelivered = _totalDelivered(id, list);
         if (totalDelivered == 0) {
@@ -631,11 +724,12 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         _sweepWallet(c, c.defender);
     }
 
-    /// @notice 结束后攻方提走剩余质押；重复调用只提差额。
+    /// @notice 普通赛结束后攻方提走剩余质押；重复调用只提差额。
     /// @dev normal（攻破/到期）：未拉取的罚款留在 Arena 供 defender 事后 collect；
     ///      弃权（waived）：未拉取罚款豁免，攻方提 stake - penaltyTaken。
     function withdrawStake(bytes32 id) external nonReentrant {
         Contest storage c = contests[id];
+        if (c.isMining) revert NotNormalContest();
         if (c.state != State.Ended) revert NotEnded(id);
         Attacker storage a = attackers[id][msg.sender];
         if (!a.joined) revert NotJoined();
@@ -655,26 +749,20 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     }
 
     // ------------------------------------------------------------------
-    // 挖矿
+    // 挖矿退役
     // ------------------------------------------------------------------
 
-    /// @notice 任何人可触发：按有效时长（扣除暂停）线性铸币到 W。
-    function accrue(bytes32 id) external nonReentrant {
+    /// @notice 未攻破时由平台主动停止挖矿赛：W 余额退回 Treasury，不铸造。
+    /// @dev 仅 Live+isMining；hash 永久 retired；释放并发名额与 active 映射。
+    function retireMining(bytes32 id) external onlyOperator nonReentrant {
         Contest storage c = contests[id];
-        if (!c.isMining || c.state != State.Live) revert NotLive(id);
+        if (c.state != State.Live) revert NotLive(id);
+        if (!c.isMining) revert NotMiningContest();
 
-        uint256 cutoff = block.timestamp;
-        uint256 paused = c.pausedTotal;
-        if (c.lastPauseAt != 0) paused += cutoff - c.lastPauseAt;
-        uint256 effective =
-            cutoff > c.start && cutoff - c.start > paused ? cutoff - c.start - paused : 0;
-        uint256 k = effective / EPOCH;
-        uint256 due = k * c.miningRate - c.miningMinted;
-        if (due == 0) revert NothingToWithdraw();
-
-        c.miningMinted += due;
-        rtm.mint(c.wallet, due);
-        emit MiningAccrued(id, c.wallet, due);
+        _end(c, block.timestamp);
+        uint256 returned = rtm.balanceOf(c.wallet);
+        if (returned > 0) rtm.controllerTransfer(c.wallet, treasury, returned);
+        emit MiningRetired(id, c.defenseHash, returned);
     }
 
     // ------------------------------------------------------------------
@@ -688,6 +776,12 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         returns (bool)
     {
         return attackers[id][who].joined;
+    }
+
+    /// @notice 该场攻方 join 时记录的一次性数据同意；矿工恒为 true。
+    /// @dev R3 起 DataMarket 以此校验出售资格；未加入返回 false。
+    function dataConsent(bytes32 id, address who) external view returns (bool) {
+        return attackers[id][who].dataConsent;
     }
 
     function contestWallet(bytes32 id) external view returns (address) {
@@ -706,15 +800,14 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
             wallet: c.wallet,
             stake: c.stake,
             stakeBps: c.stakeBps,
+            defenseHash: c.defenseHash,
             start: c.start,
             end: c.end,
             endedAt: c.endedAt,
             state: uint8(c.state),
             isMining: c.isMining,
             attackerCount: c.attackerCount,
-            paused: c.lastPauseAt != 0,
-            miningRate: c.miningRate,
-            miningMinted: c.miningMinted
+            paused: c.lastPauseAt != 0
         });
     }
 }

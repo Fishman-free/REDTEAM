@@ -23,6 +23,7 @@ const {
   makeContest,
   makeMining,
   joinAs,
+  joinMiningAs,
   attack,
   msgHash
 } = require('./arena.helpers');
@@ -151,29 +152,6 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
       expect(await arena.remainingStake(id, attackerA.address)).to.equal(s - accrued2);
     });
 
-    it('mining collect 进入 Treasury，不进入 defender', async function () {
-      const { arena, rtm, treasury, defender, outsider, attackerA } = game;
-      const { id, rate } = await makeMining(game, { rate: RTM(2), stakeBps: BPS });
-
-      await time.increase(EPOCH);
-      await arena.accrue(id); // W = rate
-      await joinAs(game, attackerA, id);
-      const s = (await arena.attackers(id, attackerA.address)).stake;
-      expect(s).to.equal((rate * BigInt(BPS)) / 10000n);
-
-      await time.increase(EPOCH);
-      const due = await arena.penaltyDue(id, attackerA.address);
-      expectClose(due, s - expectedRemaining(s, 1n), 'mining due');
-
-      const treasuryBefore = await rtm.balanceOf(treasury.target);
-      const defenderBefore = await rtm.balanceOf(defender.address);
-      await expect(arena.connect(outsider).collectPenalties(id))
-        .to.emit(arena, 'PenaltiesCollected')
-        .withArgs(id, treasury.target, due);
-      expect(await rtm.balanceOf(treasury.target)).to.equal(treasuryBefore + due);
-      expect(await rtm.balanceOf(defender.address)).to.equal(defenderBefore);
-      expect(await arena.penaltyDue(id, attackerA.address)).to.equal(0n);
-    });
   });
 
   // ==================================================================
@@ -511,7 +489,7 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
 
     it('普通赛 expire 不改变 activeMiningCount', async function () {
       const { arena, outsider, w, w2 } = game;
-      await makeMining(game, { wallet: w, rate: RTM(1) });
+      await makeMining(game, { wallet: w });
       expect(await arena.activeMiningCount()).to.equal(1n);
 
       const { id, end } = await makeContest(game, { wallet: w2 });
@@ -522,20 +500,15 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
       expect(await arena.activeMiningCount()).to.equal(1n);
     });
 
-    it('暂停中 mining breach / fault 释放名额，且 paused 复位', async function () {
+    it('暂停中 mining breach / retire 释放名额，且 paused 复位', async function () {
       const { arena, rtm, operator, attackerA, w, w2 } = game;
-      const c1 = await makeMining(game, { wallet: w, rate: RTM(2), stakeBps: BPS });
-      const c2 = await makeMining(game, { wallet: w2, rate: RTM(1) });
-      await makeMining(game, {
-        wallet: ethers.Wallet.createRandom().address,
-        rate: RTM(1)
-      });
+      const c1 = await makeMining(game, { wallet: w });
+      const c2 = await makeMining(game, { wallet: w2 });
+      await makeMining(game);
       expect(await arena.activeMiningCount()).to.equal(3n);
 
       // breach 路径：暂停中仍可攻破，名额必须释放。
-      await time.increase(EPOCH);
-      await arena.accrue(c1.id);
-      await joinAs(game, attackerA, c1.id);
+      await joinMiningAs(game, attackerA, c1.id);
       await arena.connect(operator).pause(c1.id);
       expect((await arena.contestInfo(c1.id)).paused).to.equal(true);
 
@@ -544,19 +517,17 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
       expect(await arena.activeMiningCount()).to.equal(2n);
       expect((await arena.contestInfo(c1.id)).paused).to.equal(false);
 
-      // fault 路径：暂停中弃权，同样释放名额并清掉 pause 标记。
+      // retire 路径：暂停中主动退役，同样释放名额并清掉 pause 标记。
+      // 挖矿赛没有 fault 路径（reportDefenderFault 仅普通赛）。
       await arena.connect(operator).pause(c2.id);
       expect((await arena.contestInfo(c2.id)).paused).to.equal(true);
-      await arena.connect(operator).reportDefenderFault(c2.id);
+      await arena.connect(operator).retireMining(c2.id);
       expect(await arena.contestState(c2.id)).to.equal(2n);
       expect(await arena.activeMiningCount()).to.equal(1n);
       expect((await arena.contestInfo(c2.id)).paused).to.equal(false);
 
       // 释放出的名额可立即复用。
-      await makeMining(game, {
-        wallet: ethers.Wallet.createRandom().address,
-        rate: RTM(1)
-      });
+      await makeMining(game);
       expect(await arena.activeMiningCount()).to.equal(2n);
     });
 
@@ -670,42 +641,23 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
       expect(collectReceipt.gasUsed).to.be.lessThan(500_000n);
     });
 
-    it('挖矿赛 k=84：定点迭代不超时，collect gas 有界', async function () {
-      const { arena, rtm, treasury, outsider, attackerA } = game;
-      // rate=100 是 MAX_MINING_RATE 合法上限；只建一场，避免 MAX_ACTIVE_MINING=3 干扰。
-      const { id, rate } = await makeMining(game, { rate: RTM(100), stakeBps: BPS });
-      expect(rate).to.equal(RTM(100));
+    it('挖矿赛 collectPenalties / withdrawStake 恒为 NotNormalContest', async function () {
+      const { arena, attackerA } = game;
+      const { id } = await makeMining(game);
+      await joinMiningAs(game, attackerA, id);
 
-      await time.increase(EPOCH);
-      await arena.accrue(id); // 有效 2h，W 余额 = rate = 100 RTM
-      await joinAs(game, attackerA, id); // base=100，s=10 RTM
-
-      const s = (await arena.attackers(id, attackerA.address)).stake;
-      expect(s).to.equal((rate * BigInt(BPS)) / 10000n);
-      expect(s).to.equal(RTM(10));
-
-      await time.increase(84n * EPOCH); // 自 joinedAt 起精确 84 个 epoch
-      const rem = await assertRemaining(
-        arena,
-        id,
-        attackerA.address,
-        s,
-        84n,
-        'mining k=84'
-      );
-      const due = await arena.penaltyDue(id, attackerA.address);
-      expect(due).to.equal(s - rem);
-
-      // 挖矿赛任何人都可收罚款，收款方为 Treasury。
-      const treasuryBefore = await rtm.balanceOf(treasury.target);
-      const collectReceipt = await (await arena.connect(outsider).collectPenalties(id))
-        .wait();
-      expect(await rtm.balanceOf(treasury.target)).to.equal(treasuryBefore + due);
+      await expect(arena.connect(game.defender).collectPenalties(id))
+        .to.be.revertedWithCustomError(arena, 'NotNormalContest');
+      await expect(arena.connect(attackerA).withdrawStake(id))
+        .to.be.revertedWithCustomError(arena, 'NotNormalContest');
+      expect(await arena.remainingStake(id, attackerA.address)).to.equal(0n);
       expect(await arena.penaltyDue(id, attackerA.address)).to.equal(0n);
 
-      // 无 end 的挖矿赛此时仍 Live，无需 breach/expire。
-      expect(await arena.contestState(id)).to.equal(1n);
-      expect(collectReceipt.gasUsed).to.be.lessThan(500_000n);
+      await arena.connect(game.operator).retireMining(id);
+      await expect(arena.connect(game.defender).collectPenalties(id))
+        .to.be.revertedWithCustomError(arena, 'NotNormalContest');
+      await expect(arena.connect(attackerA).withdrawStake(id))
+        .to.be.revertedWithCustomError(arena, 'NotNormalContest');
     });
   });
 });
