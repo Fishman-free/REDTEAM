@@ -13,8 +13,8 @@
 | [2026-10-05 live.v3 对照报告](../rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md) | 真实模型预算验证轮；L0/L1 分列，12开放发现、修复容量与有限验收边界披露 |
 | [区块链攻击悬赏与持续评估总构想](references/research/RSI攻击悬赏与持续评估机制_研究构想.md) | 原始研究目标，保留 |
 | [RTM 悬赏预算与合约设计](references/research/RTM_BOUNTY_DESIGN.md) | 独立历史研究/实现，不是 Flower，尚未接入当前 PayAssist，排除商业路线 |
-| [外部攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md)、[旧 Arena 会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound](../contracts/src/BountyRound.sol) | 独立 HTTP/commit–reveal 原型；当前 PayAssist 无公共提交到链上判奖端到端接线 |
-| [证据与奖励协议 v1](EVIDENCE_REWARD_PROTOCOL.md)、[RTM 桥](../contracts/scripts/rtm-reward-bridge.js) | 旧 Arena claim 与本地 BountyVault 桥；不是当前 PayAssist 奖励实现 |
+| [外部攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md)、[旧 Arena 会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound（已归档）](../archieve/contracts-2026-10/BountyRound.sol) | 独立 HTTP/commit–reveal 原型；当前 PayAssist 无公共提交到链上判奖端到端接线 |
+| [证据与奖励协议 v1](EVIDENCE_REWARD_PROTOCOL.md)、[RTM 桥（已归档）](../archieve/contracts-2026-10/rtm-reward-bridge.js) | 旧 Arena claim 与本地 BountyVault 桥；不是当前 PayAssist 奖励实现 |
 | [历史研究论文 Markdown](paper/payment-agent-security-rsi.md)、[历史论文 PDF](paper/payment-agent-security-rsi.pdf) | 历史确定性研究稿；20%→100%受未见族分母缩小影响，逐点成功项始终2，不能证明跨族泛化；不含当前 live.v3 结果，PDF未更新 |
 | [跨模块协议](references/research/EXPERIMENT_PROTOCOL.md)、[开发路线](references/research/DEVELOPMENT_ROADMAP.md) | 独立后端/证据/整合研究，保留 |
 | [整合记录](references/research/INTEGRATION.md)、[2026-09-18审查](references/research/SECURITY_REVIEW_2026-09-18.md)、[2026-09-23验收](references/research/VALIDATION_2026-09-23.md)、[2026-09-27合约审计](references/research/SECURITY_AUDIT_2026-09-27.md) | 来源记录，结果仅对应当时版本，不是 Flower 审计 |

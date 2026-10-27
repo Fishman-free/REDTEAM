@@ -9,12 +9,13 @@
 | `docs/legacy-rsi/` | 旧落地计划、基础架构、操作手册与模型实验说明 | 被当前 README 和研究方案替代的操作/实现叙述；独立原型源码保留 |
 | `docs/2026-10-03-pre-consolidation/` | 本次收敛前的 README、研究方案和索引快照 | 保留原说明与迁移上下文 |
 | [远端合入前文档](docs/2026-10-03-origin-main/docs/RESEARCH_PLAN.md) | origin/main的原始入口、实施评估和日期验证 | 当前PayAssist路径与独立RTM/接口原型分别解释；原论文/商业计划保留在docs |
+| [contracts-2026-10](contracts-2026-10/README.md) | 2026-10 归档的旧 RTM 减半/Bounty 合约、桥脚本与测试 | 由 2026-10-27 攻守博弈设计取代；新合约在 contracts/ 实现中 |
 | [history/README.md](history/README.md) | 2026-09-30 之前的原项目入口 | 由当前入口和研究方案替代 |
 | [history/.github/workflows/tests.yml](history/.github/workflows/tests.yml) | 旧目录布局的 CI | [当前 CI](../.github/workflows/tests.yml) |
 | `local-residue/`（Git 忽略） | 原目录字节码和安装元数据 | 仅本机残留，不是当前源码 |
 
 [manifest.json](manifest.json)记录原位置、保留位置、原字节 SHA-256 和替代位置。`files/summary` 的数量为 2026-09-30 基线；`reorganizations` 追加本次迁移，历史原始 hash 不随活动源码更新。归档原件中的路径和链接按当时文本保留；当前索引提供可用入口。
 
-独立契约、原始总构想、RTM/合约设计、预注册、修复者对照和基准规格仍在参考目录；未接入或日期较早不足以删除这些资产。没有搬走生产源码。
+独立契约、原始总构想、RTM/合约设计、预注册、修复者对照和基准规格仍在参考目录；未接入或日期较早不足以删除这些资产。除 2026-10 归档的旧 RTM/Bounty 体系外，没有搬走生产源码。
 
 完整宿主 state 位于 `rsi4safety/.rsi4safety/payassist-v2/`，保持 Git 忽略且未改。提交的[五份关键 trial](../rsi4safety/payment_agents/evidence/samples/manifest.json)只用于核查典型行为；完整4158次分母和链验证需要本地原始 state。

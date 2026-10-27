@@ -78,7 +78,7 @@ Arena 在发现通过独立裁决并去重通过后，写一条 claim request（
 1. 合约层无内容去重映射：同内容派生相同 `claim_id` 后，链上重复 `configureClaim` 会回滚，
    但不同 evaluator/不同部署实例之间没有跨实例去重。
 2. `beneficiary` 与外部攻击者身份没有绑定机制（无钱包证明流程）；当前由 evaluator 登记。
-3. commit–reveal 公开提交的**最小合约层已落地**（2026-10-02，`contracts/src/BountyRound.sol`：
+3. commit–reveal 公开提交的**最小合约层已落地**（2026-10-02，`archieve/contracts-2026-10/BountyRound.sol`：
    先承诺后揭示、同材料先到先得、关线后裁决、pull 模式领奖），HTTP 会话/配额原型见
    `rsi4safety/execution/src/rsi4safety/arena/interface/`；但"会话提交 → 复现验证 →
    链上判奖"的端到端链路与外部身份绑定仍未接线。

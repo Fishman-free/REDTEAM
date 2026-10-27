@@ -176,7 +176,7 @@ claimPayout(bytes32 claimId)
 
 ### 3.2 RTM 代币（限量 + 年度减半）
 
-已实现于 `contracts/RTMToken.sol` + `contracts/BountyVault.sol`（分支 `safety/contracts-and-rtm`）：
+已实现于 `contracts/RTMToken.sol` + `contracts/BountyVault.sol`（分支 `safety/contracts-and-rtm`）：源码已于 2026-10 归档至 `archieve/contracts-2026-10/`，本节为历史设计。
 
 - **固定上限 21,000,000 RTM**，永不增发
 - **年度减半预算**：第 0 年预算 = 上限的一半，此后逐年减半；逐年预算之和 < 上限（比特币式）

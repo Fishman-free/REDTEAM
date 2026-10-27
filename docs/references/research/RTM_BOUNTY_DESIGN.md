@@ -1,7 +1,9 @@
 # RTM 悬赏代币设计说明
 
-> 对应合约：`contracts/src/RTMToken.sol`、`contracts/src/BountyVault.sol`
-> 对应测试：`contracts/test/rtm.test.js`
+> **已归档（2026-10）**：本文描述的 RTM 减半与 BountyVault/BountyRound 体系已被 [2026-10-27 攻守博弈设计](../../superpowers/specs/2026-10-27-rtm-redteam-game-design.md) 取代；合约与测试位于 `archieve/contracts-2026-10/`。
+
+> 对应合约：`archieve/contracts-2026-10/RTMToken.sol`、`archieve/contracts-2026-10/BountyVault.sol`
+> 对应测试：`archieve/contracts-2026-10/rtm.test.js`
 
 本文说明攻击悬赏代币 REDTEAM（RTM）的发行上限、当年预算预留及认领生命周期，已同步远端 `6394fc2` 的安全修复。审计原始记录见[合约审计](SECURITY_AUDIT_2026-09-27.md)。年度预算不等于“全年额度不可被耗尽”或奖励真实性保证。完整构想见 [RSI 悬赏研究构想](RSI攻击悬赏与持续评估机制_研究构想.md)。
 
@@ -39,7 +41,7 @@ sum(n>=0) yearBudget(n) = 2 * YEAR0_BUDGET - popcount(YEAR0_BUDGET)
                         = MAX_SUPPLY - 38 wei
 ```
 
-38 是 `YEAR0_BUDGET` 的二进制 1 的个数。也就是说预算表之和**严格小于** `MAX_SUPPLY`（留有 38 wei 的余量），即使每一年都被铸造到最后一 wei 也无法触及上限——发行表本身就封死了无限增发的可能，`MAX_SUPPLY` 只是冗余的第二道边界，而不是唯一防线。（`contracts/test/rtm.test.js` 对 n = 0…255 求和并断言该等式。）
+38 是 `YEAR0_BUDGET` 的二进制 1 的个数。也就是说预算表之和**严格小于** `MAX_SUPPLY`（留有 38 wei 的余量），即使每一年都被铸造到最后一 wei 也无法触及上限——发行表本身就封死了无限增发的可能，`MAX_SUPPLY` 只是冗余的第二道边界，而不是唯一防线。（`archieve/contracts-2026-10/rtm.test.js` 对 n = 0…255 求和并断言该等式。）
 
 ## 3. 年度预算与授权边界
 
@@ -145,10 +147,10 @@ evaluator 调用 configureClaim(id, attacker, amount)   ← 登记奖励依据�
 
 ## 6. 本地验证范围
 
-`contracts/test/rtm.test.js` 覆盖：竞争性预留与 `minted + reserved <= budget`、已耗尽年度不能再配置、下一年减半、精确年度边界、旧年认领拒付/取消、成功结算与取消恰好释放一次、终态 id 不可复用、授权轮换、降低单笔上限、暂停三个写操作及暂停跨年、未来发行起点、零预算年份、初始化不可重绑，以及 mint 失败后的原子回滚。
+`archieve/contracts-2026-10/rtm.test.js` 覆盖：竞争性预留与 `minted + reserved <= budget`、已耗尽年度不能再配置、下一年减半、精确年度边界、旧年认领拒付/取消、成功结算与取消恰好释放一次、终态 id 不可复用、授权轮换、降低单笔上限、暂停三个写操作及暂停跨年、未来发行起点、零预算年份、初始化不可重绑，以及 mint 失败后的原子回滚。
 
 故障测试只在 Hardhat 进程内进行：一项临时 impersonate vault 以模拟预算意外消耗，验证 vault 复检与饱和减法；另一项临时写入 RTM 的 ERC20 totalSupply 槽，让真实 `mint` 触发 `MaxSupplyExceeded`，检查 claim、预留、累计数和余额未变化，恢复槽值后再次正常结算。这不是生产入口或用户可用权限，不修改 RTM 代码/ABI，也不新增 mock 合约。
 
-审计回归 [audit-poc.test.js](../../../contracts/test/audit-poc.test.js) 额外覆盖所有权保护、累计结算上限、显式续期、部署零值校验、付款 ID 隔离、绑定事件及结算日志顺序。付款合约公开 getter 从 `used` 改为 `usedOps` / `usedInvoices`，外部消费者需适配；现有本地脚本无旧 getter 依赖。
+审计回归 [audit-poc.test.js](../../../archieve/contracts-2026-10/audit-poc.test.js) 额外覆盖所有权保护、累计结算上限、显式续期、部署零值校验、付款 ID 隔离、绑定事件及结算日志顺序。付款合约公开 getter 从 `used` 改为 `usedOps` / `usedInvoices`，外部消费者需适配；现有本地脚本无旧 getter 依赖。
 
 验证命令在 `contracts/` 执行为 `npm test`、`npx hardhat compile`、`git diff --check`，另对本次修改做隐私/凭据模式扫描。不连接外部 RPC、不使用真实资金或远程 LLM。全套既有支付-agent 测试仍运行其本地离线 mock 路径，并非新增 RTM/Arena/生产集成。

@@ -1847,6 +1847,117 @@
         "docs/business/redteam-business-plan.pdf",
         "docs/EVIDENCE_REWARD_PROTOCOL.md"
       ]
+    },
+    {
+      "date": "2026-10-27",
+      "scope": "Archive the 2026-10 legacy RTM halving/Bounty contracts, bridge script and tests under archieve/contracts-2026-10/; the 2026-10-27 red-team game design supersedes them.",
+      "source_commit": "f1ecd61d4769bc645b2b36a971ab3dd465386be7",
+      "records": [
+        {
+          "original": "contracts/src/RTMToken.sol",
+          "archived": "archieve/contracts-2026-10/RTMToken.sol",
+          "sha256": "7cef33c8aa78f6e80f499f253f46727e8aaf3c377e9fd60cd1c3ad686583736f",
+          "reason": "Legacy annual-halving RTM token superseded by the 2026-10-27 red-team game design; archived verbatim for historical audit.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/src/BountyVault.sol",
+          "archived": "archieve/contracts-2026-10/BountyVault.sol",
+          "sha256": "d4ad880a62b9218cccd5680184e1982edcf066f579051cdde319f8f8ffee1711",
+          "reason": "Legacy evaluator-gated mint and settlement vault superseded by the planned Arena staking, penalty and settlement flow; archived verbatim for historical audit.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/src/BountyRound.sol",
+          "archived": "archieve/contracts-2026-10/BountyRound.sol",
+          "sha256": "ae3849de95247d9591d96b043240936584ebb1310e22bac186d04a8e1e5f4a9c",
+          "reason": "Legacy ETH-escrow commit-reveal layer superseded by the planned Arena escrow; archived verbatim for historical audit.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/scripts/rtm-reward-bridge.js",
+          "archived": "archieve/contracts-2026-10/rtm-reward-bridge.js",
+          "sha256": "735fcbff85a4620dd56915a30802e3ead8d6e65089509250fd1bea5e09117bf7",
+          "reason": "Legacy claim-requests to BountyVault settlement bridge superseded by the planned Arena settlement flow; archived verbatim for historical audit.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/test/rtm.test.js",
+          "archived": "archieve/contracts-2026-10/rtm.test.js",
+          "sha256": "281d52e0a3132a2f574122d5bfcb83364abca8bd79b6547b14367c2b41a84d92",
+          "reason": "Legacy halving/Bounty test archived with its contracts; payment-only audit cases continue in contracts/test/payment-audit-regressions.test.js.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md",
+            "contracts/test/payment-audit-regressions.test.js"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/test/rtm-budget-model.test.js",
+          "archived": "archieve/contracts-2026-10/rtm-budget-model.test.js",
+          "sha256": "604c4c781d4477e8adb5d971f571406e58b9f1376d2fc8148971249ee3f404b6",
+          "reason": "Legacy annual budget model test archived with the halving contracts; payment-only audit cases continue in contracts/test/payment-audit-regressions.test.js.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md",
+            "contracts/test/payment-audit-regressions.test.js"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/test/rtm-bridge.test.js",
+          "archived": "archieve/contracts-2026-10/rtm-bridge.test.js",
+          "sha256": "82b5c065bb8d9d4cd0296dc035d286e6f0dfaaa863bf35c8376a4b7aa09a985e",
+          "reason": "Legacy RTM bridge test archived with the bridge script; payment-only audit cases continue in contracts/test/payment-audit-regressions.test.js.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md",
+            "contracts/test/payment-audit-regressions.test.js"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/test/bounty-round.test.js",
+          "archived": "archieve/contracts-2026-10/bounty-round.test.js",
+          "sha256": "1397834d9d7e9fb156013574f0079fb91f1f936fdb06e0e3789fa5c5987df913",
+          "reason": "Legacy BountyRound commit-reveal test archived with the contract; payment-only audit cases continue in contracts/test/payment-audit-regressions.test.js.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md",
+            "contracts/test/payment-audit-regressions.test.js"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        },
+        {
+          "original": "contracts/test/audit-poc.test.js",
+          "archived": "archieve/contracts-2026-10/audit-poc.test.js",
+          "sha256": "ad082bf33ee0367cae666d25f6ef02f480b11ec7f0045495dcac6856d0116010",
+          "reason": "Whole audit PoC archived with the legacy Bounty contracts; cases that only exercise current payment contracts were extracted to contracts/test/payment-audit-regressions.test.js.",
+          "replaced_by": [
+            "docs/superpowers/specs/2026-10-27-rtm-redteam-game-design.md",
+            "contracts/test/payment-audit-regressions.test.js"
+          ],
+          "original_bytes_preserved": true,
+          "operation": "move"
+        }
+      ]
     }
   ]
 }
