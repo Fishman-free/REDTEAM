@@ -167,6 +167,16 @@ describe('DataMarket 数据市场', function () {
     ).to.equal(true);
   });
 
+  it('buyFromAttacker：未在该场注册的攻方 -> NotAttacker', async function () {
+    const contest = await createEndedContest();
+    await market.connect(game.operator).publish(contest.id, ROOT);
+
+    // attackerB 未加入本场，即使 root 已发布也必须拒绝。
+    await expect(
+      market.connect(game.defender).buyFromAttacker(contest.id, game.attackerB.address)
+    ).to.be.revertedWithCustomError(market, 'NotAttacker');
+  });
+
   it('publish：非 operator、未结束、零 root、重复发布均拒绝', async function () {
     const live = await makeContest(game, { wallet: game.w2 });
     await expect(market.connect(game.defender).publish(live.id, ROOT))

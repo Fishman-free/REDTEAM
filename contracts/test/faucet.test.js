@@ -102,6 +102,27 @@ describe('Faucet 水龙头', function () {
       .to.be.revertedWithCustomError(faucet, 'Expired');
   });
 
+  it('deadline 等于区块时间戳时当秒仍有效', async function () {
+    const boundaryClaimer = game.outsider;
+    const now = BigInt(await time.latest());
+    const deadline = now + 600n;
+    const t = ticket(boundaryClaimer.address, 1n, deadline);
+    // 签名是链下操作，不挖块；claim 必须是 setNextBlockTimestamp 之后的下一笔交易。
+    const sig = await sign(t);
+    await time.setNextBlockTimestamp(deadline);
+
+    const tx = await faucet.connect(boundaryClaimer).claim(t, sig);
+    const receipt = await tx.wait();
+    const block = await ethers.provider.getBlock(receipt.blockNumber);
+
+    // 证明边界用例命中的确实是 deadline 当秒。
+    expect(block.timestamp).to.equal(Number(deadline));
+    expect(await faucet.lastClaim(boundaryClaimer.address)).to.equal(deadline);
+    await expect(tx)
+      .to.emit(faucet, 'Claimed')
+      .withArgs(boundaryClaimer.address, 1n, DRIP);
+  });
+
   it('24h 冷却：立即二次领取 Cooldown，满 24h 后新 nonce 可领', async function () {
     const now = BigInt(await time.latest());
     const deadline = now + 2n * DAY;
