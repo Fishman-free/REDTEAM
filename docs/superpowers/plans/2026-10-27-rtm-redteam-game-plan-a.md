@@ -1510,7 +1510,7 @@ git commit -m "feat(infra): single-validator Besu QBFT testnet with zero gas"
 3. **新增 `config.toml`**：草稿只靠命令行；实现新增 data-path/genesis-file/node-private-key-file/rpc-http-*/min-gas-price/tx-pool-enable-balance-check。compose 仍显式传关键命令行参数。
 4. **零 gas 选项**：除 `min-gas-price=0` 外还需要 `tx-pool-enable-balance-check=false`；该选项 25.10.0 才引入，24.5.1 没有，因此运行时镜像改为 `hyperledger/besu:25.10.0`。`pertxgaslimit:0` 保留在 `config.qbft`，24.5.1 operator 与 25.10.0 runtime 均接受。
 5. **QBFT/DEBUG API 与绑定**：command 显式加 `--rpc-http-api=ETH,NET,WEB3,QBFT,DEBUG`、`--host-allowlist=*`、`--rpc-http-cors-origins=all`；端口只绑 `127.0.0.1`，默认 8545/30303，可用 `BESU_RPC_PORT`/`BESU_P2P_PORT` 覆盖（本机 8545 被其他项目占用，实测用 8546）。
-6. **generate.sh 安全性**：默认拒绝覆盖已有 `networkFiles/`/`keydir/`，不再 `rm -rf` 用户数据；`qbftConfig.json` 由源 `genesis.json` 经 here-doc 包裹，不依赖 jq；Windows Git Bash 用 `pwd -W` + `MSYS_NO_PATHCONV=1` 处理 bind mount。
+6. **generate.sh 安全性**：默认拒绝覆盖已有 `networkFiles/`/`keydir/`，且 `data/` 非空时拒绝生成（避免新 genesis 与旧链数据错配；空 `data/` 允许），不再 `rm -rf` 用户数据；唯一 key 目录用 POSIX glob + `set --` 读取（兼容 macOS Bash 3.2，不使用 `mapfile`）；`qbftConfig.json` 由源 `genesis.json` 经 here-doc 包裹，不依赖 jq；Windows Git Bash 用 `pwd -W` + `MSYS_NO_PATHCONV=1` 处理 bind mount。
 7. **Hardhat 网络**：增加 `chainId:48850`、`gasPrice:0`、`gas`、`timeout:120000`。Hardhat 配置校验只接受数字或 `"auto"`，故 `gas` 写成数值字面量 `0x1ffffffffffffe`（=9007199254740990），而不是字符串 `'0x1ffffffffffffe'`。
 8. **镜像版本**：generate 默认 24.5.1（operator 正常）；运行时默认 25.10.0。25.10.0 operator 在本机 Windows bind mount 下写完输出后仍以 `Output directory already exists` 退出（exit 1），故不用于 generate。
 9. **实测**：单验证者 QBFT 2s 出块；`eth_chainId=0xbed2`、`eth_gasPrice=0x0`、`qbft_getValidatorsByBlockNumber` 与 `keydir/address` 一致；零余额账户 + `gasPrice:0` 部署合约成功；`npm test` 322 passing。

@@ -32,6 +32,8 @@ infra/besu-testnet/
 - Docker Desktop 已启动，`docker info` 可用。
 - Bash（Windows 用 Git Bash）。`generate.sh` 会自动处理 Git Bash 的 `pwd -W`
   与 `MSYS_NO_PATHCONV`，不需要硬编码 Windows 路径。
+- macOS 自带 Bash 3.2 可直接运行；脚本用 POSIX glob 取唯一 key 目录，不依赖
+  Bash 4+ 的 `mapfile`。
 - 默认端口 `8545` / `30303` 空闲。若被其他项目占用，用环境变量换 host 端口
   （见下文），容器内端口不变。
 
@@ -44,7 +46,8 @@ bash generate.sh          # 或 ./generate.sh
 
 脚本会：
 
-1. 检查 Docker 可用；
+1. 检查 Docker 可用；若 `networkFiles/`/`keydir/` 已存在，或 `data/` 存在且
+   非空，则拒绝（空 `data/` 允许）；
 2. 用 here-doc 把 `genesis.json` 包成 `qbftConfig.json`（不依赖 jq）；
 3. 运行
    `besu operator generate-blockchain-config --config-file=/work/qbftConfig.json --to=/work/networkFiles --private-key-file-name=key`；
@@ -52,8 +55,9 @@ bash generate.sh          # 或 ./generate.sh
 5. 把唯一 key 复制为 `keydir/key`、`keydir/key.pub`，并把地址写入
    `keydir/address`（`chmod 600 keydir/key`）。
 
-**默认拒绝覆盖**：若 `networkFiles/` 或 `keydir/` 已存在，脚本会退出并提示先备份。
-不要直接删除用户数据；确认要重置时手动执行：
+**默认拒绝覆盖**：若 `networkFiles/` 或 `keydir/` 已存在，或 `data/` 存在且非空，
+脚本会退出并提示先备份（空 `data/` 允许）。不要直接删除用户数据；确认要重置时
+手动执行：
 
 ```bash
 rm -rf networkFiles keydir data qbftConfig.json
@@ -224,8 +228,9 @@ npx hardhat run <script> --network besu-testnet
 - 私钥仅用于本测试网，不要复用到主网或任何有价值的环境。
 - 丢失 key 或重新运行 `generate.sh` 会生成不同 validator/genesis；必须删除
   `data/` 后从新 genesis 重来，旧链上的合约/状态不会保留。
-- 容器只读挂载 `keydir/key`，但 Docker bind mount 不是硬件安全模块；生产主网
-  验证者应离线生成并加密存档。
+- 容器只读挂载 `keydir/key`。Windows/Git Bash 下 `chmod 600` 可能不生效，但
+  `keydir/` 已 gitignore 且以只读方式挂载；仍不要把该目录提交或共享。Docker
+  bind mount 不是硬件安全模块；生产主网验证者应离线生成并加密存档。
 
 ## RPC 安全
 
@@ -255,6 +260,7 @@ docker compose up -d
 ```
 
 重置前先备份 `keydir/` 和 `networkFiles/genesis.json`；删除后无法恢复旧链。
+`generate.sh` 会拒绝非空 `data/`，所以重置必须先删除它再重新生成。
 
 ## 故障排查
 

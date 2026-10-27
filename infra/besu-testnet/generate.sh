@@ -30,6 +30,25 @@ EOF
   exit 1
 fi
 
+if [ -e data ] && [ ! -d data ]; then
+  die "data exists but is not a directory; move it away before generating"
+fi
+
+if [ -d data ] && [ -n "$(ls -A data 2>/dev/null)" ]; then
+  cat >&2 <<EOF
+error: data/ exists and is not empty.
+
+Refusing to generate a new validator/genesis while old chain data is present:
+the new genesis would not match the existing database. Back up data/ if needed,
+then remove it and re-run:
+
+  rm -rf data
+
+An empty data/ directory is allowed.
+EOF
+  exit 1
+fi
+
 [ -f genesis.json ] || die "genesis.json not found"
 
 # Wrap the source genesis template into the operator's config without jq.
@@ -66,11 +85,14 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 grep -Eq '"extraData"[[:space:]]*:[[:space:]]*"0x[0-9a-fA-F]+"' "$NETWORK_FILES/genesis.json" \
   || die "generated genesis has no non-empty extraData"
 
-mapfile -t KEY_DIRS < <(find "$NETWORK_FILES/keys" -mindepth 1 -maxdepth 1 -type d)
-[ "${#KEY_DIRS[@]}" -eq 1 ] \
-  || die "expected exactly 1 generated validator key directory, found ${#KEY_DIRS[@]}"
+# Bash 3.2 compatible (macOS default Bash): no mapfile/arrays. The script takes
+# no positional parameters, so reuse them for the unique key directory glob.
+# An unmatched glob stays literal, and the -d test then rejects it.
+set -- "$NETWORK_FILES"/keys/*/
+[ "$#" -eq 1 ] && [ -d "${1:-}" ] \
+  || die "expected exactly 1 generated validator key directory"
 
-VALIDATOR_DIR="${KEY_DIRS[0]}"
+VALIDATOR_DIR="${1%/}"
 VALIDATOR_ADDRESS="$(basename "$VALIDATOR_DIR")"
 
 mkdir -p "$KEY_DIR"
