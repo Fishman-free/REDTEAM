@@ -454,6 +454,7 @@ contract RTMToken is ERC20, Ownable {
     error InvalidMinter();
     error ZeroAmount();
     error TargetTransferRestricted(address from, address to);
+    error InvalidContestId();
     error NotArena();
 
     constructor(address initialOwner, address arena_)
@@ -470,6 +471,7 @@ contract RTMToken is ERC20, Ownable {
     function registerTarget(address wallet, bytes32 contestId) external {
         if (msg.sender != minter) revert NotArena();
         if (wallet == address(0)) revert ZeroAddress();
+        if (contestId == bytes32(0)) revert InvalidContestId();
         targetContest[wallet] = contestId;
         emit TargetRegistered(wallet, contestId);
     }
@@ -513,6 +515,8 @@ contract RTMToken is ERC20, Ownable {
     function _update(address from, address to, uint256 value) internal override {
         bytes32 contestId = targetContest[from];
         if (contestId != bytes32(0)) {
+            // 零金额不算攻破：否则 0 RTM 转账即可触发结算。
+            if (value == 0) revert TargetTransferRestricted(from, to);
             if (arena.isRegisteredAttacker(contestId, to)) {
                 // 攻破：先注销（CEI），再转账，再回调结算。
                 delete targetContest[from];

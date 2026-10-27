@@ -104,7 +104,8 @@ if (isActiveTarget(from)) {
 ```
 
 - **检测规则即结算规则**：用户要求的"检测到守方向攻方转移即结束比赛"由代币在转账交易内原子完成：注销 W → 把 W 全部余额经控制器划给获胜攻方 → 记录 `Breach` 事件。没有链下裁判窗口，没有竞态。
-- 靶钱包之间互转、入金不受限；比赛结束（破/到期/弃权）即注销，恢复普通钱包。
+- 入金不受限；**任何转出**（包括转给其他比赛的靶钱包）仅两个合法去向：该场注册攻方，或 Arena 的 `controllerTransfer`。比赛结束（破/到期/弃权）即注销，恢复普通钱包。
+- **零金额转账不构成攻破**：活跃靶的任何 0 值转出同样 revert，防止用 0 RTM 触发"攻破"白拿奖池。
 - **结算/退款/赎回走独立的 `controllerTransfer(from, to, amount)`（仅 minter 可调）**：它绕过靶策略并在必要时注销靶，是 Arena 移动 W 资金的唯一入口。Arena 不得依赖 `transferFrom` + allowance 移动 W 资金；靶钱包自行向 Arena 转账同样 revert（视同第三方），防止被诱导"转账到 Arena"绕过结算、留下无靶的活跃比赛。
 - 守方向"非该场攻方"转账（比如守方换小号想私下转走）被代币 revert——这就是"测试币标记"的实现。
 - 挖矿赛与普通赛共用同一套逻辑，defender = 平台金库地址。
@@ -168,7 +169,7 @@ EV_守 + Σ EV_攻 = −(消息费 + 各方推理费)
 ### 4.1 RTMToken.sol（重写）
 
 - ERC-20（`_update` 覆写）+ `Ownable`。无预铸。minter = Arena（部署时绑定，同旧版约束：minter 必须有代码）。
-- 靶注册表：`registerTarget(W, contestId)` / `unregisterTarget(W)` 仅 Arena 可调。
+- 靶注册表：`registerTarget(W, contestId)` / `unregisterTarget(W)` 仅 Arena 可调；`contestId` 不得为 `bytes32(0)`（非靶哨兵）。
 - 攻方集合查询 `isRegisteredAttacker(contestId, addr)` 委托 Arena。
 - `onBreach` 回调（仅 Arena）：结束比赛并控制器划转（CEI 顺序：先状态后转账）。
 - `controllerTransfer(from, to, amount)` 仅 minter：结算/退款/赎回的唯一资金划转入口，绕过靶策略并在必要时注销靶；Arena 不得依赖 allowance 的 `transferFrom` 移动 W 资金。
