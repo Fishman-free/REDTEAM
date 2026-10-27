@@ -198,6 +198,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function initialize(RTMToken rtm_) external onlyOwner {
         if (address(rtm) != address(0)) revert AlreadyInitialized();
         if (address(rtm_) == address(0) || address(rtm_).code.length == 0) revert InvalidRTM();
+        if (address(rtm_) == treasury) revert InvalidRTM();
         if (rtm_.minter() != address(this)) revert InvalidRTM();
         if (address(rtm_.arena()) != address(this)) revert InvalidRTM();
         rtm = rtm_;
