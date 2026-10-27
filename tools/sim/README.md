@@ -117,7 +117,7 @@ P_survive = Π_{m=1}^{M} (1 - p_m)^N
 N × p_self = 1 - P_survive
 ```
 
-脚本对多组 `(p, N, decay)` 做了该恒等式的数值自检，误差 < 1e-12。
+脚本内置 `self_check()`，对 `p ∈ {0.001, 0.005, 0.01, 0.05, 0.2}`、`N ∈ {1,2,5}`、`decay ∈ {1.0,0.99}` 共 30 组检查 `|N·p_self − (1−P_survive)| < 1e-12`；结果写入 `assertions` 的 `analytical_self_checks` 项，失败时非零退出。
 
 ### 2.4 收益公式
 
@@ -145,7 +145,7 @@ EV_selfplay  = -M × c                                  # 罚款/奖金是内部
 - **无人攻破路径**（概率 `P_survive`）：近似与真实完全一致。
 - **提前攻破路径**（概率 `1−P_survive`）：近似**高估攻方成本 / 低估攻方真实 EV**，同时**高估守方罚没收入 / 高估守方 EV**。
 
-也就是说，强守方的正 EV 在本模型中是一个**上界**，而不是精确值。强守方的 `P_survive` 很高（默认强守方示例约为 95.0% / 89.8%，见第 4 节），偏差主要来自少数提前攻破路径，量级有限；但主网参数定稿前仍应做**路径级**仿真（按首次攻破时间结算），不能只依赖本近似。同时，攻方 EV 被低估意味着 `N*` 也可能偏保守（真实入场人数可能更多）；强守方 EV 的上界只在给定 `N*` 下成立，路径级模型需要联合重算 `N*` 和守方 EV。
+也就是说，强守方的正 EV 在本模型中是一个**上界**，而不是精确值。强守方的 `P_survive` 很高（默认强守方示例：`p_market=0.01, N=1` 时约 `0.950368`，`p_market=0.05, N=2` 时约 `0.897998`），偏差主要来自少数提前攻破路径，量级有限；但主网参数定稿前仍应做**路径级**仿真（按首次攻破时间结算），不能只依赖本近似。同时，攻方 EV 被低估意味着 `N*` 也可能偏保守（真实入场人数可能更多）；强守方 EV 的上界只在给定 `N*` 下成立，路径级模型需要联合重算 `N*` 和守方 EV。
 
 未建模的因素还包括：攻方异质性/技能分布、风险偏好、资金时间价值、守方推理成本、数据市场收入、声誉价值、RTM 法币价格、挖矿赛奖池随时间增长、链上 gas（测试网零 gas）。这些都需要在 P1/P5 参数定稿前复核。
 
@@ -155,20 +155,20 @@ EV_selfplay  = -M × c                                  # 罚款/奖金是内部
 
 强度阈值：固定 `p_market` 和 `N*`，令 `p_def = p_market × ratio`，求守方 `EV_def = 0` 的临界 `ratio`。脚本的实现顺序是：
 
-1. 按规格给定的 ratio 阶梯 `{1.0, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01, 0.005, 0.001}` 扫描，定位守方 EV 由正变负的夹逼区间；
+1. 按实现用于夹逼的 ratio 阶梯 `{1.0, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01, 0.005, 0.001}` 扫描（规格未规定该阶梯），定位守方 EV 由正变负的夹逼区间；
 2. 在该区间内二分，得到阈值；
 3. 取 `strong_ratio = threshold × strong_fraction`（默认 0.5），计算该处的攻方真实 EV、守方 EV 和零和残差。
 
 阈值以下（`ratio < threshold`）表示守方真实强度高于市场预期，`EV_def > 0`；阈值以上则 `EV_def < 0`。默认三组活跃市场的阈值见第 4 节。
 
-阈值也有闭式解（全程持有近似下）：
+当 `decay=1.0` 且 `N*·F/S < 1` 时，阈值有闭式解（全程持有近似下）：
 
 ```
 p_def_threshold = 1 - (1 - N*·F/S)^(1/(N*·M))
 ratio_threshold = p_def_threshold / p_market
 ```
 
-脚本用二分求解；与该闭式解在默认三组活跃市场上相差 < 1e-14。注意阈值 `p_def` 取决于 `N*`、`M` 和 `F/S`，`ratio` 再除以 `p_market`；手续费和推理成本只通过改变 `N*` 间接影响阈值。
+该闭式解**仅在默认 `decay=1.0` 时成立**；`decay<1` 时每轮 `p_m` 不同，不能套用。脚本的 `self_check()` 在 `decay=1.0` 时对默认 `p_market` 集合中 `N*>0` 的市场比较闭式解与二分结果（容差 1e-12）；若 `N*·F/S ≥ 1` 则跳过该市场，`decay≠1` 时整项标记不适用。默认运行检查 3 个市场，实测最大误差约 `5.55e-17`。注意阈值 `p_def` 取决于 `N*`、`M` 和 `F/S`，`ratio` 再除以 `p_market`；手续费和推理成本只通过改变 `N*` 间接影响阈值。
 
 ---
 
@@ -244,7 +244,7 @@ EV_def = −N·M·c − N·EV_att ≤ −N·M·c < 0
 python tools/sim/mechanism_sim.py
 ```
 
-实际运行（Python 3.14.5，2026-10-27）的 `market` 行摘要如下。所有数值均来自真实输出，不是手算占位：
+**外部核验**：实际运行（Python 3.14.5，2026-10-27）的 `market` 行摘要如下。所有数值均来自真实输出，不是手算占位：
 
 | `p_market` | `N*` | 攻方预期 EV | 下一入场者 EV | 攻方真实 EV（强守方） | 对称守方 EV | 强守方 EV | 强度阈值 ratio | `strong_ratio` | 零和残差 |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -261,18 +261,19 @@ python tools/sim/mechanism_sim.py
 - 三组活跃市场的对称守方 EV 都显著为负（最接近 0 的是 `−20.908813`）；强守方 EV 都为正（`+2.360040` 或 `+4.583129`）。
 - 强度阈值随 `p_market` 上升而下降：0.01 → 0.141354，0.02 → 0.070677，0.05 → 0.029874。`p_market=0.01` 的含义是：守方真实攻破概率必须低于市场预期的 14.1354%（`p_def < 0.00141354`）才有正 EV；示例取阈值一半（7.07%）得到 `+2.36`。
 
-实际运行的断言结果（5/5 通过）：
+实际运行的断言结果（6/6 通过）：
 
 - `self_play_ev_negative`：`self_play_EV = −19.44 < 0`
 - `n_star_bounded`：最大 `N*=2`，上限 50；所有 `N*` 的均衡条件均验证通过
 - `strong_defender_positive_exists`：`p_market ∈ {0.01, 0.02, 0.05}` 共 3 组满足 `N*≥1` 且强守方 EV>0
 - `symmetric_defender_negative`：3 组活跃市场的对称守方 EV 均 < 0，最接近 0 的为 `−20.908813`
 - `zero_sum_residual_below_tolerance`：最大绝对残差 `1.42e-14 < 1e-9`
+- `analytical_self_checks`：telescoping 网格 30/30 通过（最大误差 `4.44e-16 < 1e-12`）；闭式阈值 3 个默认活跃市场通过（最大误差 `5.55e-17 < 1e-12`），`p_market=0.005` 因 `N*=0` 跳过
 
 实际运行末行（为便于阅读按 `;` 换行；程序实际输出为单行）：
 
 ```text
-OK: assertions=5/5; self_play_EV=-19.440000;
+OK: assertions=6/6; self_play_EV=-19.440000;
 p_market=0.005 N*=0 EV_att_expected=null EV_att_realized=null EV_def_symmetric=0.000000 EV_def_strong=null ratio_threshold=null ratio_strong=null residual=0.000e+00 EV_att_first_entrant=-9.133948;
 p_market=0.01 N*=1 EV_att_expected=1.468813 EV_att_realized=-21.800040 EV_def_symmetric=-20.908813 EV_def_strong=2.360040 ratio_threshold=0.14135431 ratio_strong=0.07067715 residual=3.553e-15 EV_att_first_entrant=1.468813;
 p_market=0.02 N*=1 EV_att_expected=14.043635 EV_att_realized=-21.800040 EV_def_symmetric=-33.483635 EV_def_strong=2.360040 ratio_threshold=0.07067715 ratio_strong=0.03533858 residual=3.553e-15 EV_att_first_entrant=14.043635;
@@ -283,7 +284,7 @@ p_market=0.05 N*=2 EV_att_expected=0.702889 EV_att_realized=-21.731564 EV_def_sy
 
 ## 5. 参数敏感性与取值依据
 
-以下敏感性表分别由 `--M 36|72|144`、`--fee-rate 0.0025|0.005|0.01`、`--llm-cost 0.01|0.02|0.04` 实际运行得到。
+以下敏感性表分别由 `--M 36|72|144`、`--fee-rate 0.0025|0.005|0.01`、`--llm-cost 0.01|0.02|0.04` **外部核验**运行得到（一次性覆盖参数，不是 `self_check()` 的固定网格；`self_check()` 只覆盖 §2.3 的 telescoping 网格和 §2.6 的闭式阈值）。
 
 ### 5.1 `p_market` 扫描
 
@@ -383,20 +384,21 @@ E_rate₀ ≈ N_ref × (M/K) × (fee_rate·S + llm_cost)
 
 ### 7.1 断言
 
-脚本在输出所有结果后检查以下五项，全部通过才打印 `OK:` 并返回 0：
+脚本在输出所有结果后检查以下六项，全部通过才打印 `OK:` 并返回 0：
 
 1. `self_play_EV < 0`（默认 −19.44）；
 2. `N*` 有界：所有行 `0 ≤ N* ≤ 50`，且每行的均衡条件（N* 的 EV≥0、下一人的 EV<0；N*=0 时第一人 EV<0）成立；
 3. 至少存在一个 `p_market`（`N*≥1`）使强守方 EV>0；
 4. 所有 `N*≥1` 的行的对称守方 EV<0；
-5. 所有行零和残差绝对值 < 1e-9（实测最大 1.42e-14）。
+5. 所有行零和残差绝对值 < 1e-9（实测最大 1.42e-14）；
+6. `analytical_self_checks`：固定 30 组 telescoping 网格误差 <1e-12；`decay=1.0` 时默认活跃市场的闭式阈值与二分结果误差 <1e-12（`decay≠1` 或 `N*F/S≥1` 时按规则标记不适用/跳过）。
 
-若扫描全部低于入场阈值（例如只跑 `--p-market 0.005`），`N*=0` 行仍会正常输出 `null`，但第 3 项"存在强守方正 EV"必然失败并抛 `AssertionError`。这是断言的定义，不是 N*=0 行的实现错误；默认四个 p 值包含活跃市场，正常退出 0。
+若扫描全部低于入场阈值（例如只跑 `--p-market 0.005`），`N*=0` 行仍会正常输出 `null`，但第 3 项"存在强守方正 EV"必然失败并抛 `AssertionError`。这是断言的定义，不是 N*=0 行的实现错误；**外部核验**的默认运行包含活跃市场，正常退出 0。
 
 ### 7.2 复现性
 
-- 无随机数、无时间/网络依赖；同一 Python 版本下重复运行输出逐字节一致。
-- 依赖仅 Python 标准库（`argparse`、`json`、`math`、`dataclasses`、`typing`）；本地测试 Python 3.14.5，目标 Python 3.11+。
+- 无随机数、无时间/网络依赖。**外部核验**：实现时对同一 Python 版本重复运行并 `diff`，输出逐字节一致；脚本本身未内建双跑测试。
+- 依赖仅 Python 标准库（`argparse`、`json`、`math`、`dataclasses`、`typing`）；**外部核验环境**为 Python 3.14.5，目标 Python 3.11+。
 - 输出 7 行 JSON + 1 行 `OK:`：`params`、`self_play`、4 个 `market`、`assertions`，最后 `OK:`。
 
 ### 7.3 已知限制

@@ -45,11 +45,17 @@ DEFAULT_EPOCHS = int(CONTEST_HOURS / EPOCH_HOURS)  # 12
 DEFAULT_M = int(CONTEST_HOURS * MESSAGES_PER_HOUR)  # 72
 
 DEFAULT_P_MARKETS = (0.005, 0.01, 0.02, 0.05)
-# 规格要求的强度比例扫描阶梯（从对称到极强守方）。
+# 实现用于夹逼的强度比例阶梯（规格未规定该阶梯；从对称到极强守方）。
 RATIO_SCAN = (1.0, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01, 0.005, 0.001)
 ZERO_SUM_TOL = 1e-9
 THRESHOLD_EQ_TOL = 1e-9
 BISECTION_STEPS = 200
+
+# self_check() 的固定解析检查网格与容差。
+SELF_CHECK_P = (0.001, 0.005, 0.01, 0.05, 0.2)
+SELF_CHECK_N = (1, 2, 5)
+SELF_CHECK_DECAYS = (1.0, 0.99)
+SELF_CHECK_TOL = 1e-12
 
 
 @dataclass(frozen=True)
@@ -235,7 +241,7 @@ def find_equilibrium(
 def solve_threshold(
     p_market: float, n_star: int, params: Params
 ) -> tuple[float, bool]:
-    """先按规格 ratio 阶梯扫描符号变化，再在夹逼区间二分。
+    """先按实现的夹逼 ratio 阶梯扫描符号变化，再在夹逼区间二分。
 
     在 ratio=0 时守方白拿 N*F>0；在 ratio=1（对称）时守方 EV<0。
     守方 EV 随 ratio 单调下降，故根唯一。
@@ -284,6 +290,114 @@ def solve_threshold(
     ratio = (lo + hi) / 2.0
     root_ev = ev_at_ratio(ratio)
     return ratio, abs(root_ev) <= THRESHOLD_EQ_TOL
+
+
+def self_check(params: Params) -> dict:
+    """运行可执行的解析自检，返回可写入 assertions 的报告。
+
+    1) telescoping 恒等式 N*p_self == 1-P_survive，固定 (p,N,decay) 网格；
+    2) 闭式阈值（仅 decay=1.0）：与二分阈值比较默认活跃市场。
+       decay!=1.0 时整项不适用；N*F/S>=1 时跳过该市场。
+    """
+    telescoping_checked = 0
+    telescoping_max_error = 0.0
+    telescoping_failures: list[dict] = []
+    for decay in SELF_CHECK_DECAYS:
+        check_params = replace(params, decay=decay)
+        for p in SELF_CHECK_P:
+            for n in SELF_CHECK_N:
+                stats = breach_stats(p, n, check_params)
+                error = abs(n * stats.p_self - (1.0 - stats.p_survive))
+                telescoping_checked += 1
+                telescoping_max_error = max(telescoping_max_error, error)
+                if error >= SELF_CHECK_TOL:
+                    telescoping_failures.append(
+                        {
+                            "p": p,
+                            "N": n,
+                            "decay": decay,
+                            "abs_error": error,
+                        }
+                    )
+    telescoping_pass = not telescoping_failures
+
+    closed_checked = 0
+    closed_max_error = 0.0
+    closed_failures: list[dict] = []
+    closed_checks: list[dict] = []
+    closed_skipped: list[dict] = []
+    closed_applicable = params.decay == 1.0
+
+    if closed_applicable:
+        for p_market in DEFAULT_P_MARKETS:
+            n_star, _, _ = find_equilibrium(p_market, params)
+            if n_star == 0:
+                closed_skipped.append(
+                    {"p_market": p_market, "reason": "N*=0"}
+                )
+                continue
+            exposure = n_star * params.forfeited_per_attacker / params.S
+            if exposure >= 1.0:
+                closed_skipped.append(
+                    {
+                        "p_market": p_market,
+                        "N_star": n_star,
+                        "reason": "N*F/S >= 1",
+                    }
+                )
+                continue
+            p_def_closed = 1.0 - (1.0 - exposure) ** (
+                1.0 / (n_star * params.M)
+            )
+            ratio_bisect, _ = solve_threshold(p_market, n_star, params)
+            p_def_bisect = ratio_bisect * p_market
+            error = abs(p_def_closed - p_def_bisect)
+            closed_checked += 1
+            closed_max_error = max(closed_max_error, error)
+            check = {
+                "p_market": p_market,
+                "N_star": n_star,
+                "closed_form_p_def": p_def_closed,
+                "bisection_p_def": p_def_bisect,
+                "abs_error": error,
+            }
+            closed_checks.append(check)
+            if error >= SELF_CHECK_TOL:
+                closed_failures.append(check)
+    else:
+        closed_skipped.append(
+            {
+                "reason": (
+                    f"decay={params.decay} != 1.0; "
+                    "closed form only applies at decay=1.0"
+                )
+            }
+        )
+
+    closed_pass = not closed_failures
+    return {
+        "pass": telescoping_pass and closed_pass,
+        "telescoping": {
+            "checked": telescoping_checked,
+            "max_abs_error": telescoping_max_error,
+            "tolerance": SELF_CHECK_TOL,
+            "grid": {
+                "p": list(SELF_CHECK_P),
+                "N": list(SELF_CHECK_N),
+                "decay": list(SELF_CHECK_DECAYS),
+            },
+            "failures": telescoping_failures,
+        },
+        "closed_form_threshold": {
+            "applicable": closed_applicable,
+            "checked": closed_checked,
+            "max_abs_error": closed_max_error if closed_checked else None,
+            "tolerance": SELF_CHECK_TOL,
+            "checked_markets": closed_checks,
+            "skipped": closed_skipped,
+            "failures": closed_failures,
+        },
+    }
 
 
 def simulate_market(p_market: float, params: Params) -> MarketResult:
@@ -347,7 +461,9 @@ def simulate_market(p_market: float, params: Params) -> MarketResult:
     )
 
 
-def build_assertion_report(rows: Sequence[MarketResult], params: Params) -> dict:
+def build_assertion_report(
+    rows: Sequence[MarketResult], params: Params, analytical: dict
+) -> dict:
     items = []
 
     items.append(
@@ -424,6 +540,14 @@ def build_assertion_report(rows: Sequence[MarketResult], params: Params) -> dict
                 "max_abs_residual": max_abs_residual,
                 "tolerance": ZERO_SUM_TOL,
             },
+        }
+    )
+
+    items.append(
+        {
+            "name": "analytical_self_checks",
+            "pass": bool(analytical["pass"]),
+            "detail": analytical,
         }
     )
 
@@ -578,7 +702,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for row in rows:
         emit(row.as_json())
 
-    report = build_assertion_report(rows, params)
+    analytical = self_check(params)
+    report = build_assertion_report(rows, params, analytical)
     emit(report)
     if not report["all_passed"]:
         failed = [
