@@ -99,14 +99,14 @@ def install(monkeypatch, *, payload=None, error=None):
 
 
 class FakeHTTPResponse:
-    """Minimal HTTP response used by the redirect tests (never read)."""
+    """Minimal HTTP response used by the fake opener tests."""
 
-    def __init__(self, url, code, msg, headers):
+    def __init__(self, url, code, msg, headers, body=b""):
         self.url = url
         self.code = code
         self.msg = msg
         self.headers = headers
-        self.fp = io.BytesIO(b"")
+        self.fp = io.BytesIO(body)
 
     def info(self):
         return self.headers
@@ -119,6 +119,13 @@ class FakeHTTPResponse:
 
     def close(self):
         self.fp.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.close()
+        return False
 
 
 class RedirectingHTTPSHandler(urllib.request.HTTPSHandler):
@@ -139,6 +146,29 @@ class RedirectingHTTPSHandler(urllib.request.HTTPSHandler):
         headers = email.message.Message()
         headers["Location"] = self.target
         return FakeHTTPResponse(request.full_url, self.code, "Redirect", headers)
+
+
+class SuccessHTTPSHandler(urllib.request.HTTPSHandler):
+    """Serve a canned 200 JSON response and record each request."""
+
+    handler_order = 100
+
+    def __init__(self, body):
+        super().__init__()
+        self.body = body
+        self.requests = []
+
+    def https_open(self, request):
+        self.requests.append(request)
+        if request.full_url != BASE_URL + "/chat/completions":
+            raise AssertionError("unexpected host was requested")
+        return FakeHTTPResponse(
+            request.full_url,
+            200,
+            "OK",
+            email.message.Message(),
+            body=self.body,
+        )
 
 
 def success_payload(**overrides):
@@ -212,6 +242,37 @@ def test_load_allowlist_rejects_malformed_entries(raw):
         load_allowlist({"MODEL_ALLOWLIST_JSON": raw})
 
 
+def test_load_allowlist_rejects_unknown_fields_without_echo():
+    secret = "sk-allowlist-value-must-not-echo"
+    raw = json.dumps(
+        {
+            "glm": {
+                "base_url": BASE_URL,
+                "model": MODEL,
+                "api_key": secret,
+            }
+        }
+    )
+
+    with pytest.raises(AllowlistError) as caught:
+        load_allowlist({"MODEL_ALLOWLIST_JSON": raw})
+
+    assert secret not in str(caught.value)
+
+
+def test_load_allowlist_rejects_deeply_nested_json():
+    raw = "[" * 100_000 + "]" * 100_000
+
+    with pytest.raises(AllowlistError):
+        load_allowlist({"MODEL_ALLOWLIST_JSON": raw})
+
+
+def test_load_allowlist_rejects_nan_or_infinity():
+    for constant in ("NaN", "Infinity", "-Infinity"):
+        with pytest.raises(AllowlistError):
+            load_allowlist({"MODEL_ALLOWLIST_JSON": '{"glm": ' + constant + "}"})
+
+
 @pytest.mark.parametrize(
     "base_url",
     [
@@ -230,6 +291,17 @@ def test_load_allowlist_rejects_malformed_entries(raw):
         "https://api.example.com/v1#",
         "https://api.example.com:not-a-port/v1",
         "https://api.example.com/v1 path",
+        "https://api.example.com/v1\x00",
+        "https://api.example.com/v1\x1b",
+        "https://api.example.com/v1\x7f",
+        "https://api.example.com/v1\x80",
+        "https://api.example.com/v1\x9f",
+        "https://api.example.com/v1\\path",
+        "\nhttps://api.example.com/v1",
+        "https://api.example.com/v1\n",
+        "https://api.example.com/v1\t",
+        "https://api.example.com/vérif",
+        "https://exämple.com/v1",
     ],
 )
 def test_load_allowlist_rejects_unsafe_base_urls(base_url):
@@ -335,6 +407,34 @@ def test_constructor_rejects_invalid_allowlist_entries():
         ByokClient("glm", SECRET, allowlist={"glm": {"base_url": BASE_URL}})
 
 
+def test_constructor_rejects_unknown_allowlist_fields():
+    secret = "sk-allowlist-value-must-not-echo"
+    allowlist = {
+        "glm": {
+            "base_url": BASE_URL,
+            "model": MODEL,
+            "api_key": secret,
+        }
+    }
+
+    with pytest.raises(AllowlistError) as caught:
+        ByokClient("glm", SECRET, allowlist=allowlist)
+
+    assert secret not in str(caught.value)
+
+
+def test_base_url_and_model_are_read_only():
+    client = make_client()
+
+    with pytest.raises(AttributeError):
+        client.base_url = "https://evil.example/v1"
+    with pytest.raises(AttributeError):
+        client.model = "evil-model"
+
+    assert client.base_url == BASE_URL
+    assert client.model == MODEL
+
+
 @pytest.mark.parametrize("api_key", ["", "   "])
 def test_empty_api_key_is_rejected(api_key):
     with pytest.raises(ValueError, match="api_key"):
@@ -354,6 +454,23 @@ def test_api_key_with_control_characters_is_rejected_without_echo(character):
     assert "api_key" in str(caught.value)
     assert api_key not in str(caught.value)
     assert "sk-test" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "api_key",
+    [
+        "sk-\u5bc6\u94a5",
+        "sk-caf\xe9",
+        "sk-test\u2028tail",
+        "sk-test\xa0tail",
+    ],
+)
+def test_non_ascii_api_key_is_rejected_without_echo(api_key):
+    with pytest.raises(ValueError) as caught:
+        ByokClient("glm", api_key, allowlist=ALLOW)
+
+    assert "api_key" in str(caught.value)
+    assert api_key not in str(caught.value)
 
 
 def test_api_key_is_not_in_repr():
@@ -436,6 +553,37 @@ def test_complete_non_object_usage_is_ignored(monkeypatch):
     assert make_client().complete(MESSAGES, TOOLS)["usage"] == {}
 
 
+def test_complete_rejects_deeply_nested_json(monkeypatch):
+    install(monkeypatch, payload=b"[" * 100_000 + b"]" * 100_000)
+
+    with pytest.raises(ModelUnavailable) as caught:
+        make_client().complete(MESSAGES, TOOLS)
+
+    assert caught.value.kind == "agent_protocol"
+    assert str(caught.value) == "invalid json"
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_complete_rejects_non_finite_json(monkeypatch, constant):
+    payload = (
+        '{"model": "'
+        + MODEL
+        + '", "choices": [{"message": {"role": "assistant", "content": "x"}}], '
+        + '"usage": '
+        + constant
+        + "}"
+    ).encode("utf-8")
+    install(monkeypatch, payload=payload)
+
+    with pytest.raises(ModelUnavailable) as caught:
+        make_client().complete(MESSAGES, TOOLS)
+
+    assert caught.value.kind == "agent_protocol"
+    assert str(caught.value) == "invalid json"
+    assert SECRET not in str(caught.value)
+    assert BASE_URL not in str(caught.value)
+
+
 # -- HTTP fault classification -------------------------------------------
 
 
@@ -468,6 +616,37 @@ def test_http_protocol_errors(monkeypatch, code):
     assert BASE_URL not in str(caught.value)
 
 
+_HTTP_CLIENT_EXCEPTION_CASES = [
+    (http.client.BadStatusLine("bad status"), "agent_protocol", "protocol"),
+    (http.client.LineTooLong("too long"), "agent_protocol", "protocol"),
+    (http.client.RemoteDisconnected("closed"), "infrastructure", "transport"),
+    (http.client.IncompleteRead(b"partial"), "infrastructure", "transport"),
+]
+if hasattr(http.client, "IllegalHeader"):
+    _HTTP_CLIENT_EXCEPTION_CASES.append(
+        (http.client.IllegalHeader("bad header"), "agent_protocol", "protocol")
+    )
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_kind", "message_prefix"),
+    _HTTP_CLIENT_EXCEPTION_CASES,
+)
+def test_http_client_exception_classification(
+    monkeypatch, error, expected_kind, message_prefix
+):
+    install(monkeypatch, error=error)
+
+    with pytest.raises(ModelUnavailable) as caught:
+        make_client().complete(MESSAGES, TOOLS)
+
+    exc = caught.value
+    assert exc.kind == expected_kind
+    assert str(exc) == f"{message_prefix} {type(error).__name__}"
+    assert SECRET not in str(exc)
+    assert BASE_URL not in str(exc)
+
+
 def test_complete_does_not_retry(monkeypatch):
     recorder = install(monkeypatch, error=http_error(500))
 
@@ -495,7 +674,9 @@ def test_redirect_is_rejected_without_following(code):
     target = "https://redirect.example/steal"
     handler = RedirectingHTTPSHandler(code, target)
     client = make_client()
-    client._opener = urllib.request.build_opener(handler, byok._NoRedirect())
+    client._opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), handler, byok._NoRedirect()
+    )
 
     with pytest.raises(ModelUnavailable) as caught:
         client.complete(MESSAGES, TOOLS)
@@ -513,6 +694,44 @@ def test_redirect_is_rejected_without_following(code):
     request = handler.requests[0]
     assert request.full_url == BASE_URL + "/chat/completions"
     assert request.full_url != target
+    headers = {name.lower(): value for name, value in request.header_items()}
+    assert headers["authorization"] == "Bearer " + SECRET
+
+
+def test_environment_proxy_is_ignored_and_authorization_stays_on_allowlist(
+    monkeypatch,
+):
+    proxy = "http://proxy.invalid:8080"
+    for name in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+    ):
+        monkeypatch.setenv(name, proxy)
+
+    client = make_client()
+    # ProxyHandler({}) registers no *_open methods, so it does not appear in
+    # opener.handlers; what matters is that no proxy-capable handler exists.
+    assert not any(
+        isinstance(handler, urllib.request.ProxyHandler)
+        or hasattr(handler, "proxy_open")
+        for handler in client._opener.handlers
+    )
+
+    handler = SuccessHTTPSHandler(json.dumps(success_payload()).encode("utf-8"))
+    client._opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), handler, byok._NoRedirect()
+    )
+
+    result = client.complete(MESSAGES, TOOLS)
+
+    assert result["message"]["content"] == "hello back"
+    assert len(handler.requests) == 1
+    request = handler.requests[0]
+    assert request.full_url == BASE_URL + "/chat/completions"
+    assert request.full_url != proxy
     headers = {name.lower(): value for name, value in request.header_items()}
     assert headers["authorization"] == "Bearer " + SECRET
 

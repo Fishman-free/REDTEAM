@@ -14,10 +14,15 @@ Faults are split into two classes because the runner treats them differently:
   violated the protocol; this is not an infrastructure outage.
 
 Redirects are refused (a 3xx becomes an ``agent_protocol`` failure) so the
-``Authorization`` header cannot be forwarded to a different host.  API keys
-containing control characters are rejected before any request is built.
+``Authorization`` header cannot be forwarded to a different host.  The opener
+ignores environment proxies for the same reason: BYOK connects directly to
+the allowlisted base URL.  Allowlist entries accept only ``base_url`` and
+``model``, and ``base_url`` must be visible ASCII.  API keys must also be
+visible ASCII (0x20-0x7E); anything else is rejected before a request exists.
 
-No retries are performed here; the runner owns retry/abstention policy.
+JSON parsing rejects NaN/Infinity and classifies excessive nesting as a
+protocol failure.  No retries are performed here; the runner owns
+retry/abstention policy.
 """
 
 from __future__ import annotations
@@ -43,6 +48,18 @@ INFRASTRUCTURE = "infrastructure"
 AGENT_PROTOCOL = "agent_protocol"
 _KINDS = frozenset({INFRASTRUCTURE, AGENT_PROTOCOL})
 _INFRASTRUCTURE_HTTP_CODES = frozenset({401, 402, 403, 429})
+_ALLOWLIST_FIELDS = frozenset({"base_url", "model"})
+
+# BadStatusLine/LineTooLong/IllegalHeader are response-protocol failures.
+# RemoteDisconnected is a ConnectionError and is handled as infrastructure
+# before this tuple is consulted (it also subclasses BadStatusLine).
+_HTTP_PROTOCOL_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    http.client.BadStatusLine,
+    http.client.LineTooLong,
+)
+_illegal_header = getattr(http.client, "IllegalHeader", None)
+if _illegal_header is not None:
+    _HTTP_PROTOCOL_EXCEPTIONS += (_illegal_header,)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -50,6 +67,12 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+def _reject_json_constant(value: str) -> None:
+    """Reject non-finite numbers accepted by Python's JSON extension."""
+
+    raise ValueError(f"non-finite JSON number is not allowed: {value}")
 
 
 class AllowlistError(ValueError):
@@ -100,11 +123,14 @@ def _is_loopback(hostname: str) -> bool:
 
 
 def _validate_base_url(base_url: str, provider: str) -> None:
-    if any(
-        character.isspace() or ord(character) < 0x20 or ord(character) == 0x7F
-        for character in base_url
+    # Validate the raw value before any strip/normalization: leading or
+    # trailing whitespace, C0/C1/DEL and non-ASCII are all rejected here.
+    if not base_url or any(
+        not 0x21 <= ord(character) <= 0x7E for character in base_url
     ):
-        raise _provider_error(provider, "base_url must not contain whitespace or control characters")
+        raise _provider_error(
+            provider, "base_url must contain only visible ASCII characters"
+        )
     if "\\" in base_url:
         raise _provider_error(provider, "base_url must not contain backslashes")
 
@@ -141,6 +167,9 @@ def _validated_allowlist(data: Mapping[str, Any]) -> dict[str, dict[str, str]]:
             raise AllowlistError(
                 f"model allowlist entry {provider!r} must be a mapping"
             )
+        for field in entry:
+            if field not in _ALLOWLIST_FIELDS:
+                raise _provider_error(provider, "entry contains unsupported fields")
 
         base_url = entry.get("base_url")
         model = entry.get("model")
@@ -149,9 +178,11 @@ def _validated_allowlist(data: Mapping[str, Any]) -> dict[str, dict[str, str]]:
         if not isinstance(model, str) or not model.strip():
             raise _provider_error(provider, "model must be a non-empty string")
 
+        # Validate the raw base_url before stripping; the validation rejects
+        # all whitespace, so stripping afterwards cannot hide control bytes.
+        _validate_base_url(base_url, provider)
         base_url = base_url.strip()
         model = model.strip()
-        _validate_base_url(base_url, provider)
         allowlist[provider] = {"base_url": base_url, "model": model}
 
     return allowlist
@@ -175,8 +206,8 @@ def load_allowlist(env: Mapping[str, str] | None = None) -> dict[str, dict[str, 
         return {}
 
     try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
+        data = json.loads(raw, parse_constant=_reject_json_constant)
+    except (ValueError, RecursionError):
         raise AllowlistError(f"{ENV_MODEL_ALLOWLIST} is not valid JSON") from None
     if not isinstance(data, dict):
         raise AllowlistError(f"{ENV_MODEL_ALLOWLIST} must be a JSON object")
@@ -223,21 +254,28 @@ class ByokClient:
 
         if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("api_key must be a non-empty string")
-        if any(
-            ord(character) < 0x20 or 0x7F <= ord(character) <= 0x9F
-            for character in api_key
-        ):
-            raise ValueError("api_key must not contain control characters")
+        if any(not 0x20 <= ord(character) <= 0x7E for character in api_key):
+            raise ValueError("api_key must contain only visible ASCII characters")
 
         self.provider = provider
-        self.base_url = entry["base_url"].rstrip("/")
-        self.model = entry["model"]
+        self._base_url = entry["base_url"].rstrip("/")
+        self._model = entry["model"]
         self.timeout = _validate_timeout(timeout)
         self._api_key = api_key
-        # A custom opener replaces the default HTTPRedirectHandler, so a 3xx
-        # response becomes an HTTPError (classified as agent_protocol) and the
-        # bearer token is never forwarded to a redirect target.
-        self._opener = urllib.request.build_opener(_NoRedirect())
+        # An empty ProxyHandler keeps HTTP_PROXY/HTTPS_PROXY from receiving
+        # the bearer token.  _NoRedirect replaces the default redirect handler
+        # so a 3xx becomes an HTTPError (classified as agent_protocol).
+        self._opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), _NoRedirect()
+        )
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
+    @property
+    def model(self) -> str:
+        return self._model
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(provider={self.provider!r}, model={self.model!r})"
@@ -301,13 +339,28 @@ class ByokClient:
                 else AGENT_PROTOCOL
             )
             raise ModelUnavailable(f"http {exc.code}", kind=kind) from None
+        except (http.client.RemoteDisconnected, http.client.IncompleteRead) as exc:
+            # RemoteDisconnected is also a ConnectionError/BadStatusLine; keep
+            # it as infrastructure.  IncompleteRead means bytes went missing in
+            # transit, which is a transport fault rather than a model reply.
+            raise ModelUnavailable(
+                f"transport {type(exc).__name__}", kind=INFRASTRUCTURE
+            ) from None
         except (
             urllib.error.URLError,
             TimeoutError,
             ConnectionError,
-            http.client.HTTPException,
             OSError,
         ) as exc:
+            raise ModelUnavailable(
+                f"transport {type(exc).__name__}", kind=INFRASTRUCTURE
+            ) from None
+        except _HTTP_PROTOCOL_EXCEPTIONS as exc:
+            # Malformed HTTP status lines/headers are protocol violations.
+            raise ModelUnavailable(
+                f"protocol {type(exc).__name__}", kind=AGENT_PROTOCOL
+            ) from None
+        except http.client.HTTPException as exc:
             raise ModelUnavailable(
                 f"transport {type(exc).__name__}", kind=INFRASTRUCTURE
             ) from None
@@ -316,8 +369,8 @@ class ByokClient:
             raise ModelUnavailable("response too large", kind=AGENT_PROTOCOL)
 
         try:
-            data = json.loads(raw)
-        except (ValueError, UnicodeDecodeError):
+            data = json.loads(raw, parse_constant=_reject_json_constant)
+        except (ValueError, UnicodeDecodeError, RecursionError):
             raise ModelUnavailable("invalid json", kind=AGENT_PROTOCOL) from None
         if not isinstance(data, dict):
             raise ModelUnavailable("invalid response", kind=AGENT_PROTOCOL)
