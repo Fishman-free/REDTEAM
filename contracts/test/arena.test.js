@@ -174,6 +174,13 @@ describe('Arena + Treasury', function () {
       expect(await arena.PRECISION()).to.equal(10n ** 18n);
     });
 
+    it('Arena 部署字节码低于 EIP-170 上限', async function () {
+      const factory = await ethers.getContractFactory('Arena');
+      const sizeInBytes = (factory.bytecode.length - 2) / 2;
+      expect(sizeInBytes).to.be.greaterThan(0);
+      expect(sizeInBytes).to.be.lessThan(24576);
+    });
+
     it('initialize 仅 owner 且只能一次，并校验 RTM 代码与 minter', async function () {
       const { arena, rtm, owner, outsider, treasury, walletSigner } = game;
 
@@ -238,6 +245,21 @@ describe('Arena + Treasury', function () {
         .to.be.revertedWithCustomError(mainnet.arena, 'TestnetOnly');
 
       expect(await game.arena.testnet()).to.equal(true);
+    });
+
+    it('testnet=false 下 accrue 仍可铸币，不被 mintForTest 门禁阻断', async function () {
+      const mainnet = await deployGame({ testnet: false });
+      const { id, rate } = await makeMining(mainnet, { rate: RTM(1) });
+      expect(await mainnet.rtm.totalSupply()).to.equal(0n);
+
+      await time.increase(2n * HOUR);
+      await expect(mainnet.arena.accrue(id))
+        .to.emit(mainnet.arena, 'MiningAccrued')
+        .withArgs(id, mainnet.walletSigner.address, rate);
+      expect(await mainnet.rtm.balanceOf(mainnet.walletSigner.address)).to.equal(rate);
+      expect(await mainnet.rtm.totalSupply()).to.equal(rate);
+      await expect(mainnet.arena.mintForTest(mainnet.defender.address, RTM(1)))
+        .to.be.revertedWithCustomError(mainnet.arena, 'TestnetOnly');
     });
   });
 
@@ -519,16 +541,21 @@ describe('Arena + Treasury', function () {
         .to.be.revertedWithCustomError(arena, 'NotJoined');
     });
 
-    it('到期后 expire 前：join / attack / reportDefenderFault 均 ContestExpired', async function () {
+    it('到期后 expire 前：join / attack / markDelivered / reportDefenderFault 均 ContestExpired', async function () {
       const { arena, operator, outsider, attackerA, attackerB, defender } = game;
       const { id, end } = await makeContest(game);
       await joinAs(game, attackerA, id);
-      await time.increaseTo(end);
+      const preEndHash = ethers.id('pre-end');
+      await arena.connect(attackerA).attack(id, preEndHash);
 
+      await time.increaseTo(end);
       await expect(joinAs(game, attackerB, id))
         .to.be.revertedWithCustomError(arena, 'ContestExpired')
         .withArgs(id);
       await expect(arena.connect(attackerA).attack(id, ethers.id('late-msg')))
+        .to.be.revertedWithCustomError(arena, 'ContestExpired')
+        .withArgs(id);
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, preEndHash))
         .to.be.revertedWithCustomError(arena, 'ContestExpired')
         .withArgs(id);
       await expect(arena.connect(operator).reportDefenderFault(id))
@@ -570,30 +597,41 @@ describe('Arena + Treasury', function () {
         .to.be.revertedWithCustomError(arena, 'FeeZero');
     });
 
-    it('markDelivered：仅 operator、未加入/超出 attackCount 拒绝', async function () {
+    it('markDelivered：绑定 msgHash，未付费/重复送达/越界拒绝', async function () {
       const { arena, operator, attackerA, attackerB } = game;
       const { id } = await makeContest(game);
       await joinAs(game, attackerA, id);
+      const d1 = ethers.id('d1');
+      const d2 = ethers.id('d2');
 
-      await expect(arena.connect(operator).markDelivered(id, attackerB.address))
+      await expect(arena.connect(operator).markDelivered(id, attackerB.address, d1))
         .to.be.revertedWithCustomError(arena, 'NotJoined');
-      await expect(arena.connect(operator).markDelivered(id, attackerA.address))
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, d1))
         .to.be.revertedWithCustomError(arena, 'NothingToMark');
-      await expect(arena.connect(attackerA).markDelivered(id, attackerA.address))
+      await expect(arena.connect(attackerA).markDelivered(id, attackerA.address, d1))
         .to.be.revertedWithCustomError(arena, 'NotOperator');
 
-      await arena.connect(attackerA).attack(id, ethers.id('d1'));
-      await expect(arena.connect(operator).markDelivered(id, attackerA.address))
+      await arena.connect(attackerA).attack(id, d1);
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, d1))
         .to.emit(arena, 'MarkDelivered')
-        .withArgs(id, attackerA.address, 1n);
+        .withArgs(id, attackerA.address, d1, 1n);
+      expect(await arena.deliveredMsg(id, attackerA.address, d1)).to.equal(true);
       expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(1n);
-      await expect(arena.connect(operator).markDelivered(id, attackerA.address))
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, d1))
         .to.be.revertedWithCustomError(arena, 'NothingToMark');
 
-      await arena.connect(attackerA).attack(id, ethers.id('d2'));
-      await expect(arena.connect(operator).markDelivered(id, attackerA.address))
+      await arena.connect(attackerA).attack(id, d2);
+      // 已送达的 hash 不可重复计数；未付费 hash 也不可标记。
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, d1))
+        .to.be.revertedWithCustomError(arena, 'BadParams');
+      await expect(
+        arena.connect(operator).markDelivered(id, attackerA.address, ethers.id('never-paid'))
+      ).to.be.revertedWithCustomError(arena, 'BadParams');
+
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, d2))
         .to.emit(arena, 'MarkDelivered')
-        .withArgs(id, attackerA.address, 2n);
+        .withArgs(id, attackerA.address, d2, 2n);
+      expect(await arena.deliveredMsg(id, attackerA.address, d2)).to.equal(true);
       expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(2n);
     });
 
@@ -867,6 +905,58 @@ describe('Arena + Treasury', function () {
       expect(await arena.contestState(id)).to.equal(2n);
     });
 
+    it('reportDefenderFault 仅 operator', async function () {
+      const { arena, attackerA, defender } = game;
+      const { id } = await makeContest(game);
+      await expect(arena.connect(attackerA).reportDefenderFault(id))
+        .to.be.revertedWithCustomError(arena, 'NotOperator');
+      await expect(arena.connect(defender).reportDefenderFault(id))
+        .to.be.revertedWithCustomError(arena, 'NotOperator');
+      expect(await arena.contestState(id)).to.equal(1n);
+    });
+
+    it('弃权：delivered>0 但整数 share=0 时跳过，W 全额守恒', async function () {
+      const { arena, rtm, operator, attackerA, attackerB, walletSigner } = game;
+      const tinyStake = 200n; // wei；fee=1 wei，share 可由整数除法归零
+      const { id } = await makeContest(game, {
+        stake: tinyStake,
+        stakeBps: 2000,
+        duration: DAY
+      });
+      await joinAs(game, attackerA, id);
+      await joinAs(game, attackerB, id);
+      const s = (tinyStake * 2000n) / 10000n;
+      expect(s).to.equal(40n);
+
+      // A delivered=1，B delivered=200 => total=201，A 的 share=200/201=0。
+      const aHash = ethers.id('zero-share-a');
+      await arena.connect(attackerA).attack(id, aHash);
+      await arena.connect(operator).markDelivered(id, attackerA.address, aHash);
+      for (let i = 0; i < 200; i++) {
+        const h = ethers.id(`zero-share-b-${i}`);
+        await arena.connect(attackerB).attack(id, h);
+        await arena.connect(operator).markDelivered(id, attackerB.address, h);
+      }
+
+      const aBefore = await rtm.balanceOf(attackerA.address);
+      const bBefore = await rtm.balanceOf(attackerB.address);
+      expect(await rtm.balanceOf(walletSigner.address)).to.equal(tinyStake);
+
+      await expect(arena.connect(operator).reportDefenderFault(id))
+        .to.emit(arena, 'DefenderFault')
+        .withArgs(id);
+
+      // A 的 share=0 分支被跳过；B 作为最后一个非零 delivered 取全部 200 wei。
+      expect(await rtm.balanceOf(attackerA.address)).to.equal(aBefore);
+      expect(await rtm.balanceOf(attackerB.address)).to.equal(bBefore + tinyStake);
+      expect(await rtm.balanceOf(walletSigner.address)).to.equal(0n);
+      expect(await arena.contestState(id)).to.equal(2n);
+
+      await arena.connect(attackerA).withdrawStake(id);
+      await arena.connect(attackerB).withdrawStake(id);
+      expect(await rtm.balanceOf(arena.target)).to.equal(0n);
+    });
+
     it('弃权：按 delivered 2:1 分 S、零 share 跳过、未拉取罚款豁免', async function () {
       const { arena, rtm, defender, operator, attackerA, attackerB, outsider } = game;
       const { id } = await makeContest(game);
@@ -874,12 +964,15 @@ describe('Arena + Treasury', function () {
       await joinAs(game, attackerB, id);
       await joinAs(game, outsider, id);
 
-      await arena.connect(attackerA).attack(id, ethers.id('a1'));
-      await arena.connect(attackerA).attack(id, ethers.id('a2'));
-      await arena.connect(operator).markDelivered(id, attackerA.address);
-      await arena.connect(operator).markDelivered(id, attackerA.address);
-      await arena.connect(attackerB).attack(id, ethers.id('b1'));
-      await arena.connect(operator).markDelivered(id, attackerB.address);
+      const a1 = ethers.id('a1');
+      const a2 = ethers.id('a2');
+      const b1 = ethers.id('b1');
+      await arena.connect(attackerA).attack(id, a1);
+      await arena.connect(attackerA).attack(id, a2);
+      await arena.connect(operator).markDelivered(id, attackerA.address, a1);
+      await arena.connect(operator).markDelivered(id, attackerA.address, a2);
+      await arena.connect(attackerB).attack(id, b1);
+      await arena.connect(operator).markDelivered(id, attackerB.address, b1);
 
       // 先让罚款发生并拉走一部分，验证弃权后只退 stake - penaltyTaken。
       await time.increase(2n * HOUR);
@@ -1146,6 +1239,16 @@ describe('Arena + Treasury', function () {
       // 退款只清 paidFee，不清 usedMsg：同一 hash 不得再次付费。
       await expect(arena.connect(attackerA).attack(id, h1))
         .to.be.revertedWithCustomError(arena, 'BadParams');
+
+      // 已送达消息不可退款（即使 Treasury 未授权也应先命中 BadParams）。
+      const h2 = ethers.id('refund-delivered');
+      await arena.connect(attackerA).attack(id, h2);
+      await arena.connect(game.operator).markDelivered(id, attackerA.address, h2);
+      expect(await arena.deliveredMsg(id, attackerA.address, h2)).to.equal(true);
+      await expect(arena.connect(operator).refundUnserved(id, attackerA.address, h2))
+        .to.be.revertedWithCustomError(arena, 'BadParams');
+      expect(await arena.paidFee(id, attackerA.address, h2)).to.equal(fee);
+      expect(await arena.usedMsg(id, attackerA.address, h2)).to.equal(true);
     });
 
     it('Treasury：withdraw / approveSpender 仅 owner，forceApprove 可覆盖额度', async function () {

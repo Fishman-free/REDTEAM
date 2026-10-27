@@ -84,6 +84,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     mapping(bytes32 => mapping(address => mapping(bytes32 => uint256))) public paidFee;
     /// @notice 消息 hash 一经付费即永久占用；退款只清 paidFee，不清本标记。
     mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public usedMsg;
+    /// @notice 已送达消息标记；已送达不可退款，且每条 hash 只能计一次送达。
+    mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public deliveredMsg;
     bytes32[] public contestList;
 
     event ContestCreated(
@@ -102,7 +104,12 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         uint256 seq,
         uint256 fee
     );
-    event MarkDelivered(bytes32 indexed id, address indexed attacker, uint256 delivered);
+    event MarkDelivered(
+        bytes32 indexed id,
+        address indexed attacker,
+        bytes32 indexed msgHash,
+        uint256 delivered
+    );
     event PenaltiesCollected(bytes32 indexed id, address indexed recipient, uint256 amount);
     event Paused(bytes32 indexed id);
     event Unpaused(bytes32 indexed id);
@@ -317,15 +324,22 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         emit AttackPaid(id, msg.sender, msgHash, seq, fee);
     }
 
-    /// @notice operator 标记一条付费消息已送达。
-    function markDelivered(bytes32 id, address attacker) external onlyOperator {
+    /// @notice operator 标记一条已付费消息送达；msgHash 必须已付费且只能计一次。
+    function markDelivered(bytes32 id, address attacker, bytes32 msgHash)
+        external
+        onlyOperator
+    {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
+        if (block.timestamp >= c.end) revert ContestExpired(id);
         Attacker storage a = attackers[id][attacker];
         if (!a.joined) revert NotJoined();
         if (a.delivered >= a.attackCount) revert NothingToMark();
+        if (!usedMsg[id][attacker][msgHash]) revert BadParams();
+        if (deliveredMsg[id][attacker][msgHash]) revert BadParams();
+        deliveredMsg[id][attacker][msgHash] = true;
         a.delivered += 1;
-        emit MarkDelivered(id, attacker, a.delivered);
+        emit MarkDelivered(id, attacker, msgHash, a.delivered);
     }
 
     /// @notice operator 退还一条未送达消息的费用（Treasury 需预先授权 Arena）。
@@ -334,6 +348,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         onlyOperator
         nonReentrant
     {
+        if (deliveredMsg[id][attacker][msgHash]) revert BadParams();
         uint256 fee = paidFee[id][attacker][msgHash];
         if (fee == 0) revert NothingToRefund();
         paidFee[id][attacker][msgHash] = 0;
