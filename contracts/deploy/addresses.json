@@ -20,5 +20,7 @@
   "totalSupply": "1000004",
   "smokeMining": true,
   "smokeDefenseHash": "0xba7ca5938e79b4ebfaef41cf78ea37e51130cab361de418b2cf5b938a2df7ebb",
+  "smokeContestId": "0x2996addb6e64517f520227e4dd5f7e222430c534affa0f90c23dd61336a55b29",
+  "smokeTxHash": "0x1c6e764019472148cf5627596e669f92d03e01e5fb6abd856750691a660e9f39",
   "deployedAt": "2026-10-27T16:02:53.892Z"
 }

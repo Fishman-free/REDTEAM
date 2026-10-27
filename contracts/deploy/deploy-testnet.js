@@ -23,6 +23,11 @@
  * 任何校验失败都会以非零退出码结束；addresses.json 只在全部 assert 通过后写入。
  * 本脚本绝不读取或打印私钥；deployer 私钥只经 Hardhat 的 BESU_TESTNET_KEY 注入。
  * 挖矿烟测的 W 是进程内新生成的随机钱包，私钥不打印、不落盘，用后随进程丢弃。
+ *
+ * 烟测失败回收：预打款后若 create 已成功且比赛仍 Live，脚本由 operator 调
+ * retireMining 把 W 余额退回 Treasury；若 create 未成功（W 尚未成为靶），脚本
+ * 用内存中的 W 私钥把余额转回 Treasury。回收失败只告警，不掩盖原始异常，
+ * 且失败路径绝不写 addresses.json。
  */
 
 const fs = require('fs');
@@ -160,9 +165,21 @@ async function runMiningSmoke(ctx) {
   const rpcProvider = new ethers.JsonRpcProvider(rpcUrl);
   const wallet = ethers.Wallet.createRandom().connect(rpcProvider);
   const w = wallet.address;
+  const defenseHash = ethers.id(MINING_SMOKE_HASH_INPUT);
+  let contestId = null;
+  let prefunded = false;
   console.log(`  smoke W      ${w} (private key in memory only)`);
 
   try {
+    // 独立 provider 也必须指向 48850，防止 BESU_TESTNET_RPC 回退到别的链。
+    const smokeNetwork = await rpcProvider.getNetwork();
+    if (smokeNetwork.chainId !== EXPECTED_CHAIN_ID) {
+      die(
+        `smoke provider chainId guard failed: expected ${EXPECTED_CHAIN_ID} ` +
+          `(${EXPECTED_CHAIN_ID_HEX}), got ${smokeNetwork.chainId} at ${rpcUrl}`
+      );
+    }
+
     assertEq('rtm.balanceOf(W) before pre-fund', await rtm.balanceOf(w), 0n);
     assertEq(
       'rtm.balanceOf(treasury) before pre-fund',
@@ -170,6 +187,8 @@ async function runMiningSmoke(ctx) {
       treasuryMiningFund
     );
 
+    // 先置位再发 tx：即使 wait/网络异常，catch 也按 W 的真实余额决定是否退回收。
+    prefunded = true;
     await send(
       `treasury.withdraw(rtm, W, ${formatRtm(miningReward)} RTM)`,
       treasury.withdraw(rtmAddress, w, miningReward)
@@ -186,7 +205,6 @@ async function runMiningSmoke(ctx) {
       faucetFunding + treasuryMiningFund
     );
 
-    const defenseHash = ethers.id(MINING_SMOKE_HASH_INPUT);
     const createReceipt = await send(
       'arena.createMiningContest(W, hash)',
       arena.createMiningContest(w, defenseHash)
@@ -195,6 +213,7 @@ async function runMiningSmoke(ctx) {
     if (id === ethers.ZeroHash) {
       die('smoke: activeDefenseHash not set after createMiningContest');
     }
+    contestId = id;
     const created = findEvent(
       'arena',
       arena.interface,
@@ -313,6 +332,85 @@ async function runMiningSmoke(ctx) {
       winner: deployerAddress,
       reward: formatRtm(miningReward),
     };
+  } catch (error) {
+    // 失败回收：只告警，不掩盖原始异常；回收失败时提示人工处理。
+    try {
+      console.warn(`\nSmoke failed: ${error && error.message ? error.message : error}`);
+      let id = contestId;
+      if (!id) {
+        try {
+          const active = await arena.activeDefenseHash(defenseHash);
+          if (active !== ethers.ZeroHash) id = active;
+        } catch (lookupError) {
+          console.warn(
+            `  recovery: activeDefenseHash lookup failed: ` +
+              `${lookupError && lookupError.message ? lookupError.message : lookupError}`
+          );
+        }
+      }
+
+      if (id) {
+        const state = await arena.contestState(id);
+        const info = await arena.contestInfo(id);
+        if (state === 1n && info.isMining) {
+          const balance = await rtm.balanceOf(w);
+          console.warn(
+            `  recovery: contest ${id} is Live; retireMining returns ` +
+              `${formatRtm(balance)} RTM from W to Treasury`
+          );
+          const receipt = await (await arena.retireMining(id)).wait();
+          if (!receipt || receipt.status !== 1) {
+            console.warn(
+              '  recovery: retireMining reverted; manual recovery required (see deploy/README.md)'
+            );
+          } else {
+            console.warn(
+              `  recovery: retireMining tx ${receipt.hash}; W balance now ` +
+                `${formatRtm(await rtm.balanceOf(w))} RTM`
+            );
+          }
+        } else {
+          console.warn(
+            `  recovery: contest state=${state} isMining=${info.isMining}; ` +
+              'already ended/settled, no retire required'
+          );
+        }
+      } else if (prefunded) {
+        const balance = await rtm.balanceOf(w);
+        const stillTarget = await rtm.isTarget(w);
+        if (stillTarget) {
+          console.warn(
+            '  recovery: W is still a registered target; manual operator retireMining required ' +
+              '(see deploy/README.md)'
+          );
+        } else if (balance > 0n) {
+          console.warn(
+            `  recovery: create did not register W; W refunds ${formatRtm(balance)} RTM to Treasury`
+          );
+          const receipt = await (
+            await rtm.connect(wallet).transfer(treasuryAddress, balance, { gasPrice: 0 })
+          ).wait();
+          if (!receipt || receipt.status !== 1) {
+            console.warn(
+              '  recovery: W refund transfer reverted; manual recovery required (see deploy/README.md)'
+            );
+          } else {
+            console.warn(`  recovery: W refund tx ${receipt.hash}`);
+          }
+        } else {
+          console.warn('  recovery: W balance is 0; no refund required');
+        }
+      } else {
+        console.warn('  recovery: no pre-fund was made; nothing to recover');
+      }
+    } catch (recoveryError) {
+      console.warn(
+        `  recovery failed: ` +
+          `${recoveryError && recoveryError.message ? recoveryError.message : recoveryError}. ` +
+          'Manual recovery required; see deploy/README.md.'
+      );
+    }
+    throw error;
   } finally {
     // 只销毁 RPC provider；wallet（含私钥）随本函数作用域结束被丢弃。
     rpcProvider.destroy();
@@ -359,6 +457,7 @@ async function main() {
     process.env.OPERATOR_ADDRESS,
     deployerAddress
   );
+  const faucetSignerExplicit = Boolean((process.env.FAUCET_SIGNER_ADDRESS || '').trim());
   const ticketSigner = normalizeAddress(
     'FAUCET_SIGNER_ADDRESS',
     process.env.FAUCET_SIGNER_ADDRESS,
@@ -404,6 +503,12 @@ async function main() {
       `refundAllowance=${formatRtm(refundAllowance)} RTM`
   );
   console.log(`mining smoke  ${runSmoke ? 'enabled' : 'disabled'}`);
+
+  if (platform !== deployerAddress && !faucetSignerExplicit) {
+    console.warn('\nWARNING: PLATFORM_ADDRESS != deployer but FAUCET_SIGNER_ADDRESS is not set.');
+    console.warn('         Faucet.ticketSigner is immutable and will remain the deployer.');
+    console.warn('         Set FAUCET_SIGNER_ADDRESS explicitly for production.\n');
+  }
 
   console.log('\nDeploying contracts...');
   const treasury = await deploy('Treasury', [deployerAddress]);
@@ -506,7 +611,7 @@ async function main() {
       faucetFunding,
       treasuryMiningFund,
       miningReward,
-      rpcUrl: hre.network.config.url || 'http://127.0.0.1:8545',
+      rpcUrl: (process.env.BESU_TESTNET_RPC || '').trim() || 'http://127.0.0.1:8546',
     });
   } else {
     console.log('\nMining smoke skipped (RUN_MINING_SMOKE=0).');
@@ -580,9 +685,13 @@ async function main() {
     totalSupply: formatRtm(totalSupply),
     smokeMining: smoke !== null,
     smokeDefenseHash: smoke ? smoke.defenseHash : null,
+    smokeContestId: smoke ? smoke.contestId : null,
+    smokeTxHash: smoke ? smoke.txHash : null,
     deployedAt: new Date().toISOString(),
   };
 
+  // 只有部署、烟测、owner 转移和全部断言均成功后才写登记文件；
+  // 任何失败都会退出，已存在的 addresses.json 保持不变。
   fs.writeFileSync(
     ADDRESSES_FILE,
     `${JSON.stringify(registry, null, 2)}\n`,
