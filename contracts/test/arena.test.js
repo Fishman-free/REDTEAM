@@ -1251,6 +1251,29 @@ describe('Arena + Treasury', function () {
       expect(await arena.usedMsg(id, attackerA.address, h2)).to.equal(true);
     });
 
+    it('退款后不可 markDelivered，delivered 保持不变', async function () {
+      const { arena, rtm, treasury, treasuryOwner, operator, attackerA } = game;
+      const { id } = await makeContest(game);
+      await joinAs(game, attackerA, id);
+      const h = ethers.id('refunded-then-delivered');
+      await arena.connect(attackerA).attack(id, h);
+      const fee = (STAKE * 50n) / 10000n;
+
+      await treasury.connect(treasuryOwner).approveSpender(rtm.target, arena.target, fee);
+      await arena.connect(operator).refundUnserved(id, attackerA.address, h);
+      expect(await arena.paidFee(id, attackerA.address, h)).to.equal(0n);
+      expect(await arena.usedMsg(id, attackerA.address, h)).to.equal(true);
+      expect(await arena.deliveredMsg(id, attackerA.address, h)).to.equal(false);
+
+      const deliveredBefore = (await arena.attackers(id, attackerA.address)).delivered;
+      await expect(arena.connect(operator).markDelivered(id, attackerA.address, h))
+        .to.be.revertedWithCustomError(arena, 'BadParams');
+      expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(
+        deliveredBefore
+      );
+      expect(await arena.deliveredMsg(id, attackerA.address, h)).to.equal(false);
+    });
+
     it('Treasury：withdraw / approveSpender 仅 owner，forceApprove 可覆盖额度', async function () {
       const { arena, rtm, treasury, treasuryOwner, outsider } = game;
       await arena.mintForTest(treasury.target, RTM(50));

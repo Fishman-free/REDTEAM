@@ -336,6 +336,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (!a.joined) revert NotJoined();
         if (a.delivered >= a.attackCount) revert NothingToMark();
         if (!usedMsg[id][attacker][msgHash]) revert BadParams();
+        // 已退款（paidFee 清零）的消息不可再标记送达。
+        if (paidFee[id][attacker][msgHash] == 0) revert BadParams();
         if (deliveredMsg[id][attacker][msgHash]) revert BadParams();
         deliveredMsg[id][attacker][msgHash] = true;
         a.delivered += 1;
