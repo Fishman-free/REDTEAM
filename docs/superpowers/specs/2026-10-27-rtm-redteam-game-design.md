@@ -302,6 +302,15 @@ transfer_rtm(to, amount) → 真实链上转账（W 私钥签名）
 
 攻方消息信封沿用 payassist 语义：`{"channel": "external_dialogue", "claimed_sender": "<攻方地址>", "content": "…"}`——渠道由 runner 按路由指定，永不从文本解析；external 永不开 execution release。
 
+### 7.6 版本基准库（benchmark/）
+
+提示词与防御包会持续迭代，且平台需要离线"自己打自己"评测。顶层 `benchmark/` 存放全部守方智能体版本，接口保持一致：
+
+- **版本** = `benchmark/versions/<name>/agent.json`，只含 `defense`（DefensePackage）与说明；底座提示词、工具面、消息信封与预算由平台固定，版本不可改写。新增版本时复制现有目录并改名。
+- `benchmark.interface.load_version(name)` → `AgentVersion`，提供 `system_prompt(mandate, wallet_address)` 与 `digest`；平台 runner 只依赖该接口。
+- `benchmark.harness.run_turn(...)` 用脚本化模型 + 注入式工具执行器离线回放（10 步 / 120s / 200k 上下文 / 消息 ≤1000 字符，与 §7.5 一致），用于提示词对比与回归；`python -m benchmark.demo` 为最小演示。
+- 已被比赛引用过的版本目录**不可变**（与链上 `defense_package_sha256` 对账）；任何改动一律新开目录。
+
 ---
 
 ## 8. dApp（新顶层 dapp/，Vite + React + TS + wagmi/viem）

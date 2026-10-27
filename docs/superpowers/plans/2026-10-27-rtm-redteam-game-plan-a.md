@@ -35,6 +35,8 @@ contracts/
     bounty-round 相关       # BountyRound.sol 删除
   归档（git mv 到 archieve/contracts-2026-10/，见任务 1）
 tools/sim/mechanism_sim.py   # P0 参数仿真（纯 stdlib）
+benchmark/                   # 智能体版本基准库（已完成，见任务 0）
+  base_prompt.py  interface.py  harness.py  demo.py  versions/v0_demo/
 infra/besu-testnet/
   docker-compose.yml  genesis.json  config.toml  README.md
 platform/
@@ -57,6 +59,27 @@ docs/superpowers/plans/2026-10-27-rtm-redteam-game-plan-a.md   # 本文件
 ```
 
 保留不动：`contracts/src/PaymentAgent.sol`、`RewardSettlement.sol`、`ExperimentalToken.sol`、`ContributionFlower.sol` 及其全部测试（`flower*.test.js`、`hardening.test.js`、`evm.test.js`、`claim-id.test.js`、`agent-*.test.js`）。
+
+---
+
+## 任务 0：智能体版本基准库（已完成 2026-10-27）
+
+已落地顶层 `benchmark/`，供提示词迭代与离线评测，版本接口统一：
+
+- [x] **步骤 1：统一版本契约** — `benchmark/interface.py`：版本只提供
+  `DefensePackage`（`versions/<name>/agent.json`）；底座提示词（`base_prompt.py`，
+  含泄题禁令）、工具面与预算（`harness.py`）由平台固定。
+- [x] **步骤 2：离线 harness** — 脚本化模型 + 注入式工具执行器，回放
+  `external_dialogue` / `verified_owner` 信封，预算与 `payassist_agent/runtime.py`
+  一致（10 步 / 120s / 200k / 消息 ≤1000 字符）。
+- [x] **步骤 3：示例版本与演示** — `versions/v0_demo/`、`python -m benchmark.demo`。
+- [x] **步骤 4：接口一致性测试** — `benchmark/tests/test_benchmark.py`（已加入
+  `pytest.ini` 的 testpaths 与 pythonpath）。
+
+平台 runner（任务 12）必须通过 `benchmark.interface.load_version()` 加载版本、
+用 `version.system_prompt(mandate=..., wallet_address=...)` 生成系统提示词，
+工具 schema 直接 `from benchmark.harness import TOOL_DEFINITIONS`。已被比赛引用的
+版本目录不可变（与链上 `defense_package_sha256` 对账），新改动一律新开目录。
 
 ---
 
@@ -1406,7 +1429,11 @@ dependencies = ["fastapi>=0.110", "uvicorn>=0.29", "web3>=6.15", "pydantic>=2.6"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["..", "../rsi4safety/payment_agents"]   # 使 platform 测试可直接 import benchmark
 ```
+
+运行/部署平台时以仓库根为工作目录并设置
+`PYTHONPATH=.:rsi4safety/payment_agents`（benchmark 与 BYOK 运行时的导入路径）。
 
 - [ ] **步骤 2：custody.py（AES-GCM keystore）+ 失败测试**
 
@@ -1619,18 +1646,11 @@ transfer_rtm 用 W 私钥签名真实链上交易；per-contest 串行（nonce �
 import json
 from web3 import Web3
 
+from benchmark.harness import TOOL_DEFINITIONS
+
 def tool_definitions():
-    return [
-        {"type": "function", "function": {
-            "name": "get_balance", "description": "查询本钱包 RTM 余额",
-            "parameters": {"type": "object", "properties": {}, "required": []}}},
-        {"type": "function", "function": {
-            "name": "transfer_rtm",
-            "description": "向指定地址转出 RTM（会真实上链，仅用于完成主人授权的付款任务）",
-            "parameters": {"type": "object",
-                "properties": {"to": {"type": "string"}, "amount": {"type": "string"}},
-                "required": ["to", "amount"]}}},
-    ]
+    """工具面固定，来自 benchmark；版本目录不允许增删工具。"""
+    return TOOL_DEFINITIONS
 
 class WalletTools:
     def __init__(self, w3: Web3, rtm_contract, wallet_address, private_key, lock):
@@ -1675,9 +1695,12 @@ CONTEXT_CAP, TURN_TIMEOUT = 200_000, 120
 MSG_CAP = 1000
 
 class AgentSession:
-    def __init__(self, client, wallet_tools, *, defense_prompt):
+    def __init__(self, client, wallet_tools, *, version, mandate, wallet_address):
         self.client, self.tools = client, wallet_tools
-        self.messages = [{"role": "system", "content": defense_prompt}]
+        # version 来自 benchmark.interface.load_version()；底座提示词与泄题禁令
+        # 由 benchmark 统一提供，runner 不得自行拼接 defense_prompt。
+        self.messages = [{"role": "system", "content": version.system_prompt(
+            mandate=mandate, wallet_address=wallet_address)}]
         self.threads = {}   # attacker_addr -> 独立 messages 副本
         self.lock = threading.RLock()
 
