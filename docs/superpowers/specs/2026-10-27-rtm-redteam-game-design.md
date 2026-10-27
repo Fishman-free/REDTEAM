@@ -200,7 +200,7 @@ paidFee[contestId][attacker][msgHash]
 - `createMiningContest(wallet, E_rate, r)` 仅 operator：W 非零/非靶/非 minter；defender=Treasury；无 S；记录 `stakeBps=r`；`end=type(uint64).max`。
 - `join(id)`：仅 Live 且 `now < end`；`base = isMining ? rtm.balanceOf(W) : S`；`s = base·r/10000`；记录 `base` 作为该攻方的 `feeBase`；`transferFrom(s → Arena)`；每地址一次、50 人上限、暂停快照。
 - `attack(id, msgHash)`：仅 Live、`now < end` 且未暂停；`seq = ++attackCount`；`fee = feeBase·0.5%`；`usedMsg[id][msg][msgHash]` 永久防重（退款后也不可复用），`paidFee` 记录可退金额；fee 转 Treasury；发 `AttackPaid`。挖矿赛的 feeBase 是加入时 W 余额，不允许为 0 费率。
-- `markDelivered(id, attacker, msgHash)`（operator）：仅 Live 且 `now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达；置 `deliveredMsg=true`、`delivered++`。
+- `markDelivered(id, attacker, msgHash)`（operator）：仅 Live 且 `now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达、`paidFee > 0`（已退款不可标记）；置 `deliveredMsg=true`、`delivered++`。
 - `refundUnserved(id, attacker, msgHash)`（operator）：只按 `paidFee` 记录的金额退款（Treasury 先 `approveSpender(Arena)`），清零记录，幂等；**`deliveredMsg` 为 true 的已送达消息不得退款**。
 - `collectPenalties(id)`：`accrued = s − s·(3/4)^k`（k 以 `endedAt` 冻结）；`due = accrued − penaltyTaken`；normal 转给 defender，mining 转给 Treasury；可重复调用拉差额。
 - `pause/unpause`（operator）：累计 pausedTotal，冻结罚款与挖矿时钟；`_elapsed` 必须扣除**进行中**的暂停（`lastPauseAt != 0` 时加上 `now − lastPauseAt`）。

@@ -577,7 +577,7 @@ git commit -m "feat(contracts): rewrite RTMToken with target-wallet transfer pol
 3. `Attacker` 记账字段：`stake, base(feeBase), joinedAt, pausedAtJoin, attackCount, delivered, penaltyTaken, stakeWithdrawn, waived, joined`。`base` 在 join 时快照（normal=S，mining=W 余额）；`s=base·r/10000`。
 4. `Contest` 增加 `endedAt`；**所有结束路径**（breach/expire/fault）设置 `endedAt`，`_elapsed` 用 `min(now, end, endedAt)` 冻结时间；`_pow75(k)` 用平方-乘 O(log k)，禁止 O(k) 循环。
 5. `join`/`attack`/`reportDefenderFault` 都必须要求 `now < end`（到期后、expire 前的窗口不允许新加入、付费消息或改判弃权）；`attack` 用 `usedMsg` 永久防重（退款后同一 hash 不可复用），`paidFee` 只用于精确退款。`seq=++attackCount`；`fee=feeBase·0.5%`；fee 转 Treasury；暂停中 revert。挖矿赛费率不得为 0。
-6. `markDelivered(id, attacker, msgHash)`：仅 operator、`now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达；置 `deliveredMsg[id][attacker][hash]=true` 并 `delivered++`。
+6. `markDelivered(id, attacker, msgHash)`：仅 operator、`now < end`；要求已加入、`delivered < attackCount`、`usedMsg` 为 true、未标记过送达、`paidFee > 0`（已退款不可标记）；置 `deliveredMsg[id][attacker][hash]=true` 并 `delivered++`。
 7. `refundUnserved`：仅按 `paidFee` 精确退款（Treasury 需 `approveSpender(Arena)`），清零记录、幂等；`deliveredMsg` 为 true 的已送达消息不得退款；删除占位行。
 8. 罚款记账：`accrued = s − s·(3/4)^k`；`collectPenalties` 的 `due = accrued − penaltyTaken`；`withdrawStake` 用 `stakeWithdrawn` 独立记账。normal 到期/攻破：攻击方提 `s − accruedAtEnd − stakeWithdrawn`，未拉取罚款留在 Arena 供 defender 事后收取；fault：`waived=true`，提 `s − penaltyTaken − stakeWithdrawn`（未拉取罚款豁免，已拉走不退）。
 9. `reportDefenderFault`：仅 operator、仅 `now < end`；normal 按 delivered 分 S（无 delivered 退 defender）；mining 不分 S，但把 W 中已铸余额 `controllerTransfer` 回 Treasury；先设 `endedAt`。
