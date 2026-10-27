@@ -502,7 +502,7 @@ contract RTMToken is ERC20, Ownable {
     ///      Arena 不得用 transferFrom + allowance 移动 W 资金。
     function controllerTransfer(address from, address to, uint256 amount) external {
         if (msg.sender != minter) revert NotArena();
-        if (to == address(0)) revert ZeroAddress();
+        if (from == address(0) || to == address(0)) revert ZeroAddress();
         bytes32 contestId = targetContest[from];
         if (contestId != bytes32(0)) {
             delete targetContest[from];
@@ -517,6 +517,8 @@ contract RTMToken is ERC20, Ownable {
         if (contestId != bytes32(0)) {
             // 零金额不算攻破：否则 0 RTM 转账即可触发结算。
             if (value == 0) revert TargetTransferRestricted(from, to);
+            // Arena 地址永远不是合法收款方，即使被误登记为攻方。
+            if (to == minter) revert TargetTransferRestricted(from, to);
             if (arena.isRegisteredAttacker(contestId, to)) {
                 // 攻破：先注销（CEI），再转账，再回调结算。
                 delete targetContest[from];
