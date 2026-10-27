@@ -1813,11 +1813,15 @@ git commit -m "feat(platform): backend skeleton with AES-GCM custody and chain b
 > **任务 11 实现修订（2026-10-28）：allowlist 构造时加载，不用模块级全局。**
 >
 > - 上方草稿的模块级 `MODEL_ALLOWLIST` + import 时读 env 已废弃（测试会失败）。`load_allowlist(env=None)` 每次调用解析 `MODEL_ALLOWLIST_JSON`（缺省 `{}`）；`ByokClient(provider, api_key, *, allowlist=None, timeout=60.0)` 在**构造时**加载/校验 allowlist，模块内没有缓存全局，也不在 import 时读 env。
-> - `base_url`/`model` 只来自 allowlist，构造器不接受这两个参数；`base_url` 去尾斜杠、model 固定。校验 provider/base_url/model 非空；`base_url` 仅 http(s)，非 loopback 必须 https（loopback 可 http）；允许 path（如 `/v1`），拒绝 userinfo、query、fragment。不读取 API key，返回独立复制。
+> - `base_url`/`model` 只来自 allowlist，构造器不接受这两个参数；`base_url` 去尾斜杠、model 固定，并以只读 property 暴露，构造后不能覆盖。allowlist 条目只接受 `base_url`/`model`，未知字段（尤其 `api_key`）一律拒绝；返回/保存的配置只含安全字段。
+> - `base_url` 在 strip 前按原始值校验：只接受可见 ASCII（0x21–0x7E），拒绝 C0/C1/DEL、空白（含首尾）、非 ASCII、反斜杠、userinfo、query、fragment；允许 path（如 `/v1`）；仅 http(s)，非 loopback 必须 https（loopback 可 http）。不读取 API key，返回独立复制。
 > - 异常：`AllowlistError(ValueError)`；`ModelError(RuntimeError)` 带 `kind`/`usage`；`ModelUnavailable(ModelError)` 为具体异常，`complete()` 失败统一抛 `ModelUnavailable`。
-> - 错误分类：401/402/403/429/5xx、transport/timeout/connection -> `infrastructure`；3xx、其他 4xx、坏 JSON/schema/空 choices、响应模型不匹配、响应超过 2,000,000 bytes -> `agent_protocol`。客户端用自定义 no-redirect opener 拒绝跟随 3xx，不向重定向目标发送请求或 `Authorization`。api_key 含 CR/LF/NUL 或其他控制字符在构造时拒绝（`ValueError`，不回显 key）。错误文本只用 `http <code>` / `transport <Type>` / `model mismatch` 等，不含 api_key 或完整 base_url；不重试。
-> - 测试：`platform/tests/test_byok.py` **109 passed**（拦截低层 socket/`HTTPConnection.connect`，注入假 transport / 假 HTTPS 响应，不联网）；全套 `cd platform && .venv/Scripts/python -m pytest tests -q` **173 passed**（任务 10 的 64 + 本任务 109）。
-> - 提交：`4fbe68e feat(platform): BYOK allowlisted model client with fault classification`；安全修复 `410ebc7 fix(platform): block BYOK redirects and header injection`（均未 push）。
+> - 错误分类：401/402/403/429/5xx、transport/timeout/connection、`RemoteDisconnected`/`IncompleteRead` -> `infrastructure`；3xx、其他 4xx、坏 JSON/schema、空 choices、响应模型不匹配、响应超过 2,000,000 bytes、`BadStatusLine`/`LineTooLong`/`IllegalHeader`、JSON 递归过深/NaN/Infinity -> `agent_protocol`。客户端用自定义 no-redirect opener 拒绝跟随 3xx，不向重定向目标发送请求或 `Authorization`；opener 显式使用 `ProxyHandler({})`，BYOK 默认直连、不读取 `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`（未来如启用代理，必须显式配置并记录 key 会经过代理）。api_key 只接受可见 ASCII 0x20–0x7E，CR/LF/NUL、其他控制字符或非 ASCII 在构造时拒绝（`ValueError`，不回显 key）。错误文本只用 `http <code>` / `transport <Type>` / `protocol <Type>` / `model mismatch` 等，不含 api_key 或完整 base_url；不重试。
+> - JSON：`json.loads(..., parse_constant=...)` 拒绝 NaN/Infinity；allowlist 与响应都捕获 `RecursionError`（响应归 `agent_protocol`）。
+> - 测试：`platform/tests/test_byok.py` **138 passed**（拦截低层 socket/`HTTPConnection.connect`，注入假 transport / 假 HTTPS 响应，不联网；覆盖原始值、深层 JSON、HTTP 异常、环境代理、只读属性等）；全套 `cd platform && .venv/Scripts/python -m pytest tests -q` **202 passed**（任务 10 的 64 + 本任务 138）。
+> - 提交：`4fbe68e feat(platform): BYOK allowlisted model client with fault classification`；`410ebc7 fix(platform): block BYOK redirects and header injection`；`f4076ff fix(platform): harden BYOK boundaries and proxy handling`（均未 push）。
+>
+> **旧草稿警告：下方步骤 1/2 的示例代码为旧草稿，禁止照抄**（模块级 `MODEL_ALLOWLIST`、import 时读 env、`urlopen` 默认重定向/代理等均已废弃）；以上方修订与当前 `platform/redteam_platform/byok.py` 为准。
 
 **文件：**
 - 创建：`platform/redteam_platform/byok.py`

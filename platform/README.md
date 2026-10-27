@@ -97,19 +97,29 @@ export MODEL_ALLOWLIST_JSON='{
 }'
 ```
 
-校验规则：`provider`、`base_url`、`model` 非空；`base_url` 仅接受 http(s)，
-非 loopback 的 http 拒绝；loopback（`localhost`、`127.0.0.0/8`、`::1`）可用
-http；允许 path（如 `/v1`），拒绝 userinfo、query 与 fragment。`base_url` 尾斜杠
-会被移除。客户端固定 POST `{base_url}/chat/completions`，请求体含
+校验规则：allowlist 条目只允许 `base_url` 与 `model` 两个字段，其他字段（尤其
+`api_key`）一律拒绝，返回的配置只保留这两个安全字段；若 `Settings.model_allowlist`
+里混入额外字段，传入 `ByokClient` 会在构造时失败。`provider`、`base_url`、`model`
+非空；`base_url` 在 strip 前按原始值校验，只接受可见 ASCII（0x21–0x7E），拒绝
+C0/C1/DEL、空白、非 ASCII、反斜杠、userinfo、query 与 fragment；允许 path（如
+`/v1`）；非 loopback 的 http 拒绝，loopback（`localhost`、`127.0.0.0/8`、`::1`）
+可用 http。`base_url` 尾斜杠会被移除；`base_url`/`model` 以只读 property 暴露，
+构造后不能覆盖。客户端固定 POST `{base_url}/chat/completions`，请求体含
 `model/messages/tools/parallel_tool_calls=false/temperature=0/max_tokens`。
 
-错误分两类：HTTP 401/402/403/429/5xx 与 transport/timeout/connection 为
-`ModelError.kind == "infrastructure"`；3xx、其余 4xx、坏 JSON/schema、空 choices、
-响应模型不匹配、响应超过 2 MB 为 `"agent_protocol"`。客户端使用 no-redirect
-opener 拒绝跟随 3xx，因此不会把 `Authorization: Bearer <key>` 发往重定向目标。
-含 CR/LF/NUL 或其他控制字符的 api_key 在构造时以 `ValueError` 拒绝，错误消息
-不回显 key。具体异常均为 `ModelUnavailable(ModelError)`；客户端不重试，
+错误分两类：HTTP 401/402/403/429/5xx、transport/timeout/connection、
+`RemoteDisconnected`/`IncompleteRead` 为 `ModelError.kind == "infrastructure"`；
+3xx、其余 4xx、坏 JSON/schema、空 choices、响应模型不匹配、响应超过 2 MB、
+`BadStatusLine`/`LineTooLong`/`IllegalHeader`、JSON 递归过深/NaN/Infinity 为
+`"agent_protocol"`。具体异常均为 `ModelUnavailable(ModelError)`；客户端不重试，
 重试/弃权由 runner 处理。
+
+安全边界：客户端使用 no-redirect opener，3xx 不跟随，不会把
+`Authorization: Bearer <key>` 发往重定向目标。**BYOK 默认直连，不使用
+`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`**：opener 使用空 ProxyHandler，避免 key
+被环境代理截获；若未来确需代理，必须由平台显式配置，并明确记录 key 会经过代理。
+api_key 只接受可见 ASCII 0x20–0x7E；CR/LF/NUL、其他控制字符或非 ASCII 均在
+构造时以 `ValueError` 拒绝，错误消息不回显 key。
 
 ```python
 from redteam_platform.byok import ByokClient, ModelError
@@ -139,8 +149,9 @@ cd platform
 测试不联网：chain 的 `verify_chain` 用假 provider 注入；custody 使用临时目录和
 较低的 scrypt 参数（`scrypt_n=2**14`，仅测试；生产默认 `2**15`）；BYOK 测试拦截
 低层 socket/`HTTPConnection.connect` 并注入假 transport / 假 HTTPS 响应，覆盖
-allowlist/URL 校验、请求体、错误分类、3xx 不跟随、api_key 控制字符、不重试与
-密钥泄漏断言。当前全套 **173 passed**（config/custody/chain 64 + BYOK 109）。
+allowlist/URL 原始值校验、未知字段、请求体、HTTP 客户端异常分类、3xx 不跟随、
+环境代理忽略、JSON 深层嵌套/NaN、api_key ASCII/控制字符、只读属性、不重试与
+密钥泄漏断言。当前全套 **202 passed**（config/custody/chain 64 + BYOK 138）。
 
 ## 安全约定
 
