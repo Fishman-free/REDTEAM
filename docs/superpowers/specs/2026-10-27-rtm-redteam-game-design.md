@@ -270,11 +270,14 @@ paidFee[contestId][attacker][msgHash]
 
 ## 5. 链基建（infra/）
 
-- 测试网：1 验证者 Besu QBFT，docker-compose；genesis：`zeroBaseFee:true`、`contractSizeLimit:2147483647`、`shanghaiTime/cancunTime:0`（必须匹配 cancun 编译，否则合约交易 revert——Besu issue #8954）；每节点 `--min-gas-price=0`。
-- 主网：4 验证者（初期全平台控制，路线图引入外部验证者），同上。
-- `besu operator generate-block-chain-config` 生成 genesis/extraData 的 runbook；验证者密钥管理文档（离线生成、加密存档）。
-- 公网 RPC 前置限流网关（Nginx/专用代理）：免费 gas 必须防 spam。
-- `contracts/hardhat.config.js` 增加 `besu-testnet`/`besu-mainnet`（env RPC+账户）与两个本地 hardhat fork 网络（桥测试用）。
+- 测试网：1 验证者 Besu QBFT，chainId `48850`（`0xbed2`）；`infra/besu-testnet/` 提供 `genesis.json`（源模板，无 `extraData`）、`config.toml`、`docker-compose.yml`、`generate.sh` 与完整 runbook `README.md`。
+- 零 gas：genesis `zeroBaseFee:true`；每节点 `min-gas-price=0` 且 `tx-pool-enable-balance-check=false`（Besu 25.10.0 起支持；24.5.1 无此选项）；`pertxgaslimit:0` 置于 `config.qbft`（当前 24.5.1 operator 与 25.10.0 runtime 均接受；若未来镜像拒绝则移除，Arena 部署远低于默认单交易上限）；不得设置 `tx-pool-price-bump`。
+- Genesis/密钥生成：`generate.sh` 用官方 `besu operator generate-blockchain-config`（here-doc 把源 `genesis.json` 包成 `qbftConfig.json`，不依赖 jq）生成 `networkFiles/genesis.json`（含 `extraData`）与 `networkFiles/keys/<address>/key|key.pub`，再复制为 `keydir/key`、`keydir/key.pub`、`keydir/address`。`networkFiles/`、`keydir/`、`data/`、`qbftConfig.json` 不入库，validator 私钥绝不提交；丢失或重新生成会改变 genesis，必须清 `data/` 重来。
+- 版本：generate 默认 `hyperledger/besu:24.5.1`；运行时默认 `hyperledger/besu:25.10.0`（25.10.0 operator 在本机写完输出后仍报 `Output directory already exists`，故只用于运行时）。两者均可用 `BESU_IMAGE` 覆盖。
+- Cancun：`shanghaiTime:0`/`cancunTime:0` 必须与 Hardhat `evmVersion: cancun` 一致（Besu issue #8954）；`contractSizeLimit:2147483647`。已用零余额账户、`gasPrice:0` 实测部署合约成功。
+- 网络暴露：compose 只绑定 `127.0.0.1`（默认 RPC 8545、P2P 30303，host 端口可用 `BESU_RPC_PORT`/`BESU_P2P_PORT` 覆盖）；公网 RPC 必须前置 Nginx `limit_req` 等限流网关，且不要暴露 `DEBUG`/`QBFT` 管理 API。
+- 主网：4 验证者（初期全平台控制，路线图引入外部验证者），沿用零 gas 参数、local-only 绑定与限流要求。
+- `contracts/hardhat.config.js` 已有 `hardhat` 与 `besu-testnet` 网络：`BESU_TESTNET_RPC`、`BESU_TESTNET_KEY`、`chainId:48850`、`gasPrice:0`、`gas:0x1ffffffffffffe`（Hardhat 配置校验只接受数值或 `"auto"`，必须写数值字面量而非带引号字符串）、`timeout:120000`。仍计划 `besu-mainnet` 与两个本地 hardhat fork 网络（桥测试用）。
 
 ---
 
