@@ -104,6 +104,25 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await rtm.isTarget(defender.address)).to.equal(false);
   });
 
+  it('registerTarget 拒绝把 minter 自身注册为靶', async () => {
+    await expect(stub.registerTarget(rtm.target, stub.target, contestId))
+      .to.be.revertedWithCustomError(rtm, 'InvalidTarget');
+
+    expect(await rtm.isTarget(stub.target)).to.equal(false);
+    expect(await rtm.isControlledWallet(stub.target)).to.equal(false);
+  });
+
+  it('重复注册活跃靶 revert AlreadyTarget，原 contestId 不变', async () => {
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+    expect(await rtm.isControlledWallet(defender.address)).to.equal(true);
+
+    await expect(stub.registerTarget(rtm.target, defender.address, ethers.id('contest-2')))
+      .to.be.revertedWithCustomError(rtm, 'AlreadyTarget');
+
+    expect(await rtm.targetContest(defender.address)).to.equal(contestId);
+    expect(await rtm.isControlledWallet(defender.address)).to.equal(true);
+  });
+
   it('靶向已登记攻方转账即攻破：到账、注销、Breach 事件与 onBreach 回调各一次', async () => {
     await stub.setAttacker(contestId, attacker.address, true);
     await stub.registerTarget(rtm.target, defender.address, contestId);
@@ -238,6 +257,30 @@ describe('RTMToken 靶钱包转账策略', function () {
     expect(await stub.breachCalls()).to.equal(0n);
   });
 
+  it('controllerTransfer 拒绝从非受控地址划转', async () => {
+    await stub.mint(rtm.target, outsider.address, RTM(10));
+    expect(await rtm.isControlledWallet(outsider.address)).to.equal(false);
+
+    await expect(stub.controllerSend(rtm.target, outsider.address, bystander.address, RTM(1)))
+      .to.be.revertedWithCustomError(rtm, 'NotControlledWallet');
+
+    expect(await rtm.balanceOf(outsider.address)).to.equal(RTM(10));
+    expect(await rtm.balanceOf(bystander.address)).to.equal(0n);
+  });
+
+  it('controllerTransfer 拒绝零金额，靶不被注销', async () => {
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+
+    await expect(stub.controllerSend(rtm.target, defender.address, outsider.address, 0))
+      .to.be.revertedWithCustomError(rtm, 'ZeroAmount');
+
+    expect(await rtm.isTarget(defender.address)).to.equal(true);
+    expect(await rtm.targetContest(defender.address)).to.equal(contestId);
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(100));
+    expect(await rtm.balanceOf(outsider.address)).to.equal(0n);
+  });
+
   it('注销后靶恢复普通钱包，可向任意第三方转账', async () => {
     await stub.mint(rtm.target, defender.address, RTM(100));
     await stub.registerTarget(rtm.target, defender.address, contestId);
@@ -252,6 +295,34 @@ describe('RTMToken 靶钱包转账策略', function () {
       .withArgs(defender.address, outsider.address, RTM(10));
     expect(await rtm.balanceOf(outsider.address)).to.equal(RTM(10));
     expect(await rtm.balanceOf(defender.address)).to.equal(RTM(90));
+    expect(await stub.breachCalls()).to.equal(0n);
+  });
+
+  it('unregister 非靶为幂等 no-op，不发 TargetUnregistered', async () => {
+    await expect(stub.unregisterTarget(rtm.target, outsider.address))
+      .to.not.emit(rtm, 'TargetUnregistered');
+    await expect(stub.unregisterTarget(rtm.target, outsider.address))
+      .to.not.emit(rtm, 'TargetUnregistered');
+
+    expect(await rtm.isTarget(outsider.address)).to.equal(false);
+    expect(await rtm.isControlledWallet(outsider.address)).to.equal(false);
+  });
+
+  it('注销后的受控钱包仍可被 controllerTransfer 划转', async () => {
+    await stub.mint(rtm.target, defender.address, RTM(100));
+    await stub.registerTarget(rtm.target, defender.address, contestId);
+    await stub.unregisterTarget(rtm.target, defender.address);
+    expect(await rtm.isTarget(defender.address)).to.equal(false);
+    expect(await rtm.isControlledWallet(defender.address)).to.equal(true);
+
+    const tx = await stub.controllerSend(rtm.target, defender.address, outsider.address, RTM(40));
+    await expect(tx)
+      .to.emit(rtm, 'Transfer')
+      .withArgs(defender.address, outsider.address, RTM(40));
+    await expect(tx).to.not.emit(rtm, 'TargetUnregistered');
+
+    expect(await rtm.balanceOf(outsider.address)).to.equal(RTM(40));
+    expect(await rtm.balanceOf(defender.address)).to.equal(RTM(60));
     expect(await stub.breachCalls()).to.equal(0n);
   });
 
