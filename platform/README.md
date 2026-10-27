@@ -1,10 +1,11 @@
-# redteam-platform（任务 10 骨架）
+# redteam-platform（任务 10 骨架 + 任务 11 BYOK）
 
-REDTEAM 平台后端的配置、加密托管与链绑定骨架。本阶段只包含：
+REDTEAM 平台后端的配置、加密托管、链绑定与 BYOK 模型客户端。本阶段包含：
 
 - `redteam_platform.config`：从环境变量与 `contracts/deploy/addresses.json` 读取并校验配置；
 - `redteam_platform.custody`：AES-256-GCM + scrypt 的本地加密 vault（W 私钥、守方 BYOK Key）；
-- `redteam_platform.chain`：加载五合约 ABI / 校验地址与 chainId 的只读 web3.py 绑定。
+- `redteam_platform.chain`：加载五合约 ABI / 校验地址与 chainId 的只读 web3.py 绑定；
+- `redteam_platform.byok`：守方自带 Key 的白名单模型客户端（provider/base_url/model 由平台固定，调用方只传 api_key）。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -40,7 +41,7 @@ pip install -e ".[dev]"
 | `CHAIN_TIMEOUT` | `15` | RPC 超时秒数 |
 | `OPERATOR_KEY_ENTRY` | `operator` | keystore **条目名**，不是密钥 |
 | `FAUCET_SIGNER_ENTRY` | `faucet-signer` | keystore **条目名**，不是密钥 |
-| `MODEL_ALLOWLIST_JSON` | `{}` | JSON object；任务 11 再填供应商 |
+| `MODEL_ALLOWLIST_JSON` | `{}` | 模型白名单 JSON object；构造 `ByokClient` 时读取（见下） |
 
 生成主密钥（只在本机保存，例如密码管理器/密钥管理系统）：
 
@@ -82,6 +83,48 @@ arena = client.contracts["Arena"]
 custody = Custody(settings.vault_path)   # 从 PLATFORM_MASTER_KEY 读取主密钥
 ```
 
+## BYOK 模型客户端
+
+`ByokClient(provider, api_key)` 只接受 provider 与 API key；`base_url` 与 `model`
+必须来自 `MODEL_ALLOWLIST_JSON`，构造器不接受覆盖。allowlist 在**构造时**读取，
+因此不存在 import 时缓存；API key 由调用方从 Custody 取出，只保留在实例内，
+不写入 URL/请求体/磁盘，也不会出现在 repr 或错误消息中。
+
+```bash
+export MODEL_ALLOWLIST_JSON='{
+  "glm": {"base_url": "https://glm.example.com/v1", "model": "glm-5.3"},
+  "qwen-local": {"base_url": "http://127.0.0.1:18081/v1", "model": "Qwen/Qwen3-4B-Instruct-2507"}
+}'
+```
+
+校验规则：`provider`、`base_url`、`model` 非空；`base_url` 仅接受 http(s)，
+非 loopback 的 http 拒绝；loopback（`localhost`、`127.0.0.0/8`、`::1`）可用
+http；允许 path（如 `/v1`），拒绝 userinfo、query 与 fragment。`base_url` 尾斜杠
+会被移除。客户端固定 POST `{base_url}/chat/completions`，请求体含
+`model/messages/tools/parallel_tool_calls=false/temperature=0/max_tokens`。
+
+错误分两类：HTTP 401/402/403/429/5xx 与 transport/timeout/connection 为
+`ModelError.kind == "infrastructure"`；其余 4xx、坏 JSON/schema、空 choices、
+响应模型不匹配、响应超过 2 MB 为 `"agent_protocol"`。具体异常均为
+`ModelUnavailable(ModelError)`；客户端不重试，重试/弃权由 runner 处理。
+
+```python
+from redteam_platform.byok import ByokClient, ModelError
+from redteam_platform.custody import Custody
+
+custody = Custody(settings.vault_path)
+api_key = custody.load("defender-byok:<entry>")   # 条目名由调用方决定
+client = ByokClient("glm", api_key)
+try:
+    result = client.complete(messages, tools, max_tokens=1200, timeout=60)
+    message, usage = result["message"], result["usage"]
+except ModelError as exc:
+    if exc.kind == "infrastructure":
+        pass  # 守方基础设施故障：上层按弃权/罚没策略处理
+    else:
+        pass  # 模型输出/协议错误：不等于基础设施故障
+```
+
 ## 测试
 
 ```bash
@@ -91,7 +134,9 @@ cd platform
 ```
 
 测试不联网：chain 的 `verify_chain` 用假 provider 注入；custody 使用临时目录和
-较低的 scrypt 参数（`scrypt_n=2**14`，仅测试；生产默认 `2**15`）。
+较低的 scrypt 参数（`scrypt_n=2**14`，仅测试；生产默认 `2**15`）；BYOK 测试拦截
+`urllib.request.urlopen` 并注入假响应，覆盖 allowlist/URL 校验、请求体、错误分类、
+不重试与密钥泄漏断言。当前全套 **164 passed**（config/custody/chain 64 + BYOK 100）。
 
 ## 安全约定
 

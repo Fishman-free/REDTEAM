@@ -1810,6 +1810,15 @@ git commit -m "feat(platform): backend skeleton with AES-GCM custody and chain b
 
 ## 任务 11：BYOK 模型客户端
 
+> **任务 11 实现修订（2026-10-28）：allowlist 构造时加载，不用模块级全局。**
+>
+> - 上方草稿的模块级 `MODEL_ALLOWLIST` + import 时读 env 已废弃（测试会失败）。`load_allowlist(env=None)` 每次调用解析 `MODEL_ALLOWLIST_JSON`（缺省 `{}`）；`ByokClient(provider, api_key, *, allowlist=None, timeout=60.0)` 在**构造时**加载/校验 allowlist，模块内没有缓存全局，也不在 import 时读 env。
+> - `base_url`/`model` 只来自 allowlist，构造器不接受这两个参数；`base_url` 去尾斜杠、model 固定。校验 provider/base_url/model 非空；`base_url` 仅 http(s)，非 loopback 必须 https（loopback 可 http）；允许 path（如 `/v1`），拒绝 userinfo、query、fragment。不读取 API key，返回独立复制。
+> - 异常：`AllowlistError(ValueError)`；`ModelError(RuntimeError)` 带 `kind`/`usage`；`ModelUnavailable(ModelError)` 为具体异常，`complete()` 失败统一抛 `ModelUnavailable`。
+> - 错误分类：401/402/403/429/5xx、transport/timeout/connection -> `infrastructure`；其他 4xx、坏 JSON/schema/空 choices、响应模型不匹配、响应超过 2,000,000 bytes -> `agent_protocol`。错误文本只用 `http <code>` / `transport <Type>` / `model mismatch` 等，不含 api_key 或完整 base_url；不重试。
+> - 测试：`platform/tests/test_byok.py` **100 passed**（拦截 `urllib.request.urlopen`，不联网）；全套 `cd platform && .venv/Scripts/python -m pytest tests -q` **164 passed**（任务 10 的 64 + 本任务 100）。
+> - 提交：`4fbe68e feat(platform): BYOK allowlisted model client with fault classification`（未 push）。
+
 **文件：**
 - 创建：`platform/redteam_platform/byok.py`
 - 测试：`platform/tests/test_byok.py`
