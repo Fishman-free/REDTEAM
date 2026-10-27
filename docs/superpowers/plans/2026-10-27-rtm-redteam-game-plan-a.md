@@ -1359,6 +1359,27 @@ git add contracts/src/Faucet.sol contracts/src/DataMarket.sol contracts/test/fau
 git commit -m "feat(contracts): faucet with EIP-712 tickets and data market with 70/30 split"
 ```
 
+### 实现修订（2026-10-27，最终契约，禁止照抄上方草稿）
+
+上方任务 7 的 Faucet/DataMarket 代码块为早期草稿，存在以下已知缺陷；实际实现已按 §4.3/§4.4 与本节落地：
+
+**Faucet**
+- 草稿把 `msg.sender != ticket.to` 归入 `NonceUsed`；最终拆为独立错误 `NotTicketHolder`，并在校验首位。
+- 校验顺序固定：持有人 → 过期（deadline 当秒仍有效）→ nonce 严格递增（0 默认无效）→ OZ `ECDSA.recover == ticketSigner` → 24h 冷却 `Cooldown(remaining)`；CEI 后转账并发 `Claimed`。
+- 构造参数校验：rtm/ticketSigner 零地址 → `ZeroAddress`，`dripAmount == 0` → `BadParams`。
+- 不提供 owner 提款函数；Faucet 由 `Arena.mintForTest` 预充（仅 testnet）。
+
+**DataMarket**
+- 草稿引用不存在的 `Arena.publish`、把 Arena 当发布权限来源。最终不改 Arena；DataMarket 自带 `operator`（owner 可轮换），仅 operator 可 `publish`，要求比赛 `state == 2`（Ended）、root 非零、一次性。
+- 草稿允许买家传入 `stake`（可伪造价格）。最终 `buyOwn` 从 `arena.contestInfo` 读取 S/defender，价格为 `S × dataPriceBps / 10000`；`buyFromAttacker` 价格为全局 `attackerDataPrice`。
+- 草稿的 `saleApproved` 未绑定买家、且不校验注册攻方。最终授权键为 `(contestId, attacker, buyer)`，攻方必须是该场注册攻方。
+- `buyOwn`/`buyFromAttacker` 均仅限 defender、拒绝 mining 比赛、每人每份数据一次性。
+- `DataSold` 字段顺序固定为 `(buyer, seller, contestId, amount, platformCut)`（草稿 contestId 在前，错误）。
+- 常量按规格命名 `platformShareBps = 7000`；`dataPriceBps = 1000`、`attackerDataPrice = 1 ether` 为全局 owner 可调参数；本轮不做按场价格覆盖、EIP-712 代提交或退款。
+- 分账：平台 70% → Treasury，提供方 30%；`buyOwn` 中 30% 退回 defender（净付 70%），事件按实际金额记录；先置已购标记再 `_split`，合约不托管资金。
+
+（实现结果：新增 15 个测试；`cd contracts && npm test` 全量 320 passing。）
+
 ---
 
 ## 任务 8：Besu 测试链基建

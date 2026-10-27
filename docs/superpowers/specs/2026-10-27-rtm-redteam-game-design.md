@@ -221,18 +221,24 @@ paidFee[contestId][attacker][msgHash]
 
 ### 4.3 Faucet.sol（测试网）
 
-- `claim(ticket, sig)`：EIP-712 票据（域分隔含 chainId），per-address nonce + 24h 冷却；后端签发（captcha/OAuth 防女巫）。发 X tRTM + 平台代付 gas（测试网原生币由平台预充给 Faucet）。
-- 模板沿用 `ContributionFlower.sol` 的 EIP-712+nonce+deadline 结构。
+- `contract Faucet is Ownable, EIP712`，EIP-712 域为 `("RTM Faucet", "1")`，域分隔含 chainId 与 verifyingContract（OZ 自动处理）。
+- `Ticket { address to; uint256 nonce; uint64 deadline; }`，`TICKET_TYPEHASH = keccak256("Ticket(address to,uint256 nonce,uint64 deadline)")`。
+- `IERC20 immutable rtm`、`address immutable ticketSigner`、`uint256 immutable dripAmount`、`COOLDOWN = 24 hours`；`nonces[to]` 记录已用最大 nonce，`lastClaim[to]` 记录上次领取时间。
+- `claim(ticket, sig)` 校验顺序：`msg.sender == ticket.to`（否则 `NotTicketHolder`）→ `block.timestamp <= ticket.deadline`（deadline 当秒仍有效，否则 `Expired`）→ `ticket.nonce > nonces[to]`（严格递增；0 默认无效，否则 `NonceUsed`）→ EIP-712 digest 经 OZ `ECDSA.recover` 必须等于 `ticketSigner`（否则 `InvalidSigner`）→ 距上次领取满 24h（否则 `Cooldown(remaining)`）。
+- CEI：先写 `nonces[to]`/`lastClaim[to]`，再 `rtm.safeTransfer(to, dripAmount)`，最后发 `Claimed(to, nonce, amount)`。
+- 构造参数校验：rtm/ticketSigner 零地址 revert `ZeroAddress`，`dripAmount == 0` revert `BadParams`；不提供 owner 提款函数，不使用 `tx.origin` 或原始 `ecrecover`。
+- Faucet 的 tRTM 由 `Arena.mintForTest` 预充（仅 testnet 部署；主网无此路径）；后端用 ticketSigner 私钥按 captcha/OAuth 结果签票据。平台代付 gas 依赖测试网零 gas/平台预充原生币，不在合约内实现。
 
 ### 4.4 DataMarket.sol（新）
 
-- `publish(contestId, root)`（runner 操作员）：登记数据集根哈希。
-- `approveSale(contestId, buyer)`：攻方对"出售自己的进攻数据给某买家"的链上签名同意（也可由后端以攻方 EIP-712 签名代提交）。
-- `buy(contestId)`：
-  - **守方买自己被攻破的数据**：无需卖家同意（链上校验 defender == msg.sender），付 `dataPriceBps×S`。
-  - **守方买某攻方的进攻数据**：需该攻方 `approveSale` 在先；价格为合约参数 `attackerDataPrice`（可按场设定）。
-- 成交资金拆分：**70% → Treasury（平台抽成）**，30% → 数据提供方（被购数据的攻方，或同意出售的守方地址）。`platformShareBps = 7000` 为常量参数。
-- `DataSold(buyer, seller, contestId, amount, platformCut)` 事件驱动后端交付；买家按 Merkle 根校验数据完整性。
+- `contract DataMarket is Ownable`；`operator` 由 owner 通过 `setOperator` 轮换，仅 operator 可 `publish`。**Arena 不提供 publish，也不为本模块改动 Arena。**
+- `publish(contestId, root)`（onlyOperator）：root 非零（`ZeroRoot`）；`arena.contestInfo(contestId).state == 2`（Ended，否则 `NotEnded`）；每场仅一次（`AlreadyPublished`）；写入 `datasetRoot` 并发 `DatasetPublished`。
+- `approveSale(contestId, buyer)`：买家非零（`ZeroAddress`）；调用者必须是该场已注册攻方（`arena.isRegisteredAttacker`，否则 `NotAttacker`）；授权精确绑定 `(contestId, attacker, buyer)`，不是全场通用同意；发 `SaleApproved`。
+- `buyOwn(contestId)`：仅已发布数据集（`NotPublished`）；仅 `msg.sender == info.defender`（`NotDefender`）且非 mining（`NotNormalContest`）；每地址一次（`AlreadyBought`）。价格 = `info.stake × dataPriceBps / 10000`（S 从 Arena 读取，买家不能传 stake）；seller = buyer = defender，70% → Treasury，30% 退回 defender（净付 70%，事件按实际金额记录）。
+- `buyFromAttacker(contestId, attacker)`：同样仅 defender、非 mining；`attacker` 必须是该场注册攻方（`NotAttacker`）；需 `saleApproved[contestId][attacker][msg.sender]`（`NotApproved`）；每个 `(contest, attacker, buyer)` 一次（`AlreadyBought`）。价格 = 全局 `attackerDataPrice`。
+- 分账：`platformShareBps = 7000` 固定；`_split` 从买家直转 Treasury 70%、数据提供方 30%，合约不托管资金；先置已购标记再分账（CEI）；零金额分支跳过转账。`DataSold(buyer, seller, contestId, amount, platformCut)` 字段顺序固定，驱动后端交付。
+- 全局参数：`dataPriceBps = 1000`（10%）、`attackerDataPrice = 1 ether`，owner 可调；`setDataPriceBps > 10000` 或 `setAttackerDataPrice == 0` revert `BadParams`。本轮不做按场价格覆盖、EIP-712 代提交或退款。
+- 错误：`NotPublished/NotDefender/NotApproved/AlreadyBought/NotOperator/ZeroAddress/ZeroRoot/AlreadyPublished/NotEnded/NotAttacker/NotNormalContest/BadParams`。
 
 ### 4.5 Treasury.sol（新）
 
@@ -256,6 +262,8 @@ paidFee[contestId][attacker][msgHash]
 8. 挖矿：accrue 线性、重复 accrue 幂等、暂停冻结、手续费基数=加入时 W 余额、并发挖矿赛上限 K；`testnet=false` 时 `mintForTest` revert。
 9. 注册与结算边界：`createContest` 非 operator revert；wallet 不能是 minter/已注册靶；重复注册 revert；`controllerTransfer` 只能划受控钱包；零金额/零地址拒绝；`unregisterTarget` 非靶幂等。
 10. 记账与冻结：`endedAt` 后时间旅行不再增加罚款；到期未拉取罚款仍可由 defender 收取；弃权豁免未拉取罚款；`penaltyTaken`/`stakeWithdrawn` 双账本不重复提款；`refundUnserved` 只按 `paidFee` 精确退且幂等。
+11. Faucet：正常领取事件与余额；同票重放（`NonceUsed`）；nonce=0；过期（deadline 当秒有效）；立即二次领取（`Cooldown`）；`time.increase(24h)` 后新 nonce 可领；错误签名者（`InvalidSigner`）；ticket.to 与调用者不一致（`NotTicketHolder`）；构造参数零地址/零 drip；EIP-712 域含 chainId/verifyingContract。
+12. DataMarket：`platformShareBps == 7000`；publish 非 operator/未结束/零 root/重复发布；buyOwn 价格=10%×S、Treasury 70%、defender 净付 70%、重复 `AlreadyBought`；approveSale 按买家绑定（授权他人不可用）、非注册攻方 `NotAttacker`、buyer=0；buyFromAttacker 价格 `attackerDataPrice`、70/30、重复；非 defender 两条购买路径均 `NotDefender`；setOperator 权限轮换与零地址；价格参数越界与更新后生效。
 
 ---
 
