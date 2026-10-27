@@ -1572,6 +1572,23 @@ git add contracts/deploy/
 git commit -m "feat(contracts): testnet deployment script with address registry"
 ```
 
+### 实现修订（2026-10-27）
+
+任务 9 已按实际合约与节点落地（`contracts/deploy/deploy-testnet.js`、`contracts/deploy/README.md`、`contracts/deploy/addresses.json`）。计划草稿的以下缺陷已修正，实现以实际文件为准：
+
+1. **Arena 构造器**：实际签名为 `(address initialOwner, address treasury, bool testnet)`；草稿漏了第三个参数。测试网必须传 `testnet=true`，否则 `mintForTest` 不可用。
+2. **注水方法**：草稿的 `arena.mintFor(...)` 不存在；实际为 `mintForTest(to, amount)`（仅 `testnet=true`）。
+3. **DataMarket operator**：草稿漏了 `market.setOperator(operator)`；不加则 `publish` 永远 revert `NotOperator`。
+4. **Treasury allowance**：草稿漏了 `treasury.approveSpender(rtm, arena, treasuryAllowance)`；`refundUnserved` 需要从 Treasury 划转手续费。
+5. **chainId 守卫**：部署前 `await provider.getNetwork()` 必须为 `48850`（`0xbed2`），否则直接抛错，防止把 RPC 误指向本机 Anvil 8545。网络名使用 `besu-testnet`。
+6. **等待部署/交易**：每个 `deploy()` 后 `waitForDeployment()`；`initialize`/`setOperator`/`mintForTest`/`approveSpender`/`transferOwnership` 等每笔 tx 都 `wait()` 并检查 receipt 状态。
+7. **owner 顺序**：草稿把 Treasury/Arena/RTM/Faucet/DataMarket 直接部署给 `platform`；实际先全部 owner=deployer 完成 wiring，再按需（`PLATFORM_ADDRESS` 非零且 != deployer）逐个 `transferOwnership(platform)` 并等待。默认 platform=deployer，不转移。
+8. **环境变量**：`PLATFORM_ADDRESS`、`OPERATOR_ADDRESS`、`FAUCET_SIGNER_ADDRESS` 默认 deployer；`FAUCET_DRIP_RTM` 默认 200、`FAUCET_FUND_RTM` 默认 1000000、`TREASURY_ALLOWANCE_RTM` 默认 1000000；地址用 `getAddress` 校验且拒绝零地址，金额 `parseEther` 且拒绝 0。
+9. **地址登记**：写脚本同目录 `addresses.json`（`__dirname`），字段为 network、chainId、rpc、deployer、platform、operator、ticketSigner、treasury、arena、rtm、faucet、dataMarket、faucetDrip、faucetFunding、treasuryAllowance、deployedAt；不含私钥。写文件前断言 minter/arena/rtm/testnet/operator/signer/drip/五个 owner/余额/totalSupply/allowance/`activeMiningCount()==0`，失败退出码 1。
+10. **重部署保护**：`addresses.json` 已存在时部署前报错，除非 `DEPLOY_ALLOW_REDEPLOY=1`（旧地址会被覆盖）。
+11. **本机环境**：8545 被其他项目占用，部署用 `BESU_TESTNET_RPC=http://127.0.0.1:8546`；`keydir/key` 自带 `0x` 前缀，Hardhat 也接受无前缀私钥，命令用 `tr -d '\r\n'` 注入且不打印、不落盘。
+12. **实测（2026-10-27）**：chainId 48850；五合约地址 Treasury `0x4B6648955b5938F9BE2bc35d3dD9300a4062f611`、Arena `0x3a8df899d27801D0b37db9dF8A29Aa27B6610111`、RTM `0xF08F681A58aB71E9FaC4B9E55DE4b29e309C46d7`、Faucet `0x042Bc6dfbc08ECe0Db7901b1d2D65a1F9ede35b3`、DataMarket `0x9446F32556dE6E053F6E22205d7300f0ED1d28Fb`；脚本全部 assert 通过，独立 `eth_getCode`/`eth_call` 复核通过；`npx hardhat compile` 成功，`npm test` 322 passing。
+
 ---
 
 ## 任务 10：平台后端骨架（config/custody/chain）

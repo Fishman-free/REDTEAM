@@ -278,6 +278,9 @@ paidFee[contestId][attacker][msgHash]
 - 网络暴露：compose 只绑定 `127.0.0.1`（默认 RPC 8545、P2P 30303，host 端口可用 `BESU_RPC_PORT`/`BESU_P2P_PORT` 覆盖）；公网 RPC 必须前置 Nginx `limit_req` 等限流网关，且不要暴露 `DEBUG`/`QBFT` 管理 API。
 - 主网：4 验证者（初期全平台控制，路线图引入外部验证者），沿用零 gas 参数、local-only 绑定与限流要求。
 - `contracts/hardhat.config.js` 已有 `hardhat` 与 `besu-testnet` 网络：`BESU_TESTNET_RPC`、`BESU_TESTNET_KEY`、`chainId:48850`、`gasPrice:0`、`gas:0x1ffffffffffffe`（Hardhat 配置校验只接受数值或 `"auto"`，必须写数值字面量而非带引号字符串）、`timeout:120000`。仍计划 `besu-mainnet` 与两个本地 hardhat fork 网络（桥测试用）。
+- 测试网部署：`contracts/deploy/deploy-testnet.js` 在部署前做 chainId 守卫（`provider.getNetwork().chainId` 必须为 `48850`，防止误连本机 Anvil 8545），随后按序部署 Treasury、Arena（构造器 `(initialOwner, treasury, testnet=true)`）、RTMToken（minter=arena）、Faucet、DataMarket，并完成 wiring：`arena.initialize(rtm)`、`arena.setOperator(operator)`、`market.setOperator(operator)`、`arena.mintForTest(faucet, faucetFunding)`（仅 testnet）、`treasury.approveSpender(rtm, arena, treasuryAllowance)`（`refundUnserved` 所需）。每个 `deploy()` 后 `waitForDeployment()`，每笔 tx `wait()`。`PLATFORM_ADDRESS` 默认 deployer；若非零且不同于 deployer，wiring 后把五个 Ownable 的 ownership 转给 platform。owner 在 wiring 期间始终是 deployer，避免提前转移导致无法配置。
+- 部署脚本写 `contracts/deploy/addresses.json`（network/chainId/rpc/deployer/platform/operator/ticketSigner/五合约地址/faucetDrip/faucetFunding/treasuryAllowance/deployedAt，绝不含私钥），写文件前断言：`rtm.minter()==arena`、`rtm.arena()==arena`、`arena.rtm()==rtm`、`arena.testnet()==true`、Arena/DataMarket operator、Faucet signer/drip、五个 owner、Faucet 预充余额与 totalSupply、Treasury allowance、`activeMiningCount()==0`；任一失败退出码 1。`addresses.json` 已存在时默认拒绝重部署，需 `DEPLOY_ALLOW_REDEPLOY=1` 显式覆盖。部署参数（地址/金额）全部有默认值，地址经 `getAddress` 校验、金额经 `parseEther` 且拒绝 0。
+- 本机 runbook 与命令见 `contracts/deploy/README.md`；因 8545 被其他项目占用，本机用 `BESU_TESTNET_RPC=http://127.0.0.1:8546`，私钥经 `BESU_TESTNET_KEY` 从 gitignored 的 `keydir/key` 注入且不打印。当前测试网部署地址以 `contracts/deploy/addresses.json` 为准。
 
 ---
 
