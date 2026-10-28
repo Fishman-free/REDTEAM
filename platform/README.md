@@ -1,4 +1,4 @@
-# redteam-platform（任务 10 骨架 + 任务 11 BYOK + 任务 12 runner + 任务 13 indexer）
+# redteam-platform（任务 10–14：骨架 / BYOK / runner / indexer / 数据服务）
 
 REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端与智能体 runner。本阶段包含：
 
@@ -10,7 +10,10 @@ REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端�
 - `redteam_platform.runner`：每赛一个智能体会话，攻方隔离线程、资格测试、预算与停服；
 - `redteam_platform.agent_tools`：固定工具面 `get_balance` / `transfer_rtm`，W 私钥真实签名；
 - `redteam_platform.transcripts`：按 join 时 `dataConsent` 决定是否落盘；
-- `redteam_platform.indexer`：链事件 → SQLite → 攻方/守方/矿工/挖矿榜（含烟测排除与 runner 停服回调）。
+- `redteam_platform.indexer`：链事件 → SQLite → 攻方/守方/矿工/挖矿榜（含烟测排除与 runner 停服回调）；
+- `redteam_platform.faucet_signer`：Faucet EIP-712 票据签发（audited key、nonce、captcha）；
+- `redteam_platform.data_service`：consent-aware 数据集 bundle / operator publish / 切片交付；
+- `redteam_platform.rsi_export`：挖矿攻破 → RSI findings（仅 `rsi_only` 数据，不进 DataMarket）。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -296,6 +299,103 @@ with EventIndexer(
 `data_consent(id, addr)` 供任务 14 数据服务使用。金额一律为十进制 wei 字符串，
 避免 JS 精度与 SQLite 64 位整数溢出。
 
+## Faucet 票据（任务 14）
+
+`faucet_signer.FaucetSigner` 签 `Faucet.sol` 的 EIP-712 票据：
+
+- 域：`name="RTM Faucet"`、`version="1"`、`chainId`、`verifyingContract=faucet`；
+  类型：`Ticket(address to,uint256 nonce,uint64 deadline)`；`TICKET_TYPEHASH` 与合约一致。
+- `to`、`nonce`、`deadline` 绑定；nonce 取 `max(链上 nonces(to), 本进程已签发)+1`，
+  也可显式传入（必须更大）；deadline 默认 `now + ticket_ttl`，限制在 `max_ttl` 内。
+- 每次签名都通过 `AuditedCustody.load(signer_entry)` 取 key，context 为
+  `{purpose:"faucet_ticket", recipient, chain_id, ticket_count:"1"}`；key 不缓存在
+  实例、不写日志、错误/repr 不含 key。
+- `captcha_required=True` 时构造器必须拿到 `captcha_verifier`，否则拒绝启动；
+  每次 `sign` 必须提供 verifier 接受的 token。开发模式显式传 `False`。
+- 可选 `expected_signer` 校验 key 派生地址与部署的 `ticketSigner` 一致。
+
+```python
+from eth_account import Account
+from redteam_platform.faucet_signer import FaucetSigner
+
+signer = FaucetSigner(
+    custody=audited,
+    signer_entry="faucet-signer",
+    faucet_address=addresses["faucet"],
+    chain_id=addresses["chainId"],
+    nonce_lookup=lambda to: chain.contracts["Faucet"].functions.nonces(to).call(),
+    captcha_required=True,
+    captcha_verifier=verify_hcaptcha,   # sync callable(token)->bool
+    expected_signer=addresses["ticketSigner"],
+)
+ticket = signer.sign(user_address, captcha_token=token)
+# 前端把 ticket.to/nonce/deadline/signature 交给 Faucet.claim
+```
+
+**边界**：`_last_issued` 只在进程内；重启或多进程签发可能重复给出同一个未领取
+nonce（合约仍禁止二次领取，但后一张票据作废）。任务 15/运维需单进程签发或加
+持久化 nonce 存储。本次测试用 `recover_message` 验证签名与合约 EIP-712 摘要一致，
+并用 ABI 断言 tuple 字段；未部署 Faucet 到 eth-tester（依赖未安装），真链 claim
+留给任务 17 e2e。
+
+## 数据服务（任务 14）
+
+`data_service.DataService`：
+
+- `bundle(contest_id)` 只打包**普通赛**且 `dataConsent=true` 的攻方 transcript +
+  守方自有文件（`defender/contest.json`、可选 `defender/session.json`）。即使磁盘
+  上存在 opt-out 或 `rsi_only` 文件，也会按 indexer 同意与记录字段过滤；矿工数据
+  永不进入 bundle。未结束/挖矿/被排除（烟测）比赛直接拒绝。
+- 根 = 排序文件 `sha256` 拼接后再 `sha256`（规格允许的简化）；`manifest.json`
+  列出每个文件的路径/哈希/大小与排除统计（只含地址，不含内容），manifest 本身
+  不进入根。买家可用 manifest 的叶子重算根并与链上 `datasetRoot` 比对。
+- `publish(contest_id)` 只对已结束普通赛，先查链上根未发布，再由
+  `ChainDataMarketWriter` 用 operator key 调 `DataMarket.publish`。operator key
+  每次经 `AuditedCustody` 读取，context `{purpose:"data_publish", contest_id}`，
+  不缓存、不记录 secret。
+- `deliver_own(contest_id, buyer)` / `deliver_attacker(contest_id, buyer, attacker)`：
+  只允许该场 defender；分别交付守方文件或该攻方 transcript 的 ZIP 切片，附完整
+  manifest；返回一次性 `Delivery`（token、zip 路径、root、过期时间）。token 只在
+  进程内保存，默认 600s；任务 15 负责鉴权、按 `DataSold` 事件调用与下载服务。
+- 交付前会核对 bundle 根与链上已发布根一致；数据在发布后变化则拒绝交付。
+
+```python
+from redteam_platform.data_service import ChainDataMarketWriter, DataService
+
+writer = ChainDataMarketWriter(
+    chain.w3, chain.contracts["DataMarket"], audited,
+    settings.operator_key_entry, settings.chain_id,
+)
+service = DataService(
+    indexer, Path("data/transcripts"), Path("data/bundles"), writer=writer,
+)
+result = service.publish(contest_id)
+own = service.deliver_own(contest_id, defender)
+attacker = service.deliver_attacker(contest_id, defender, attacker_address)
+```
+
+**边界**：bundle 与交付 token 缓存在进程内；重启后重建 bundle 必须与链上根一致。
+简化根不含 Merkle 证明，切片靠完整 manifest 校验；task 15 不要向未购买者返回
+manifest 之外的他人内容。ZIP 通过 `Deliverable.token` 由 API 鉴权后提供，不要
+把 token 写入日志。
+
+## RSI 导出（任务 14）
+
+`rsi_export.RsiExporter.export_breach(contest_id)` 只读挖矿赛
+`purpose=rsi` / `rsi_only=true` 的矿工 transcript 与 session snapshot，输出：
+
+- `case_id`/`contest_id`、`attacker`、`attack_goal`；
+- `turns`：每轮 miner message、agent reply、tool_calls、error；
+- `evaluation`：`outcome=breach`、`breach_classes`（含 `wrong_recipient`，
+  有成功转账再加 `successful_transfer`）、observed transfers、固定奖励、忽略记录数；
+- `snapshot`：session、扁平 messages、turns、链上 contest/breach。
+
+只允许已 settled 的挖矿赛；普通赛、未结算、缺 snapshot/transcript、非 RSI 记录、
+重复 turn 一律拒绝。导出文件写到调用方指定的输出目录（建议
+`platform/data/rsi/<cid>.json`，gitignored），**不得上传 DataMarket**；其中包含
+矿工消息与智能体回复，按敏感 RSI 数据处理。导出后由人工/离线修复流程进入
+campaign_repair，本模块不自动触发修复。
+
 ## 测试
 
 ```bash
@@ -310,14 +410,18 @@ cd platform
 用脚本化模型、假钱包工具与假链，覆盖资格测试、线程隔离、预算、数据同意、
 停服、弃权分流和 ABI 形状断言；indexer 用合成事件覆盖普通/挖矿/退役/到期/
 弃权/罚款/同意、烟测排除、部署注水排除、幂等重放、停服回调、链事件源与 ABI
-形状断言。当前全套 **320 passed**（config 30 / custody 16 / chain 18 / BYOK 138 /
-runner 相关 96 / indexer 22）。
+形状断言；task 14 覆盖 EIP-712 票据恢复/captcha/nonce、consent-aware bundle/
+publish/切片交付/下载 token/篡改检测、RSI 导出过滤与 schema、operator key 审计。
+当前全套 **348 passed**（config 30 / custody 16 / chain 18 / BYOK 138 / runner 相关
+96 / indexer 22 / faucet 10 / data 11 / rsi 7）。
 
 ## 安全约定
 
 - 不提交 vault、`.venv`、私钥或任何真实 API Key。
-- 不提交 `platform/data/`（transcript、custody 审计日志、后续索引库）；攻方/矿工
-  数据不得进入仓库。
-- 错误信息与日志不得包含 secret；custody 与审计包装已按此实现。
-- 本阶段不实现密钥轮换/多主密钥，也不实现 FastAPI/uvicorn（任务 14）；
+- 不提交 `platform/data/`（transcript、bundle、RSI 导出、custody 审计日志、索引库）；
+  攻方/矿工数据不得进入仓库。
+- 错误信息与日志不得包含 secret；custody 与审计包装已按此实现。Faucet 票据与
+  下载 token 是能力凭证，不写日志；RSI 导出含矿工消息与智能体回复，不得上传
+  DataMarket。
+- 本阶段不实现密钥轮换/多主密钥，也不实现 FastAPI/uvicorn（任务 15）；
   custody 审计已由任务 12 的 `custody_audit` 落盘，v1 无审计查询接口。
