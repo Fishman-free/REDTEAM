@@ -1,6 +1,6 @@
 # 资料索引
 
-**当前产品说明优先阅读 [商业计划 Markdown](business/redteam-business-plan.md) 与 [REDTEAM Flower 协议](FLOWER_RECOGNITION.md)。** 企业安全服务是商业主线；Flower 是独立、可选、待审查的本地 NFT 原型，历史 RTM ERC-20 仍不属于商业路线。现存 PDF 未重新生成：商业 PDF 是 Flower 更新前快照，产品说明已由当前 Markdown 替代；论文 PDF/Markdown 保留历史研究，不作为当前结果。
+**当前产品说明优先阅读 [商业计划 Markdown](business/redteam-business-plan.md) 与 [REDTEAM Flower 协议](FLOWER_RECOGNITION.md)。** 企业安全服务是商业主线；Flower 是独立、可选、待审查的本地 NFT 原型；RTM 已重构为攻守竞技场与红队挖矿，在测试网运行，主网兑换属计划 B、受法律审查门控，不属于当前商业主线。现存 PDF 未重新生成：商业 PDF 是 Flower 更新前快照，产品说明已由当前 Markdown 替代；论文 PDF/Markdown 保留历史研究，不作为当前结果。
 
 当前 PayAssist 主线设计与判断在[研究方案](RESEARCH_PLAN.md)，运行从[PayAssist 指南](../rsi4safety/payment_agents/README.md)进入。2026-10-05 live.v3 验收通过仍有12开放发现，不是生产安全证书。
 
@@ -12,7 +12,10 @@
 | [历史商业 PDF](business/redteam-business-plan.pdf) | **未重新生成，本次 Flower 更新前旧快照；产品内容已由上方当前 Markdown 替代**，不能单独作为当前说明 |
 | [2026-10-05 live.v3 对照报告](../rsi4safety/payment_agents/evidence/VALIDATION10H_COMPARATIVE_2026-10-05.md) | 真实模型预算验证轮；L0/L1 分列，12开放发现、修复容量与有限验收边界披露 |
 | [区块链攻击悬赏与持续评估总构想](references/research/RSI攻击悬赏与持续评估机制_研究构想.md) | 原始研究目标，保留 |
-| [RTM 悬赏预算与合约设计](references/research/RTM_BOUNTY_DESIGN.md) | 独立历史研究/实现，不是 Flower，尚未接入当前 PayAssist，排除商业路线 |
+| [RTM 悬赏预算与合约设计](references/research/RTM_BOUNTY_DESIGN.md) | 旧减半/BountyVault 设计已归档；RTM 已重构为攻守博弈与红队挖矿，测试网运行中，主网兑换计划 B 受法律门控 |
+| [攻守博弈与红队挖矿规格](superpowers/specs/2026-10-27-rtm-redteam-game-design.md) | 2026-10-27 当前机制：普通层零和攻防、挖矿固定 1 RTM、RSI、数据同意 |
+| [实施计划](superpowers/plans/2026-10-27-rtm-redteam-game-plan-a.md)、[工作交接](superpowers/HANDOFF-2026-10-27.md) | 任务 0–19；R1–R4 合约/部署与任务 10–17 平台/dApp/e2e；当前测试网状态 |
+| [平台后端](../platform/README.md)、[dApp](../dapp/README.md)、[R4 地址登记](../contracts/deploy/addresses.json) | runner/indexer/Faucet/数据服务/FastAPI；7 页 dApp；当前唯一有效测试网地址 |
 | [外部攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md)、[旧 Arena 会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound（已归档）](../archieve/contracts-2026-10/BountyRound.sol) | 独立 HTTP/commit–reveal 原型；当前 PayAssist 无公共提交到链上判奖端到端接线 |
 | [证据与奖励协议 v1](EVIDENCE_REWARD_PROTOCOL.md)、[RTM 桥（已归档）](../archieve/contracts-2026-10/rtm-reward-bridge.js) | 旧 Arena claim 与本地 BountyVault 桥；不是当前 PayAssist 奖励实现 |
 | [历史研究论文 Markdown](paper/payment-agent-security-rsi.md)、[历史论文 PDF](paper/payment-agent-security-rsi.pdf) | 历史确定性研究稿；20%→100%受未见族分母缩小影响，逐点成功项始终2，不能证明跨族泛化；不含当前 live.v3 结果，PDF未更新 |

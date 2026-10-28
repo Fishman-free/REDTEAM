@@ -2405,6 +2405,12 @@ git add .github/workflows/tests.yml
 git commit -m "ci: add RTM game, platform backend and dApp build to workflows"
 ```
 
+> **任务 18 实施记录（2026-10-28）**：提交 `9c2b5a9 ci: add RTM game, platform backend and dApp build to workflows`。
+>
+> - `evm` job 在 `npm test` 后新增「New RTM game contract suite」，使用仓库实际文件名：`arena.test.js`、`arena-penalty.test.js`、`arena-fuzz.test.js`、`faucet.test.js`、`datamarket.test.js`、`rtm-game.test.js`（计划草稿中的 `rtm-game-penalty/fuzz` 不存在，禁止引用）；本地运行 **116 passing**。
+> - 新增 `platform` job：Python 3.12、`cd platform && pip install -e ".[dev]"`、`pytest tests -q --ignore=tests/e2e_testnet.py`；Node 22、`cd dapp && npm ci --no-audit --no-fund && npm run build`。本地平台 **387 passed**、dApp build 成功；YAML 解析通过。
+> - CI **不传** `--run-e2e`；e2e 文件默认不被 pytest 收集，`--ignore` 是显式保险。未改 contracts/platform/dApp 代码。
+
 ---
 
 ## 任务 19：静态站文字更新与文档收尾
@@ -2444,6 +2450,8 @@ python scripts/build_site.py   # 重新生成根 index.html
 git add docs/ index.html
 git commit -m "docs: align site copy and index with the red-team mining game"
 ```
+
+> **任务 19 实施记录（2026-10-28）**：更新 `docs/site/index.html` 的 HISTORICAL RTM 卡片、FAQ-08、services「首期明确不做」与 governance「虚拟资产」段：RTM 已重构为攻守竞技场/红队挖矿、测试网运行中；主网兑换属计划 B、受法律审查门控；旧减半/Bounty 归档；未引入任何脚本/fetch/相对链接。`docs/references/research/RTM_BOUNTY_DESIGN.md` 头注补充新机制与 platform/dApp 入口；`docs/INDEX.md` 更新 RTM 行并新增攻守规格/实施计划/工作交接/平台/dApp/R4 地址索引。`python scripts/build_site.py` 重新生成根 `index.html` 与 `_config.yml`（新增 platform/dapp/infra/benchmark/tools/pptx 排除）；`--check` 通过；`python -m unittest discover -s tests -p test_site_build.py -v` **18 tests OK**（测试未硬编码 RTM 在“不做”列表，无需改断言）。未做浏览器自动化；dApp 构建与任务 17 真实链 e2e 已覆盖主要流程。提交 `docs: align site copy and index with the red-team mining game`。
 
 ---
 

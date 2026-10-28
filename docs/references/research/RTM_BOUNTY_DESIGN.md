@@ -1,6 +1,6 @@
 # RTM 悬赏代币设计说明
 
-> **已归档（2026-10）**：本文描述的 RTM 减半与 BountyVault/BountyRound 体系已被 [2026-10-27 攻守博弈设计](../../superpowers/specs/2026-10-27-rtm-redteam-game-design.md) 取代；合约与测试位于 `archieve/contracts-2026-10/`。
+> **已归档（2026-10）**：本文描述的 RTM 减半与 BountyVault/BountyRound 体系已被 [2026-10-27 攻守博弈设计](../../superpowers/specs/2026-10-27-rtm-redteam-game-design.md) 取代；新机制已在测试网运行（[平台后端](../../../platform/README.md)、[dApp](../../../dapp/README.md)、R4 合约）。旧合约与测试位于 `archieve/contracts-2026-10/`。
 
 > 对应合约：`archieve/contracts-2026-10/RTMToken.sol`、`archieve/contracts-2026-10/BountyVault.sol`
 > 对应测试：`archieve/contracts-2026-10/rtm.test.js`
