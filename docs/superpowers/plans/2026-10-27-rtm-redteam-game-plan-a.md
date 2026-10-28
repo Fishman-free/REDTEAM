@@ -2362,6 +2362,13 @@ git add platform/tests/e2e_testnet.py contracts/test/e2e-full.test.js
 git commit -m "test(e2e): full testnet flow from faucet claim to breach settlement"
 ```
 
+> **任务 17 实施记录（2026-10-28）**：真实 Besu 测试网 e2e 通过；提交 `3d50fa7 fix(platform): handle web3 POA blocks and AttributeDict receipts`、`b2e14b0 test(e2e): full testnet flow from faucet claim to mining settlement`。新增 `platform/tests/e2e_testnet.py` + `conftest.py`（`--run-e2e`，默认不收集/skip）；未改 contracts、未重新部署；**未创建 `contracts/test/e2e-full.test.js`**（可选草稿，platform e2e 已覆盖真实链）。
+>
+> - e2e 发现并修复：web3 8 `AttributeDict` 不是 `dict`（三处回执检查改 `Mapping`）；Besu QBFT POA 128-byte extraData（`ChainClient` 注入 `ExtraDataToPOAMiddleware`）；挖矿 onBreach 120k gas 不足（`TRANSFER_GAS=400k`）。
+> - 流程：faucet ticket→claim ×4；守方注册/资格→S=50 建赛；A/B join（consent true/false）+ A/B 各 2 条非触发 + A `TRIGGER`→Breach；publish→buyOwn/buyFromAttacker→deliver/download（A 内容在、B/opt-out 不在；B `NotConsented`）；合成版本挖矿→0.005/条→攻破→扫尾+固定 1 RTM+补铸→supply+1；第二场合成版本 `retireMining`→不增发、W 退回、hash retired；`RsiExporter` 仅 `rsi_only`。
+> - 成功摘要：normal `0x60669b…5913`、mining `0x42a975…8c96`、retired `0x15cc10…e219`、retired hash `0x2887ca…7edb`、dataset root `0x436835…2d8d`、RSI sha256 `89b515…a1bc`；supply 1,000,004→1,000,005；Treasury 8.455→13.91 RTM；Faucet 997,600→996,800 RTM。测试网当前 supply 1,000,005 / Treasury 13.91 / Faucet 996,800 / deployer 0.999999999999999997 / activeMining 0。
+> - 测试网噪声：前三次失败尝试的 lost-key 账户/孤儿 live 普通赛/stranded RTM；v0_demo defenseHash 已 retired（失败清理），后续挖矿用新版本/每次随机后缀的合成版本。单测仍 387 passing；e2e 显式 1 passed；contracts 327；dapp build 成功。
+
 ---
 
 ## 任务 18：CI 更新
