@@ -1007,31 +1007,74 @@ class EventIndexer:
             "history": history,
         }
 
+    def _contest_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "defender": row["defender"],
+            "wallet": row["wallet"],
+            "stake": str(row["stake"]),
+            "end": str(row["end"]),
+            "is_mining": bool(row["is_mining"]),
+            "stake_bps": int(row["stake_bps"]),
+            "defense_hash": row["defense_hash"],
+            "start_ts": int(row["start_ts"]),
+            "ended_ts": None if row["ended_ts"] is None else int(row["ended_ts"]),
+            "state": row["state"],
+            "paid_count": int(row["paid_count"]),
+            "winner": row["winner"],
+            "breach_amount": str(row["breach_amount"]),
+            "reward": str(row["reward"]),
+            "settled": bool(row["settled"]),
+        }
+
     def contest(self, contest_id: str) -> dict[str, Any] | None:
         contest_id = normalize_contest_id(contest_id)
         with self._lock:
             row = self._db().execute(
-                "SELECT * FROM contests WHERE id = ?", (contest_id,)
+                "SELECT * FROM contests WHERE id = ? AND excluded = 0",
+                (contest_id,),
             ).fetchone()
+            return None if row is None else self._contest_dict(row)
+
+    def contests(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise IndexerError("limit must be an integer in 1..1000")
+        with self._lock:
+            rows = self._db().execute(
+                """
+                SELECT * FROM contests WHERE excluded = 0
+                ORDER BY start_ts DESC, id LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [self._contest_dict(row) for row in rows]
+
+    def event_by_tx(self, tx_hash: str, name: str | None = None) -> dict[str, Any] | None:
+        if not isinstance(tx_hash, str) or not re.fullmatch(
+            r"0x[0-9a-fA-F]{64}", tx_hash
+        ):
+            raise IndexerError("tx_hash must be a 0x-prefixed 32-byte hex string")
+        if name is not None:
+            _require_visible(name, "event name")
+        query = "SELECT * FROM events WHERE tx_hash = ?"
+        params: list[Any] = [tx_hash.lower()]
+        if name is not None:
+            query += " AND name = ?"
+            params.append(name)
+        query += " ORDER BY log_index LIMIT 1"
+        with self._lock:
+            row = self._db().execute(query, params).fetchone()
             if row is None:
                 return None
             return {
-                "id": row["id"],
-                "defender": row["defender"],
-                "wallet": row["wallet"],
-                "stake": str(row["stake"]),
-                "end": str(row["end"]),
-                "is_mining": bool(row["is_mining"]),
-                "stake_bps": int(row["stake_bps"]),
-                "defense_hash": row["defense_hash"],
-                "start_ts": int(row["start_ts"]),
-                "ended_ts": None if row["ended_ts"] is None else int(row["ended_ts"]),
-                "state": row["state"],
-                "paid_count": int(row["paid_count"]),
-                "winner": row["winner"],
-                "breach_amount": str(row["breach_amount"]),
-                "reward": str(row["reward"]),
-                "settled": bool(row["settled"]),
+                "block_number": int(row["block_number"]),
+                "log_index": int(row["log_index"]),
+                "tx_hash": row["tx_hash"],
+                "contract": row["contract"],
+                "name": row["name"],
+                "args": json.loads(row["args_json"]),
+                "block_timestamp": int(row["block_timestamp"]),
+                "excluded": bool(row["excluded"]),
             }
 
     def contest_attackers(self, contest_id: str) -> dict[str, dict[str, Any]]:

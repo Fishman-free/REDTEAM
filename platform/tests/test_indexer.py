@@ -182,6 +182,38 @@ def test_leaderboards_from_events(indexer):
     assert boards["defenders"][DEFENDER]["longest_survival"] == 50
 
 
+def test_contests_and_event_lookup(indexer):
+    created_tx = "0x" + "aa" * 32
+    attack_tx = "0x" + "bb" * 32
+    indexer.apply_event(
+        ev("ContestCreated", created_args(CONTESTS[0]), block=1, log=1, tx=created_tx)
+    )
+    indexer.apply_event(
+        ev("Joined", joined_args(CONTESTS[0]), block=1, log=2, tx="0x" + "cc" * 32)
+    )
+    indexer.apply_event(
+        ev("AttackPaid", attack_args(CONTESTS[0]), block=1, log=3, tx=attack_tx)
+    )
+
+    contests = indexer.contests()
+    assert [item["id"] for item in contests] == [CONTESTS[0]]
+    assert contests[0]["state"] == "live"
+    assert contests[0]["paid_count"] == 1
+
+    event = indexer.event_by_tx(attack_tx, "AttackPaid")
+    assert event["name"] == "AttackPaid"
+    assert event["args"]["attacker"] == ATTACKER
+    assert event["args"]["id"] == CONTESTS[0]
+    assert event["excluded"] is False
+    assert indexer.event_by_tx(attack_tx, "Joined") is None
+    assert indexer.event_by_tx("0x" + "00" * 32) is None
+
+    with pytest.raises(IndexerError):
+        indexer.event_by_tx("bad")
+    with pytest.raises(IndexerError):
+        indexer.contests(limit=0)
+
+
 def test_large_breach_rest_and_net_income_are_exact(indexer):
     chain = Chain(indexer)
     chain.emit("ContestCreated", created_args(CONTESTS[0]), ts=100)

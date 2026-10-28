@@ -1,4 +1,4 @@
-# redteam-platform（任务 10–14：骨架 / BYOK / runner / indexer / 数据服务）
+# redteam-platform（任务 10–15：骨架 / BYOK / runner / indexer / 数据服务 / FastAPI）
 
 REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端与智能体 runner。本阶段包含：
 
@@ -13,7 +13,9 @@ REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端�
 - `redteam_platform.indexer`：链事件 → SQLite → 攻方/守方/矿工/挖矿榜（含烟测排除与 runner 停服回调）；
 - `redteam_platform.faucet_signer`：Faucet EIP-712 票据签发（audited key、nonce、captcha）；
 - `redteam_platform.data_service`：consent-aware 数据集 bundle / operator publish / 切片交付；
-- `redteam_platform.rsi_export`：挖矿攻破 → RSI findings（仅 `rsi_only` 数据，不进 DataMarket）。
+- `redteam_platform.rsi_export`：挖矿攻破 → RSI findings（仅 `rsi_only` 数据，不进 DataMarket）；
+- `redteam_platform.chain_gateway`：API 使用的链读写（operator/owner/W 分权、审计 key）；
+- `redteam_platform.api`：FastAPI 入口（注册/资格/比赛/消息/榜单/Faucet/数据/挖矿/下载）。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -44,11 +46,17 @@ pip install -e ".[dev]"
 | `PLATFORM_ADDRESSES_PATH` | `contracts/deploy/addresses.json` | 地址登记文件 |
 | `PLATFORM_ARTIFACTS_DIR` | `contracts/artifacts` | Hardhat artifacts 根目录 |
 | `PLATFORM_VAULT` | `platform/vault.json` | vault 文件路径（gitignored） |
+| `PLATFORM_DATA_DIR` | `platform/data` | 运行时数据根（transcript/bundle/RSI/index/审计；gitignored） |
 | `CHAIN_RPC` | 地址文件 `rpc`，再回退 `http://127.0.0.1:8546` | 仅接受 http(s) |
 | `CHAIN_ID` | 地址文件 `chainId`（当前 `48850`） | 正整数，支持 `0x` 前缀 |
 | `CHAIN_TIMEOUT` | `15` | RPC 超时秒数 |
 | `OPERATOR_KEY_ENTRY` | `operator` | keystore **条目名**，不是密钥 |
 | `FAUCET_SIGNER_ENTRY` | `faucet-signer` | keystore **条目名**，不是密钥 |
+| `TREASURY_OWNER_KEY_ENTRY` | `treasury-owner` | Treasury owner EOA 的 keystore **条目名**（挖矿预打款） |
+| `PLATFORM_MODEL_KEY_ENTRY` | `platform-model` | 平台自挖矿智能体 BYOK key 的 keystore **条目名** |
+| `PLATFORM_MODEL_PROVIDER` | 无 | 平台自挖矿使用的 allowlist provider；缺失时 `/mining/contests` 返回 503 |
+| `PLATFORM_API_TOKEN` | 无（API 必需） | 24–256 个可见非空格 ASCII；bearer token；不进 repr/日志 |
+| `FAUCET_CAPTCHA_REQUIRED` | `false` | `true` 时必须给 `build_app(captcha_verifier=...)`，否则启动失败 |
 | `MODEL_ALLOWLIST_JSON` | `{}` | 模型白名单 JSON object；构造 `ByokClient` 时读取（见下） |
 
 生成主密钥（只在本机保存，例如密码管理器/密钥管理系统）：
@@ -396,6 +404,68 @@ manifest 之外的他人内容。ZIP 通过 `Deliverable.token` 由 API 鉴权�
 矿工消息与智能体回复，按敏感 RSI 数据处理。导出后由人工/离线修复流程进入
 campaign_repair，本模块不自动触发修复。
 
+## FastAPI 入口（任务 15）
+
+`api.create_app(service, token)` 接收一个 `PlatformService` 与 bearer token；
+`api.build_app(settings, captcha_verifier=...)` 负责装配真实
+ChainClient/Custody/EventIndexer/Web3ChainGateway/FaucetSigner/DataService/runner。
+`app_from_env()` 是 uvicorn factory：
+
+```bash
+cd platform
+PYTHONPATH="..;../rsi4safety/payment_agents" \
+  .venv/Scripts/python -m uvicorn redteam_platform.api:app_from_env \
+  --factory --host 127.0.0.1 --port 8080
+```
+
+**鉴权（v1）**：除 `/health` 外所有路由都要求
+`Authorization: Bearer $PLATFORM_API_TOKEN`；单一 token 只做“能否访问平台”的
+边界，不代表 defender/attacker 身份。角色隔离、按用户 token、限流留给 dApp/运维；
+defender/buyer/attacker 身份仍由链上事件与服务层校验。
+
+路由：
+
+| 路由 | 说明 |
+|---|---|
+| `POST /defenders/register` | `{defender, provider, api_key, defense_prompt, mandate}`；BYOK/W 入审计托管、W 预置 1 wei、资格测试；失败回滚托管条目 |
+| `POST /contests` | `{stake, duration_h, stake_bps}`（可选 `?defender=`；只有一个 defender 时自动选用）；守方先 approve，operator `createContest`；返回 contest_id/tx |
+| `POST /contests/{id}/join-intent` | `{max_stake, data_consent}`；返回 `join(id,maxStake,dataConsent)` 参数与 approve 提示 |
+| `POST /contests/{id}/messages` | `{tx_hash, content}`；要求 indexer 已看到 `AttackPaid`、身份/同意匹配、未处理过该 tx；`markDelivered` → `attacker_turn` → 回复 |
+| `GET /leaderboards` | 任务 13 三榜 + 挖矿统计 |
+| `GET /contests` / `GET /contests/{id}` | 比赛列表/元数据 + 攻方列表；**不返回消息内容** |
+| `POST /faucet/ticket` | `{to, captcha_token?}`；调 `FaucetSigner`，captcha 失败 403 |
+| `POST /data/{contestId}/deliver` | `{tx_hash}`；要求 indexer 已看到 `DataSold`，按 buyer/seller 交付 `buyOwn`/`buyFromAttacker` 切片 |
+| `GET /downloads/{token}` | 用 `resolve_delivery` 返回 ZIP；token 是能力凭证，不写日志 |
+| `POST /mining/contests` | `{version}`；Treasury owner 预打款 1 RTM 到新 W（审计）→ operator `createMiningContest`；失败尝试用 W 退回 1 RTM 并报告 recovery |
+| `POST /mining/join-intent` | `{contest_id, accept_data:true}`；返回 `joinMining(id,true)` 与强制数据条款 |
+
+消息/挖矿流程要点：
+
+- 消息必须等 indexer 处理到对应 `AttackPaid`（同 tx、contest、attacker、msgHash）；
+  API 用 `_seen_txs` 快速去重，链上 `markDelivered` 的 delivered 标记是最终防重。
+- runner `defender_fault=True` 时按 `fault_path` 调 `retireMining` 或
+  `reportDefenderFault`；即使链上交易失败也立即 `stop` 该 session，返回 502 并暴露
+  `chain_action=failed`。
+- `dataConsent=false` 的消息只在 runner 内存处理；API 不写内容日志，也不在
+  `GET /contests/{id}` 暴露任何消息。
+- 挖矿赛创建先做 hash retired/active/K=3 检查，再预打款；`createMiningContest`
+  失败会用 W 私钥把余额退回 Treasury（best effort，结果在 502 detail 的 `recovery`）。
+- `POST /mining/contests` 要求 `PLATFORM_MODEL_PROVIDER` + `PLATFORM_MODEL_KEY_ENTRY`
+  可用；否则在动链之前返回 503。
+
+**v1 限制**（任务 17 e2e 会覆盖真实链，但仍需注意）：
+
+- defender 记录、runner sessions、已处理 tx 均在进程内；API 重启后不能继续服务
+  既有比赛的 runner，需要重新注册或由任务 19 加持久化。
+- 一次 registration 只能创建一个普通比赛（W 单场专用）。
+- indexer 不随 API 自动运行；必须另行运行任务 13 的 `process_block_range` 同步，
+  否则消息/交付会一直 409（未索引）。
+- captcha provider 需要注入 `build_app(captcha_verifier=...)`；生产
+  `FAUCET_CAPTCHA_REQUIRED=true` 且未注入时启动失败。
+- 真实 `Web3ChainGateway` 用测试网零 gas；主网需另配 gas。单 token 下
+  `/downloads/{token}` 任何持 token 者可下载（token 本身是能力凭证）。
+- `msgHash` 与 `content` 的绑定由前端/运营约定，API 不重新哈希 content。
+
 ## 测试
 
 ```bash
@@ -411,9 +481,12 @@ cd platform
 停服、弃权分流和 ABI 形状断言；indexer 用合成事件覆盖普通/挖矿/退役/到期/
 弃权/罚款/同意、烟测排除、部署注水排除、幂等重放、停服回调、链事件源与 ABI
 形状断言；task 14 覆盖 EIP-712 票据恢复/captcha/nonce、consent-aware bundle/
-publish/切片交付/下载 token/篡改检测、RSI 导出过滤与 schema、operator key 审计。
-当前全套 **348 passed**（config 30 / custody 16 / chain 18 / BYOK 138 / runner 相关
-96 / indexer 22 / faucet 10 / data 11 / rsi 7）。
+publish/切片交付/下载 token/篡改检测、RSI 导出过滤与 schema、operator key 审计；
+task 15 用 FastAPI TestClient + FakeGateway/FakeRunner 覆盖鉴权、注册/资格、建赛、
+join-intent、消息收费确认/markDelivered/重复与 fault 分流、榜单、faucet、DataSold
+交付/下载、挖矿预打款/创建/恢复，以及 gateway 的 tx 构造/audit/event 解码。当前
+全套 **386 passed**（config 42 / custody 16 / chain 18 / BYOK 138 / runner 96 /
+indexer 23 / faucet 10 / data 11 / rsi 7 / api 18 / gateway 7）。
 
 ## 安全约定
 
@@ -423,5 +496,11 @@ publish/切片交付/下载 token/篡改检测、RSI 导出过滤与 schema、op
 - 错误信息与日志不得包含 secret；custody 与审计包装已按此实现。Faucet 票据与
   下载 token 是能力凭证，不写日志；RSI 导出含矿工消息与智能体回复，不得上传
   DataMarket。
-- 本阶段不实现密钥轮换/多主密钥，也不实现 FastAPI/uvicorn（任务 15）；
-  custody 审计已由任务 12 的 `custody_audit` 落盘，v1 无审计查询接口。
+- `PLATFORM_API_TOKEN` 是 bearer 凭证；不要写日志/仓库。v1 单 token 不区分
+  defender/attacker 角色，生产需在前面加角色/限流层。
+- API 不记录消息正文；`dataConsent=false` 的内容仅在 runner 内存。defender/
+  session/已处理 tx 在进程内，重启后既有比赛需重新注册或加持久化。
+- indexer 不随 API 启动；必须另行运行 `process_block_range`，否则消息/交付会
+  一直等待索引。
+- 本阶段不实现密钥轮换/多主密钥；custody 审计已由任务 12 的 `custody_audit`
+  落盘，v1 无审计查询接口。

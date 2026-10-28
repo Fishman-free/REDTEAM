@@ -181,10 +181,74 @@ def test_empty_allowlist_environment_is_safe_default(base_env):
     assert load_settings(env).model_allowlist == {}
 
 
-@pytest.mark.parametrize("name", ["OPERATOR_KEY_ENTRY", "FAUCET_SIGNER_ENTRY"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "OPERATOR_KEY_ENTRY",
+        "FAUCET_SIGNER_ENTRY",
+        "TREASURY_OWNER_KEY_ENTRY",
+        "PLATFORM_MODEL_KEY_ENTRY",
+    ],
+)
 def test_empty_key_entry_name_rejected(base_env, name):
     env = dict(base_env, **{name: "   "})
     with pytest.raises(ConfigError, match=name):
+        load_settings(env)
+
+
+def test_task15_defaults(base_env):
+    settings = load_settings(base_env)
+
+    assert settings.data_dir == (REPO_ROOT / "platform" / "data").resolve()
+    assert settings.treasury_owner_entry == "treasury-owner"
+    assert settings.platform_model_entry == "platform-model"
+    assert settings.platform_model_provider is None
+    assert settings.api_token is None
+    assert settings.faucet_captcha_required is False
+
+
+def test_task15_environment_overrides(base_env, tmp_path):
+    token = "t" * 32
+    env = dict(
+        base_env,
+        PLATFORM_DATA_DIR=str(tmp_path / "runtime"),
+        TREASURY_OWNER_KEY_ENTRY="treasury-main",
+        PLATFORM_MODEL_KEY_ENTRY="miner-main",
+        PLATFORM_MODEL_PROVIDER="glm",
+        PLATFORM_API_TOKEN=token,
+        FAUCET_CAPTCHA_REQUIRED="true",
+    )
+
+    settings = load_settings(env)
+
+    assert settings.data_dir == (tmp_path / "runtime").resolve()
+    assert settings.treasury_owner_entry == "treasury-main"
+    assert settings.platform_model_entry == "miner-main"
+    assert settings.platform_model_provider == "glm"
+    assert settings.api_token == token
+    assert settings.faucet_captcha_required is True
+    assert token not in repr(settings)
+
+
+@pytest.mark.parametrize("value", ["short", "x" * 23, "x" * 257, "has space " + "x" * 20, "token\n" + "x" * 20])
+def test_invalid_api_token(base_env, value):
+    env = dict(base_env, PLATFORM_API_TOKEN=value)
+    with pytest.raises(ConfigError, match="PLATFORM_API_TOKEN"):
+        load_settings(env)
+
+
+@pytest.mark.parametrize("value", ["maybe", "2"])
+def test_invalid_captcha_boolean(base_env, value):
+    env = dict(base_env, FAUCET_CAPTCHA_REQUIRED=value)
+    with pytest.raises(ConfigError, match="FAUCET_CAPTCHA_REQUIRED"):
+        load_settings(env)
+
+
+def test_data_path_must_be_directory(base_env, tmp_path):
+    data_file = tmp_path / "data-file"
+    data_file.write_text("not a directory", encoding="utf-8")
+    env = dict(base_env, PLATFORM_DATA_DIR=str(data_file))
+    with pytest.raises(ConfigError, match="data path is not a directory"):
         load_settings(env)
 
 
