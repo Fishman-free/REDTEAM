@@ -183,7 +183,7 @@ python -m unittest discover -s tests -p test_site_build.py -v
 |---|---|
 | `rsi4safety/payment_agents/` | 当前 PayAssist 主线：任务、工具、攻击、修复、判定与实验记录。 |
 | `rsi4safety/execution/` | 共享宿主组件及保留的旧 Arena 等独立研究原型。 |
-| `contracts/` | 本地支付合约、Flower，以及历史 RTM/奖励研究。 |
+| `contracts/` | 本地支付合约与 Flower；旧 RTM/奖励研究已归档至 `archieve/`，攻守竞技场实现中。 |
 | `docs/` | 当前研究、商业讨论、技术说明和网页编辑源。 |
 | `scripts/` | 单页构建、证据核对及其他研究辅助脚本。 |
 | `archieve/` | 历史材料与原始实验，按原目录名保留，不作为当前操作指南。 |

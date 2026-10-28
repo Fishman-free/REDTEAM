@@ -110,8 +110,8 @@ L0两次开发晋级被最终验收推翻；L1没有晋级，initial/evolved都�
 | 资产 | 已有实现与当前边界 |
 |---|---|
 | [证据奖励协议v1](EVIDENCE_REWARD_PROTOCOL.md)、[Python claim协议](../rsi4safety/execution/src/rsi4safety/claim_protocol.py)、[JS claim ID](../contracts/scripts/claim-id.js) | 旧Arena绑定目标/fixture/证据摘要和奖励信息，Python与JS推导claim ID；内容指纹不能单独证明机制新颖性 |
-| [RTM奖励桥](../contracts/scripts/rtm-reward-bridge.js)、[旧Arena裁决](../rsi4safety/execution/src/rsi4safety/arena/adjudication.py) | 旧Arena登记claim-requests，JS消费登记并驱动本地BountyVault configure/settle；当前PayAssist campaign没有接入RTM |
-| [外部HTTP会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound](../contracts/src/BountyRound.sol) | 会话配额/TTL/有限反馈与commit–reveal/pull领奖分别实现；外部身份/钱包证明以及会话提交→复现→链上判奖端到端仍未接线 |
+| [RTM奖励桥（已归档）](../archieve/contracts-2026-10/rtm-reward-bridge.js)、[旧Arena裁决](../rsi4safety/execution/src/rsi4safety/arena/adjudication.py) | 旧Arena登记claim-requests，JS消费登记并驱动本地BountyVault configure/settle；当前PayAssist campaign没有接入RTM |
+| [外部HTTP会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound（已归档）](../archieve/contracts-2026-10/BountyRound.sol) | 会话配额/TTL/有限反馈与commit–reveal/pull领奖分别实现；外部身份/钱包证明以及会话提交→复现→链上判奖端到端仍未接线 |
 | [旧Arena编排器](../rsi4safety/execution/src/rsi4safety/arena/orchestrator.py) | 拆分为fixture、执行缓存、裁决和晋级模块；保留独立运行与测试，不能把其接口协议混入当前PayAssist协议 |
 | [研究论文](paper/payment-agent-security-rsi.md)（[PDF](paper/payment-agent-security-rsi.pdf)） | 历史确定性研究稿；未见族训练后从分母移出使20%→100%曲线不能证明跨族进步，逐点成功项始终2个；原稿保留，当前解释据此校正 |
 | [当前商业计划 Markdown](business/redteam-business-plan.md)（[历史 PDF](business/redteam-business-plan.pdf)） | 商业主线为安全服务；客户收入待验证，法律引文未独立核验；PDF未重新生成，是Flower更新前旧快照，产品说明已被当前Markdown替代 |

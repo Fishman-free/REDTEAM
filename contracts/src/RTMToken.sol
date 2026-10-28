@@ -4,143 +4,139 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title RTMToken
-/// @notice "REDTEAM" (RTM): the fixed-supply bounty asset of the RSI attack
-/// bounty mechanism. Emission follows a Bitcoin-style yearly halving so that
-/// even a fully successful attacker can never drain the whole pool.
-/// @dev The supply is fixed at `MAX_SUPPLY` for all time: there is no premint
-/// (the deployer receives nothing) and no path that mints outside the halving
-/// schedule.
-///
-/// Halving schedule. Each year `n` may mint at most `yearBudget(n)`:
-/// `YEAR0_BUDGET = MAX_SUPPLY / 2` for year 0, then halved every year. Summing
-/// the schedule over all years gives `2 * YEAR0_BUDGET - popcount(YEAR0_BUDGET)`,
-/// which for the constants above is `MAX_SUPPLY - 38` wei -- strictly below
-/// `MAX_SUPPLY`. So even if every year were minted down to its last wei, the
-/// schedule alone can never reach, let alone exceed, the cap; `MAX_SUPPLY` is a
-/// redundant second bound rather than the only defence.
-///
-/// Why the owner cannot exceed the schedule: ownership does not control `minter`.
-/// It cannot mint, cannot edit `yearBudget`, and cannot move `emissionStart`.
-/// `mint` is callable solely by `minter` and every call is checked against both
-/// the current year's remaining budget and the remaining supply, so the
-/// authority that configures bounties is never the authority that can inflate
-/// the asset beyond the published schedule.
+/// @notice Arena 权限接口：RTMToken 只信任 Arena 的注册与结算。
+interface IRTMArena {
+    function onBreach(bytes32 contestId, address winner) external;
+    function isRegisteredAttacker(bytes32 contestId, address who) external view returns (bool);
+}
+
+/// @title RTMToken —— 靶钱包转账策略 + Arena 独占铸币
+/// @notice "REDTEAM" (RTM)。无预铸、无减半、无总量上限；主网唯一常规增发是
+///         每次挖矿赛成功攻破时 Arena 固定补铸 1 RTM 回 Treasury（补偿预打款），
+///         测试网另有 Arena.mintForTest 注水。
+/// @dev "标记"语义：活跃靶钱包（守方智能体的钱包 W）的转出只有两个合法去向——
+///      该场注册攻方（触发 Arena.onBreach 原子结算）或 Arena 的
+///      `controllerTransfer` 控制器划转。controllerTransfer 仅接受曾注册为靶的
+///      受控钱包。其余任何转出（含守方小号、任意第三方、
+///      其他比赛的靶钱包，以及 Arena 地址本身）一律 revert TargetTransferRestricted；
+///      活跃靶的零金额转出同样 revert。转入靶钱包不受限；靶注销后恢复普通钱包。
 contract RTMToken is ERC20, Ownable {
-    /// @notice Hard cap on the total supply, 21,000,000 RTM. Never minted in
-    /// full: see the halving note in the contract documentation.
-    uint256 public constant MAX_SUPPLY = 21_000_000 ether;
-
-    /// @notice Emission budget of year 0: half of `MAX_SUPPLY`.
-    uint256 public constant YEAR0_BUDGET = MAX_SUPPLY / 2;
-
-    /// @notice Timestamp at which year 0 starts; fixed at deployment.
-    uint64 public immutable emissionStart;
-
-    /// @notice The only account allowed to call `mint`; permanently bound at deployment.
-    /// @dev The address is immutable, so owner, evaluator, and former authorities
-    /// cannot replace the BountyVault with a direct minter after deployment.
+    /// @notice 唯一铸币者/控制器（Arena），部署时绑定，不可更换。
     address public immutable minter;
 
-    /// @notice Amount minted so far in each year, indexed by year number.
-    mapping(uint256 => uint256) public mintedByYear;
+    /// @notice 靶钱包 => 所在比赛 id（bytes32(0) 表示非靶）。
+    mapping(address => bytes32) public targetContest;
 
-    /// @notice Emitted on every successful emission.
-    /// @param to Recipient of the newly minted tokens.
-    /// @param amount Amount minted.
-    /// @param year Emission year the amount was charged against.
-    event EmissionMinted(address indexed to, uint256 amount, uint256 indexed year);
+    /// @notice 曾成功注册为靶的受控钱包；永不撤销，用于结算已完成/已注销的 W。
+    mapping(address => bool) public isControlledWallet;
 
-    /// @notice Caller is not the configured minter.
+    /// @notice Arena 合约（即 minter，单独存储便于类型化调用）。
+    IRTMArena public immutable arena;
+
+    event TargetRegistered(address indexed wallet, bytes32 indexed contestId);
+    event TargetUnregistered(address indexed wallet, bytes32 indexed contestId);
+    event Breach(bytes32 indexed contestId, address indexed winner, uint256 amount);
+    event MiningMinted(address indexed to, uint256 amount);
+
     error NotMinter();
-    /// @notice A required address argument was the zero address.
     error ZeroAddress();
-    /// @notice The designated minter has no deployed contract code.
     error InvalidMinter();
-    /// @notice A required amount argument was zero.
+    error InvalidTarget();
+    error AlreadyTarget();
+    error NotControlledWallet();
+    error InvalidContestId();
     error ZeroAmount();
-    /// @notice The mint would exceed the current year's remaining budget.
-    /// @param year Year the mint was charged against.
-    /// @param requested Amount requested.
-    /// @param remaining Amount still available in that year.
-    error YearBudgetExceeded(uint256 year, uint256 requested, uint256 remaining);
-    /// @notice The mint would push `totalSupply()` past `MAX_SUPPLY`.
-    /// @param requested Amount requested.
-    /// @param available Supply still mintable.
-    error MaxSupplyExceeded(uint256 requested, uint256 available);
+    error TargetTransferRestricted(address from, address to);
+    error NotArena();
 
-    /// @notice Deploys the token with no premint: `totalSupply()` starts at 0.
-    /// @dev The minter is immutable and must be the BountyVault deployed for this
-    /// token. Binding it during construction removes any owner-controlled minting
-    /// or role-handoff window.
     /// @param initialOwner Owner retained for inherited administration; it cannot mint.
-    /// @param minter_ BountyVault address permanently authorised to mint; non-zero.
-    /// @param emissionStart_ Timestamp at which year 0 begins; must be non-zero.
-    constructor(address initialOwner, address minter_, uint64 emissionStart_)
+    /// @param arena_ Arena address permanently authorised to mint/register/settle; must have code.
+    constructor(address initialOwner, address arena_)
         ERC20("REDTEAM", "RTM")
         Ownable(initialOwner)
     {
-        if (minter_ == address(0)) revert ZeroAddress();
-        if (minter_.code.length == 0) revert InvalidMinter();
-        if (emissionStart_ == 0) revert ZeroAmount();
-        minter = minter_;
-        emissionStart = emissionStart_;
+        if (arena_ == address(0)) revert ZeroAddress();
+        if (arena_.code.length == 0) revert InvalidMinter();
+        minter = arena_;
+        arena = IRTMArena(arena_);
     }
 
-    /// @notice Mints `amount` new RTM to `to`, charged against the current
-    /// year's emission budget.
-    /// @dev Two independent bounds must both hold: the current year's remaining
-    /// budget (which implements the halving) and the remaining supply. The year
-    /// is derived from `block.timestamp`, not supplied by the caller, so the
-    /// minter cannot choose a cheaper year to mint against. Reverts if the
-    /// current year's budget is already exhausted -- callers such as
-    /// `BountyVault` are expected to retry in a later year rather than force it.
-    /// @param to Recipient of the minted tokens; must be non-zero.
-    /// @param amount Amount to mint; must be non-zero and within budget.
+    /// @notice 注册靶钱包：仅 Arena。contestId 必须非零，钱包不得是 minter。
+    /// @dev 拒绝覆盖活跃靶：同一钱包须先注销后才能重新注册。
+    function registerTarget(address wallet, bytes32 contestId) external {
+        if (msg.sender != minter) revert NotArena();
+        if (wallet == address(0)) revert ZeroAddress();
+        if (wallet == minter) revert InvalidTarget();
+        if (contestId == bytes32(0)) revert InvalidContestId();
+        if (targetContest[wallet] != bytes32(0)) revert AlreadyTarget();
+        targetContest[wallet] = contestId;
+        isControlledWallet[wallet] = true;
+        emit TargetRegistered(wallet, contestId);
+    }
+
+    /// @notice 注销靶钱包：仅 Arena。注销后钱包恢复普通 ERC-20 行为。
+    /// @dev 非靶为幂等 no-op（不重复发事件）；isControlledWallet 永不撤销。
+    function unregisterTarget(address wallet) external {
+        if (msg.sender != minter) revert NotArena();
+        bytes32 id = targetContest[wallet];
+        if (id == bytes32(0)) return;
+        delete targetContest[wallet];
+        emit TargetUnregistered(wallet, id);
+    }
+
+    /// @notice 是否活跃靶。
+    function isTarget(address wallet) external view returns (bool) {
+        return targetContest[wallet] != bytes32(0);
+    }
+
+    /// @notice 铸币：仅 Arena。用于挖矿攻破固定补铸与测试网注水，无年份预算。
     function mint(address to, uint256 amount) external {
         if (msg.sender != minter) revert NotMinter();
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
-
-        uint256 year = currentYear();
-        uint256 budget = yearBudget(year);
-        uint256 minted = mintedByYear[year];
-        uint256 remaining = budget > minted ? budget - minted : 0;
-        if (amount > remaining) revert YearBudgetExceeded(year, amount, remaining);
-
-        uint256 available = MAX_SUPPLY - totalSupply();
-        if (amount > available) revert MaxSupplyExceeded(amount, available);
-
-        mintedByYear[year] = minted + amount;
         _mint(to, amount);
-        emit EmissionMinted(to, amount, year);
+        emit MiningMinted(to, amount);
     }
 
-    /// @notice Year index of the current block, counting from `emissionStart`.
-    /// @dev Years are fixed-length windows of `365 days`; they drift from the
-    /// calendar but keep the schedule deterministic and independent of any
-    /// off-chain clock. Reverts before `emissionStart` (the subtraction would
-    /// underflow), so the schedule always starts at a known timestamp.
-    /// @return The current emission year, 0-based.
-    function currentYear() public view returns (uint256) {
-        return (block.timestamp - emissionStart) / 365 days;
+    /// @notice 结算/退款/赎回的唯一划转入口（仅 Arena），仅限受控钱包。
+    /// @dev 绕过靶策略；若 from 仍是活跃靶，先注销再划转（CEI）。
+    ///      from/to 均不得为零地址，amount 必须非零；from 必须曾注册为靶，
+    ///      防止控制器划转任意持币人。Arena 不得用 transferFrom + allowance 移动 W 资金。
+    function controllerTransfer(address from, address to, uint256 amount) external {
+        if (msg.sender != minter) revert NotArena();
+        if (from == address(0) || to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (!isControlledWallet[from]) revert NotControlledWallet();
+        bytes32 contestId = targetContest[from];
+        if (contestId != bytes32(0)) {
+            delete targetContest[from];
+            emit TargetUnregistered(from, contestId);
+        }
+        super._update(from, to, amount);
     }
 
-    /// @notice Emission budget of `year`: `YEAR0_BUDGET >> year`.
-    /// @dev The budget halves every year and is zero from year 256 on, so the
-    /// schedule is finite by construction.
-    /// @param year Emission year, 0-based.
-    /// @return Maximum amount mintable during `year`.
-    function yearBudget(uint256 year) public pure returns (uint256) {
-        return YEAR0_BUDGET >> year;
-    }
-
-    /// @notice Amount still mintable in the current year.
-    /// @return `yearBudget(currentYear())` minus what has already been minted.
-    function remainingThisYear() external view returns (uint256) {
-        uint256 year = currentYear();
-        uint256 budget = yearBudget(year);
-        uint256 minted = mintedByYear[year];
-        return budget > minted ? budget - minted : 0;
+    /// @dev 靶策略核心：覆写 _update（ERC-20 内部转账/铸币/销毁统一入口）。
+    ///      攻破分支严格 CEI：注销靶 -> 转账 -> 发 Breach -> 回调 Arena.onBreach；
+    ///      回调 revert 时整笔交易回滚。
+    function _update(address from, address to, uint256 value) internal override {
+        bytes32 contestId = targetContest[from];
+        if (contestId != bytes32(0)) {
+            // 零金额转出同样禁止：否则攻方可诱导守方调用 transfer(to=attacker, 0)
+            // 触发 Breach 并白拿奖池。
+            if (value == 0) revert TargetTransferRestricted(from, to);
+            // Arena 地址永远不是合法收款方：即使被误登记为该场攻方也拒绝。
+            if (to == minter) revert TargetTransferRestricted(from, to);
+            if (arena.isRegisteredAttacker(contestId, to)) {
+                delete targetContest[from];
+                emit TargetUnregistered(from, contestId);
+                super._update(from, to, value);
+                emit Breach(contestId, to, value);
+                arena.onBreach(contestId, to);
+                return;
+            }
+            // 转给 Arena 地址也不例外：W 自转不是合法出口，必须走 controllerTransfer。
+            revert TargetTransferRestricted(from, to);
+        }
+        super._update(from, to, value);
     }
 }

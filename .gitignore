@@ -27,3 +27,23 @@ build/
 
 # Preserved machine-local leftovers from the repository reorganization.
 /archieve/local-residue/
+
+# Local Besu testnet state, generated network files and validator keys.
+# Never commit validator keys, chain data or generated genesis artifacts.
+infra/*/data/
+infra/*/keydir/
+infra/*/networkFiles/
+infra/*/qbftConfig.json
+infra/*/key.priv
+
+# Platform backend local state (task 10+). Never commit the encrypted vault,
+# virtualenv, caches or bytecode; source files stay tracked.
+platform/.venv/
+platform/vault.json
+platform/**/__pycache__/
+.pytest_cache/
+*.pyc
+
+# Platform runtime data: transcripts, custody audit logs and (from task 13)
+# index databases. Attacker/miner content must never be committed.
+platform/data/
