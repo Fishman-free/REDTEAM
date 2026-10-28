@@ -2057,6 +2057,14 @@ git commit -m "feat(platform): hosted agent runner with real transfer tool"
 - runner/API 必须支持 `join(bytes32,uint256,bool)` 与 `joinMining(bytes32,bool)`，不得再引用 `approveSale`。
 - **custody 访问审计（薄包装，规格 §6）**：任务 10 的 `Custody` 本身不写审计；任务 12 通过一个薄审计包装调用 `Custody.load/store/delete`，记录结构化元数据 `{ts, action, entry_id, result, context}`（runner 场景 context 含 contest/runner、wallet_address、purpose），只记录 entry 名/地址/结果，绝不记录 secret、明文私钥或攻方消息/回复/工具轨迹。`dataConsent=false` 的“不写日志/证据/持久存储”仅指攻方数据内容；custody 访问元数据审计属于平台安全审计，**不受此限制，仍可写**。审计日志由该包装落盘；v1 不提供审计查询 API（查询/运维接口留给任务 19/后续运维），不要声称由 indexer 或 FastAPI 提供审计查询。
 
+> **任务 12 实施记录（2026-10-28）**：实际拆分为 `platform/redteam_platform/{runner,agent_tools,transcripts,custody_audit}.py` 与共享 `_jsonl.py`，测试为 `platform/tests/{test_runner,test_agent_tools,test_transcripts,test_custody_audit}.py`（**96 个新测试**；全套 **298 passing**）。
+>
+> - `runner.AgentSession`：`qualification(test_address)`（owner 渠道、1 wei、必须在 createContest 前且 W 非靶）；`attacker_turn(attacker, content, data_consent=...)`；`stop`/`stop_for_mining`；结果含 `defender_fault`/`fault_path`（mining -> `retireMining`，普通 -> `reportDefenderFault`）；预算 10 步/120s/200k/1000 字符/每攻方 40 轮；工具异常转通用失败回执，未知工具/畸形 tool_calls 归 `agent_protocol`。
+> - `agent_tools.WalletTools`：固定 `benchmark.harness.TOOL_DEFINITIONS`；W 私钥真实签名、per-wallet 锁串行 nonce；所有失败（参数、revert、RPC、非成功 receipt、超时）统一 `{"status":"failed","reason":"transfer failed"}`；`from_custody(...)` 只接受带 `context` 的 `AuditedCustody`（裸 `Custody` 会 `TypeError`）。
+> - `transcripts.TranscriptStore`：普通赛 `data_consent=false` 零文件 I/O；`true` 懒写 snapshot + 每轮 JSONL（`purpose=defender_dataset`）；挖矿会话创建即写 snapshot，每轮 `purpose=rsi`/`rsi_only=true`；snapshot 仅 version/digest/wallet/system_prompt_sha256。
+> - `custody_audit.AuditedCustody`：JSONL `{ts, action, entry_id, result, context}`，context 仅白名单字段（runner 四字段 + 水龙头 `recipient`/`chain_id`/`ticket_count`）；审计写失败则成功操作也不返回 secret；v1 无查询 API。
+> - 未改 `contracts/`、未部署；`platform/data/` 已加入 `.gitignore`。`join`/`joinMining` 仍由任务 14 API 调用，runner 不引用 `approveSale`/`accrue`；测试含当前 ABI 形状守卫（缺失 artifacts 时 skip）。
+
 ---
 
 ## 任务 13：indexer 与排行榜
