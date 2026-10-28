@@ -85,6 +85,9 @@ vault 文件不会自动创建；首次 `Custody.store()` 会以临时文件 + f
 - 缺少 ABI 时会提示先在 `contracts/` 运行 `npx hardhat compile`。
 - 本模块不读取私钥、不发交易；`ChainClient` 构造只做本地文件 I/O，
   `verify_chain()` 才访问 RPC。
+- Besu QBFT 区块的 `extraData` 为 128 字节；`ChainClient` 的 web3 注入了
+  `ExtraDataToPOAMiddleware`，否则 `get_block` 会被 web3 拒绝。web3 8 的回执是
+  `AttributeDict`（Mapping，不是 `dict`）；所有回执状态判断使用 `Mapping`。
 
 ```python
 from redteam_platform.config import load_settings
@@ -488,6 +491,26 @@ join-intent、消息收费确认/markDelivered/重复与 fault 分流、榜单�
 交付/下载、挖矿预打款/创建/恢复，以及 gateway 的 tx 构造/audit/event 解码。当前
 全套 **387 passed**（config 42 / custody 16 / chain 18 / BYOK 138 / runner 96 /
 indexer 23 / faucet 10 / data 11 / rsi 7 / api 19 / gateway 7）。
+
+### 测试网 e2e（默认不收集）
+
+`tests/e2e_testnet.py` 文件名不以 `test_` 开头，默认 pytest 不会收集；显式运行：
+
+```bash
+cd platform
+.venv/Scripts/python -m pytest tests/e2e_testnet.py --run-e2e -v -s
+```
+
+- 要求 `rtm-besu-validator` healthy + RPC 8546；读取
+  `infra/besu-testnet/keydir/key` 到临时 vault（operator/treasury-owner/
+  faucet-signer），**不打印/不提交**；启动 loopback OpenAI stub 作为 BYOK 模型。
+- 会改变测试网状态：新账户领水、普通赛攻破与数据买卖、挖矿结算（+1 RTM）、
+  第二场挖矿退休；结束后打印 `E2E_SUMMARY`（公开地址/contest/root/supply）。
+- 覆盖：faucet ticket→claim、守方注册/资格、approve→建赛、A/B join（consent
+  true/false）、5 条消息（含 opt-out 不落盘）、触发攻破、dataset publish、
+  buyOwn/buyFromAttacker/交付/下载、未同意 `NotConsented`、挖矿预打款/join/
+  0.005/条/攻破扫尾+补铸/停服、RSI 导出、MiningRetired 不增发。
+- 默认全量 pytest 不含该文件；CI 不要用 `--run-e2e`。
 
 ## 安全约定
 

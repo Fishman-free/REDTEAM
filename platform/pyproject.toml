@@ -24,3 +24,6 @@ include = ["redteam_platform*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "..", "../rsi4safety/payment_agents"]
+markers = [
+  "e2e: live Besu testnet end-to-end test (requires --run-e2e)",
+]
