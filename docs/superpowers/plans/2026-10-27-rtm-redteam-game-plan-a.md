@@ -2171,6 +2171,14 @@ git commit -m "feat(platform): faucet signer, data service, rsi export"
 - 新增 `MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded` 索引支持（与任务 13 对齐）。
 - **custody 访问审计（薄包装，规格 §6）**：任务 14 复用任务 12 的同一薄审计包装记录 `Custody.load/store/delete` 的 `{ts, action, entry_id, result, context}`；`faucet_signer` 每次 `Custody.load(faucet_signer_entry)` 签票时 context 含 recipient/chain_id/ticket_count；`data_service`/`rsi_export` 只处理已落盘数据、不读取托管私钥，因此不产生 custody 访问；若后续经 data_service 取用 BYOK Key，必须复用同一包装。绝不记录 secret。`dataConsent=false` 的不落盘限制仅针对攻方数据内容，不豁免 custody 访问元数据审计。
 
+> **任务 14 实施记录（2026-10-28）**：新增 `platform/redteam_platform/{faucet_signer,data_service,rsi_export}.py` 与 `platform/tests/{test_faucet_signer,test_data_service,test_rsi_export}.py`（**28 个新测试**；全套 **348 passing**）。
+>
+> - `faucet_signer.FaucetSigner`：EIP-712 域 `(RTM Faucet, 1, chainId, faucet)` + `Ticket(address to,uint256 nonce,uint64 deadline)`，`TICKET_TYPEHASH` 与 `Faucet.sol` 一致；nonce = `max(链上 nonces(to), 本进程已签发)+1`（可显式传更大值），deadline 默认 600s、上限 3600s；每次签票经 `AuditedCustody.load(signer_entry, context={purpose:"faucet_ticket", recipient, chain_id, ticket_count:"1"})`，key 不缓存；`captcha_required=True` 无 verifier 构造即失败，签票必须提供 verifier 接受的 token；可选 `expected_signer`。测试用 `encode_typed_data` + `recover_message` 验证签名与合约摘要一致、ABI tuple 形状、nonce/captcha/deadline/错误不泄露 key；**未用 eth-tester**（未安装），真链 claim 留任务 17 e2e。
+> - `data_service.DataService`：`bundle` 只含已结束普通赛 + `dataConsent=true` 攻方 + 守方自有 `defender/contest.json`/可选 `session.json`；即使磁盘存在 opt-out/`rsi_only` 文件也按 indexer 同意与记录字段（`purpose=defender_dataset`、`rsi_only=false`、`consent=true`、attacker 匹配）过滤；矿工与烟测赛拒绝。根 = 排序文件 sha256 拼接后再 sha256；manifest 不含内容、本身不入根，买家可由叶子重算根。`publish` 仅普通赛，先查链上 `datasetRoot`，再由 `ChainDataMarketWriter` 用 operator key `DataMarket.publish`；operator key 每次经 `AuditedCustody.load(context={purpose:"data_publish", contest_id})`，不缓存。`deliver_own`/`deliver_attacker` 仅 defender、交付 ZIP 切片 + 完整 manifest，返回一次性 token/路径/root/过期时间；交付前核对链上根与 bundle 根一致。**bundle/deliver 不读私钥；只有 publish writer 读 operator key（审计）**，符合步骤 2 的 operator publish 要求。
+> - `rsi_export.RsiExporter`：仅已 settled 挖矿赛，读 `purpose=rsi`/`rsi_only=true`/`consent=true` 的矿工 transcript + `is_mining=true` session snapshot；输出 `case_id/contest_id/attacker/attack_goal/turns/evaluation/snapshot`；`evaluation.breach_classes` 含 `wrong_recipient`（有观测到转给矿工的成功转账再加 `successful_transfer`）、observed transfers、固定奖励、ignored records；普通赛/未结算/缺文件/非 RSI/重复 turn 拒绝；导出文件建议 `platform/data/rsi/<cid>.json`（gitignored），不得上传 DataMarket。
+> - 未改 `contracts/`、未部署。测试不联网、不读真实 key；data service 用合成 indexer 事件 + 临时 transcript，faucet 用测试 key 与审计 vault，RSI 用合成挖矿 transcript。
+> - 边界：Faucet nonce 非持久化（重启/多进程可能重复未领取 nonce，合约仍防二次领取）；bundle/token 缓存与 token 均在进程内；简化根无 Merkle 证明，切片靠完整 manifest 校验；publish 沿用测试网 `gasPrice=0`；RSI 导出含矿工内容、需按敏感数据处理；任务 15 负责 HTTP、鉴权、按 `DataSold` 调 `deliver_*`、Faucet captcha provider/下载服务接线。
+
 ---
 
 ## 任务 15：FastAPI 入口
