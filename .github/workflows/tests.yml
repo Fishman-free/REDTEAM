@@ -77,9 +77,37 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Contract and payment-agent suites
         run: npm test
+      - name: New RTM game contract suite
+        run: npx hardhat test test/arena.test.js test/arena-penalty.test.js test/arena-fuzz.test.js test/faucet.test.js test/datamarket.test.js test/rtm-game.test.js
       - name: Nontransferable flower demo (local synthetic evidence only)
         run: npm run flower:demo
       - name: Single-turn payment demo (offline)
         run: npm run demo:agent
       - name: Multi-turn payment demo (offline)
         run: npm run demo:multiround
+  platform:
+    name: Platform backend and dApp
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install platform dependencies
+        working-directory: platform
+        run: python -m pip install -e ".[dev]"
+      - name: Platform unit tests (offline; e2e excluded)
+        working-directory: platform
+        run: python -m pytest tests -q --ignore=tests/e2e_testnet.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dapp/package-lock.json
+      - name: Install dApp dependencies
+        working-directory: dapp
+        run: npm ci --no-audit --no-fund
+      - name: Build dApp
+        working-directory: dapp
+        run: npm run build
