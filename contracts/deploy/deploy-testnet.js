@@ -442,6 +442,10 @@ async function main() {
     );
   }
 
+  // Indexer start point: include the block before the first deployment so the
+  // API can sync only the game's own history (especially on a public-chain fork).
+  const deployBlock = await ethers.provider.getBlockNumber();
+
   const signers = await ethers.getSigners();
   if (signers.length === 0) die('no signer available; set BESU_TESTNET_KEY');
   const deployer = signers[0];
@@ -667,6 +671,7 @@ async function main() {
     network: hre.network.name,
     chainId: Number(network.chainId),
     rpc: hre.network.config.url || '',
+    deployBlock,
     deployer: deployerAddress,
     platform,
     operator,
