@@ -2235,12 +2235,12 @@ git commit -m "feat(platform): FastAPI entrypoint for the contest game"
 - leaderboard/indexer 必须消费 `MiningJoined/MiningSettled/MiningRetired/DataConsentRecorded`；挖矿榜按固定 1 RTM/成功攻破，不按时间。
 - v1 不提供 custody 审计查询 API；custody 访问审计由任务 12/14 的薄包装落盘，查询/运维接口留到任务 19 或后续运维，不新增未定义表/路由。
 
-> **任务 15 实施记录（2026-10-28）**：新增 `platform/redteam_platform/api.py`、`chain_gateway.py` 与 `platform/tests/test_api.py`（18）、`test_chain_gateway.py`（7）；config 增加 `PLATFORM_DATA_DIR`/`PLATFORM_API_TOKEN`/`TREASURY_OWNER_KEY_ENTRY`/`PLATFORM_MODEL_KEY_ENTRY`/`PLATFORM_MODEL_PROVIDER`/`FAUCET_CAPTCHA_REQUIRED`（+12 测试）；indexer 增加 `contests()`/`event_by_tx()`（+1 测试）；`httpx>=0.27` 加入 dev 依赖。全套 **386 passing**。
+> **任务 15 实施记录（2026-10-28）**：新增 `platform/redteam_platform/api.py`、`chain_gateway.py` 与 `platform/tests/test_api.py`（19）、`test_chain_gateway.py`（7）；config 增加 `PLATFORM_DATA_DIR`/`PLATFORM_API_TOKEN`/`TREASURY_OWNER_KEY_ENTRY`/`PLATFORM_MODEL_KEY_ENTRY`/`PLATFORM_MODEL_PROVIDER`/`FAUCET_CAPTCHA_REQUIRED`（+12 测试）；indexer 增加 `contests()`/`event_by_tx()`（+1 测试）；`httpx>=0.27` 加入 dev 依赖。全套 **387 passing**。
 >
 > - `create_app(service, token)`：除 `/health` 外全部 bearer token（v1 单一 `PLATFORM_API_TOKEN`，常量时间比较）；`ApiError` 统一映射；`build_app(settings, captcha_verifier=)` 装配真实 ChainClient/Custody/EventIndexer/Web3ChainGateway/FaucetSigner/DataService/AgentSession；`app_from_env()` 供 `uvicorn --factory`。
-> - 路由：`POST /defenders/register`（defender/provider/api_key/defense_prompt/mandate；W+BYOK 入审计托管，W 预置 1 wei，资格测试；失败清理并回收 W 余额）、`POST /contests`（可选 `?defender=`，只有一个 defender 时自动选用；allowance 检查 → operator createContest → runner）、`POST /contests/{id}/join-intent`（data_consent 必填，返回 join 参数+approve）、`POST /contests/{id}/messages`（indexer `AttackPaid` 确认 → 身份/同意 → `_seen_txs` 快速去重 → `markDelivered` → `attacker_turn` → fault 分流）、`GET /leaderboards|/contests|/contests/{id}`（不含消息）、`POST /faucet/ticket`、`POST /data/{contestId}/deliver`（`DataSold` 确认 → `deliver_own`/`deliver_attacker`）、`GET /downloads/{token}`、`POST /mining/contests`（hash retired/active/K=3 → Treasury owner 预打款 → operator create → session；失败用 W 退回并报告 recovery）、`POST /mining/join-intent`（acceptData 必须 true + 条款）。
+> - 路由：`POST /defenders/register`（defender/provider/api_key/defense_prompt/mandate；W+BYOK 入审计托管，W 预置 1 wei，资格测试；失败清理并回收 W 余额）、`POST /contests`（可选 `?defender=`，只有一个 defender 时自动选用；allowance 检查 → operator createContest → runner）、`POST /contests/{id}/join-intent`（data_consent 必填，返回 join 参数+approve）、`POST /contests/{id}/messages`（indexer `AttackPaid` 确认 → 身份/同意 → `_seen_txs` 快速去重 → `markDelivered` → `attacker_turn` → fault 分流）、`GET /leaderboards|/contests|/contests/{id}`（不含消息）、`POST /faucet/ticket`、`POST /data/{contestId}/publish`（operator 打包发布 consent-aware 数据集）、`POST /data/{contestId}/deliver`（`DataSold` 确认 → `deliver_own`/`deliver_attacker`）、`GET /downloads/{token}`、`POST /mining/contests`（hash retired/active/K=3 → Treasury owner 预打款 → operator create → session；失败用 W 退回并报告 recovery）、`POST /mining/join-intent`（acceptData 必须 true + 条款）。
 > - `chain_gateway.Web3ChainGateway`：operator/treasury-owner/W 三种 key 分别从审计托管读取并校验派生地址；测试网 `gasPrice=0`；`createContest`/`createMiningContest` 解码 `ContestCreated`；`markDelivered`/`reportDefenderFault`/`retireMining`/`treasuryWithdraw`/`walletTransfer`/`fundWallet`；`contestInfo`/`allowance`/`balanceOf`/`activeMiningCount`/`retiredDefenseHash`/`activeDefenseHash` 读取。
-> - 测试：`cd platform && .venv/Scripts/python -m pytest tests -q` = **386 passed**；全部不联网/不读真实 key。覆盖鉴权、注册/资格清理、建赛/allowance、join/mining intent、消息 markDelivered/重复/fault/stopped、榜单/详情不含消息、faucet、DataSold 交付/下载、挖矿预打款/创建/回收、gateway tx/audit/event 解码。
+> - 测试：`cd platform && .venv/Scripts/python -m pytest tests -q` = **387 passed**；全部不联网/不读真实 key。覆盖鉴权、注册/资格清理、建赛/allowance、join/mining intent、消息 markDelivered/重复/fault/stopped、榜单/详情不含消息、faucet、dataset publish、DataSold 交付/下载、挖矿预打款/创建/回收、gateway tx/audit/event 解码。
 > - 偏离/边界：v1 单 token 无角色隔离；defender/session/已处理 tx 均在进程内，重启后既有比赛不可继续（任务 19 持久化）；一次 registration 只能建一个普通赛；indexer 不随 API 自动运行，必须另行同步；captcha provider 需注入（未实现 hCaptcha HTTP 客户端）；API 不重新哈希 content 与 msgHash 的绑定；真实 gateway 仅测试网零 gas，真链流程留任务 17 e2e。未改 `contracts/`、未部署。
 
 ---
@@ -2313,6 +2313,15 @@ git commit -m "feat(dapp): React+wagmi dApp with contest, faucet, leaderboard pa
 - MiningCenter 不再有 `accrue`；显示固定 1 RTM 奖励、0.005 RTM/条、hash 退役。
 - DataMarket 删除 `approveSale`；未同意攻方数据不可购买；挖矿数据不进入市场。
 - `ADDRESSES` 必须使用 R4 新地址；任务 9 旧地址作废。
+
+> **任务 16 实施记录（2026-10-28）**：新增 `dapp/`（Vite 7.3.7 + React 19 + TS 5.9 + wagmi 2.19 + viem 2.57 + React Query 5；`npm install && npm run build` 成功，bundle 约 614 kB 有 chunk 体积警告）。
+>
+> - 文件：`package.json`/`package-lock.json`、`vite.config.ts`（`/api` dev proxy → 8080）、`tsconfig.json`、`index.html`、`src/main.tsx`、`App.tsx`、`theme.css`、`lib/{chain,contracts,api,format,nav}.ts`、`components/AttackChat.tsx`、`pages/{Home,DefenderCenter,AttackerCenter,MiningCenter,Leaderboard,Faucet,DataMarket}.tsx`、`.env.example`、`README.md`。
+> - 链：chainId 48850、RPC 默认 8546、R4 五地址；ABI 最小集含 `join(bytes32,uint256,bool)`/`joinMining(bytes32,bool)`/`attack`/`collectPenalties`/`withdrawStake`/`dataConsent`/Faucet `claim`/DataMarket `buyOwn`/`buyFromAttacker`，无 `approveSale`/`accrue`。
+> - UI：攻方 join 前 `dataConsent` checkbox（勾选=可留存/可售，不勾选=仅内存）；矿工加入前必须接受强制 RSI 条款，只调 `joinMining(id,true)`；MiningCenter 明确固定 1 RTM、0.005/条、hash 退役、无 accrue；DataMarket 显示 `dataConsent` 状态、只对 true 的攻方给购买按钮、先 publish 再 buy/deliver/download，挖矿不可见/不可售；Faucet 票据 + claim；榜单四块；守方 approve→API 建赛→collectPenalties。
+> - `AttackChat`：approve 费用 → `attack(id, keccak256(message))` → 等待 `POST /contests/{id}/messages`（indexer 409 时重试 12×1.5s）。
+> - 为 dApp 数据市场补了平台路由 `POST /data/{contestId}/publish`（operator 打包发布），API 测试 18→19，全套 **387 passing**；提交 `36cc07e fix(platform): expose dataset publish route for dApp`；dApp 提交 `ee74475 feat(dapp): React+wagmi dApp ...`。
+> - 边界：`VITE_API_TOKEN` 会打进前端 bundle，仅限本地开发；生产需 BFF/会话/短期 token。仅 injected connector，无 WalletConnect；API/indexer 需另行启动；未做浏览器自动化（任务 18）；无 RSI 页面；单 token 不区分角色。未改 `contracts/`、未部署。
 
 ---
 
