@@ -2111,6 +2111,16 @@ git commit -m "feat(platform): event indexer and leaderboards"
 - `MiningRetired` 计入版本退役/未攻破统计，不增发。
 - 本任务只做链事件索引与排行榜，不承担 custody 访问审计；审计由任务 12/14 的薄包装落盘，v1 无审计查询接口。
 
+> **任务 13 实施记录（2026-10-28）**：新增 `platform/redteam_platform/indexer.py` + `platform/tests/test_indexer.py`（**22 个测试**；全套 **320 passing**）。
+>
+> - `EventIndexer(db_path, network=, excluded_contest_ids=, on_mining_ended=)`：SQLite `meta/events/contests/contest_attackers/attackers/defenders/miners`；`events` 主键 `(block_number, log_index)`，`INSERT OR IGNORE` 幂等；`schema_version=1`、network 不匹配直接报错；金额全部 TEXT + Python 大整数，避免 SQLite 64 位溢出。
+> - 事件：`ContestCreated/Joined/MiningJoined/DataConsentRecorded/AttackPaid/MarkDelivered/Breach/ContestSettled/Expired/DefenderFault/PenaltiesCollected/MiningSettled/MiningRetired` 更新聚合；`DatasetPublished/DataSold` 等仅存原始事件；未知事件存原始、不聚合。
+> - 榜口径：攻方 `wins/rtm_won(Breach+rest)/difficulty/streak`；守方 `contests_survived(Expired)/msgs_withstood(Expired 付费消息)/net_income=penalties-breach_loss/longest_survival`；矿工 `joined/decided_joined(settled+retired)/wins/rtm_won_fixed/difficulty/breach_rate=wins/decided_joined`；挖矿全局 `created/settled/retired/decided/breach_rate/total_fixed_reward/active_versions/history`。
+> - **烟测/注水**：`excluded_contest_ids` 内的事件仍入库 `excluded=1` 但不聚合、不触发回调；不索引 `MiningMinted`，发行量只来自已纳入比赛的 `MiningSettled.reward`，Faucet 1,000,000 / Treasury 3 / 烟测补铸 1 不计入。
+> - `process_block_range` 排序 + 幂等重放，`last_block` 整段成功后推进；`ChainEventSource` 按 R4 ABI 拉取 Arena 17 事件 + RTMToken `Breach` + DataMarket 发布/售出事件，附 block timestamp 并排序，缺 ABI 事件报错。
+> - `on_mining_ended(contest_id, event_name)` 在挖矿 `Breach`/`MiningSettled`/`MiningRetired` 首次入库时触发；回调抛错回滚事件（任务 14 接 `AgentSession.stop_for_mining`）。
+> - 未改 `contracts/`、未部署；不含 custody 审计、HTTP API、重组处理；SQLite 单写进程。
+
 ---
 
 ## 任务 14：Faucet 票据签发 + 数据服务 + rsi_export
