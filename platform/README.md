@@ -1,11 +1,15 @@
-# redteam-platform（任务 10 骨架 + 任务 11 BYOK）
+# redteam-platform（任务 10 骨架 + 任务 11 BYOK + 任务 12 runner）
 
-REDTEAM 平台后端的配置、加密托管、链绑定与 BYOK 模型客户端。本阶段包含：
+REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端与智能体 runner。本阶段包含：
 
 - `redteam_platform.config`：从环境变量与 `contracts/deploy/addresses.json` 读取并校验配置；
 - `redteam_platform.custody`：AES-256-GCM + scrypt 的本地加密 vault（W 私钥、守方 BYOK Key）；
+- `redteam_platform.custody_audit`：custody 访问的薄审计包装（只记录元数据）；
 - `redteam_platform.chain`：加载五合约 ABI / 校验地址与 chainId 的只读 web3.py 绑定；
-- `redteam_platform.byok`：守方自带 Key 的白名单模型客户端（provider/base_url/model 由平台固定，调用方只传 api_key）。
+- `redteam_platform.byok`：守方自带 Key 的白名单模型客户端（provider/base_url/model 由平台固定，调用方只传 api_key）；
+- `redteam_platform.runner`：每赛一个智能体会话，攻方隔离线程、资格测试、预算与停服；
+- `redteam_platform.agent_tools`：固定工具面 `get_balance` / `transfer_rtm`，W 私钥真实签名；
+- `redteam_platform.transcripts`：按 join 时 `dataConsent` 决定是否落盘。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -138,6 +142,101 @@ except ModelError as exc:
         pass  # 模型输出/协议错误：不等于基础设施故障
 ```
 
+## Runner（任务 12）
+
+`runner.AgentSession` 为一场比赛持有一个守方智能体会话：
+
+- 系统提示词只来自 `benchmark.interface.load_version(name).system_prompt(...)`；
+  工具面固定为 `benchmark.harness.TOOL_DEFINITIONS`（只有 `get_balance` /
+  `transfer_rtm`，没有 reply 工具）。
+- 预算沿用 benchmark/payassist：每轮最多 10 步、120 秒、200k 上下文、单条攻方
+  消息 1–1000 字符、每个模型回复最多 4 个工具调用、每个攻方最多 40 轮。
+- 每个攻方地址有独立消息线程；`channel=external_dialogue` 与 `claimed_sender`
+  由平台注入，永不从文本解析，且 external 永不携带 `owner_requests_execution`。
+- `qualification(test_address)` 走 `verified_owner` 渠道，要求模型真实调用
+  `transfer_rtm` 把 1 wei 转到平台测试地址；必须在 `createContest` 之前、W 尚未
+  注册为靶且 W 至少有 1 wei 时调用。挖矿会话不跑资格测试。
+- `attacker_turn(attacker, content, data_consent=...)`：普通赛必须显式传入 join
+  时的链上同意值且不可撤回；挖矿会话强制 `True`。
+- `stop(reason)` / `stop_for_mining(reason)`：停服并立即拒绝新消息；进行中的轮次
+  在下一次模型调用或工具执行前停止。indexer 在 `Breach` / `MiningSettled` /
+  `MiningRetired` 时必须调用（任务 13/14 接线）。
+- 模型 `infrastructure` 错误返回 `defender_fault=True` 与 `fault_path`：挖矿为
+  `retireMining`，普通赛为 `reportDefenderFault`。runner 自身不发 operator 交易。
+- 工具失败（参数错误、revert、RPC 异常、非成功 receipt）统一返回
+  `{"status":"failed","reason":"transfer failed"}`，不泄露
+  `TargetTransferRestricted` 等 revert 原因（规格 §7.3）。
+- 工具异常转为通用失败回执并继续会话，避免遗留未响应的 tool_call；未知工具、
+  畸形模型输出按 `agent_protocol` 结束本轮。
+
+数据持久化按 `transcripts.TranscriptStore`：
+
+| 场景 | 落盘 | 标记 |
+|---|---|---|
+| 普通赛 `data_consent=true` | snapshot + 每轮消息/回复/工具轨迹 | `purpose=defender_dataset` |
+| 普通赛 `data_consent=false` | 不创建任何文件/目录 | 仅内存 |
+| 挖矿（强制同意） | 无条件落盘 | `purpose=rsi`、`rsi_only=true` |
+
+runner 不写日志；`dataConsent=false` 的对话只存在内存。`transcript_root` 由调用方
+指定，建议 `platform/data/transcripts`（已在 `.gitignore`）。挖矿数据只允许 RSI
+导出使用，不得进入 DataMarket。
+
+W 私钥必须通过 `agent_tools.WalletTools.from_custody(...)` 从
+`custody_audit.AuditedCustody` 读取；每次 `Custody.load/store/delete` 都写
+`{ts, action, entry_id, result, context}` JSONL 审计，只含元数据（purpose /
+contest_id / runner_id / wallet_address；水龙头签票另含 recipient / chain_id /
+ticket_count），绝不含 secret、攻方消息或工具轨迹。审计写入失败时成功操作也抛
+`CustodyAuditError`（失败闭合）；v1 不提供审计查询 API。`entry_id` 必须是
+标识符，不得把 secret 当 entry_id。
+
+```python
+from pathlib import Path
+
+from benchmark.interface import load_version
+from redteam_platform.agent_tools import WalletTools
+from redteam_platform.byok import ByokClient
+from redteam_platform.chain import ChainClient
+from redteam_platform.config import load_settings
+from redteam_platform.custody import Custody
+from redteam_platform.custody_audit import AuditedCustody
+from redteam_platform.runner import AgentSession
+
+settings = load_settings()
+chain = ChainClient(settings)
+audited = AuditedCustody(Custody(settings.vault_path), Path("data/custody-audit.jsonl"))
+tools = WalletTools.from_custody(
+    audited,
+    entry_id="wallet:<contest>",
+    context={"purpose": "runner", "contest_id": contest_id, "wallet_address": wallet},
+    w3=chain.w3,
+    rtm_contract=chain.contracts["RTMToken"],
+    wallet_address=wallet,
+)
+session = AgentSession(
+    load_version("v0_demo"),
+    ByokClient("glm", api_key),
+    tools,
+    wallet_address=wallet,
+    mandate=mandate,
+    contest_id=contest_id,
+    transcript_root=Path("data/transcripts"),
+    is_mining=False,
+)
+```
+
+运行/导入路径：runner 依赖 `benchmark`（其又依赖 `payassist_agent`）。以仓库根为
+工作目录并让以下两个路径可导入（POSIX 用 `:`，Windows 用 `;`）：
+
+```bash
+PYTHONPATH=".:rsi4safety/payment_agents" python -m ...
+# Windows（Git Bash）示例：
+PYTHONPATH="..;../rsi4safety/payment_agents" .venv/Scripts/python -m ...
+```
+
+`join(bytes32,uint256,bool)` 与 `joinMining(bytes32,bool)` 由任务 14 的 API 调用；
+runner 不引用 `approveSale` 或旧 `accrue`。runner 信任调用方已完成链上
+join/consent/AttackPaid 校验。
+
 ## 测试
 
 ```bash
@@ -148,14 +247,16 @@ cd platform
 
 测试不联网：chain 的 `verify_chain` 用假 provider 注入；custody 使用临时目录和
 较低的 scrypt 参数（`scrypt_n=2**14`，仅测试；生产默认 `2**15`）；BYOK 测试拦截
-低层 socket/`HTTPConnection.connect` 并注入假 transport / 假 HTTPS 响应，覆盖
-allowlist/URL 原始值校验、未知字段、请求体、HTTP 客户端异常分类、3xx 不跟随、
-环境代理忽略、JSON 深层嵌套/NaN、api_key ASCII/控制字符、只读属性、不重试与
-密钥泄漏断言。当前全套 **202 passed**（config/custody/chain 64 + BYOK 138）。
+低层 socket/`HTTPConnection.connect` 并注入假 transport / 假 HTTPS 响应；runner
+用脚本化模型、假钱包工具与假链，覆盖资格测试、线程隔离、预算、数据同意、
+停服、弃权分流和 ABI 形状断言。当前全套 **298 passed**（config 30 / custody 16 /
+chain 18 / BYOK 138 / runner 相关 96）。
 
 ## 安全约定
 
 - 不提交 vault、`.venv`、私钥或任何真实 API Key。
-- 错误信息与日志不得包含 secret；custody 已按此实现。
-- 本阶段不实现密钥轮换/多主密钥、custody 访问审计，也不实现 FastAPI/uvicorn
-  （审计落点见计划任务 12/14；均在后续任务）。
+- 不提交 `platform/data/`（transcript、custody 审计日志、后续索引库）；攻方/矿工
+  数据不得进入仓库。
+- 错误信息与日志不得包含 secret；custody 与审计包装已按此实现。
+- 本阶段不实现密钥轮换/多主密钥，也不实现 FastAPI/uvicorn（任务 14）；
+  custody 审计已由任务 12 的 `custody_audit` 落盘，v1 无审计查询接口。

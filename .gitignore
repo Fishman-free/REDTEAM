@@ -43,3 +43,7 @@ platform/vault.json
 platform/**/__pycache__/
 .pytest_cache/
 *.pyc
+
+# Platform runtime data: transcripts, custody audit logs and (from task 13)
+# index databases. Attacker/miner content must never be committed.
+platform/data/
