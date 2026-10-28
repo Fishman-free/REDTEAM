@@ -1,4 +1,4 @@
-# redteam-platform（任务 10 骨架 + 任务 11 BYOK + 任务 12 runner）
+# redteam-platform（任务 10 骨架 + 任务 11 BYOK + 任务 12 runner + 任务 13 indexer）
 
 REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端与智能体 runner。本阶段包含：
 
@@ -9,7 +9,8 @@ REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端�
 - `redteam_platform.byok`：守方自带 Key 的白名单模型客户端（provider/base_url/model 由平台固定，调用方只传 api_key）；
 - `redteam_platform.runner`：每赛一个智能体会话，攻方隔离线程、资格测试、预算与停服；
 - `redteam_platform.agent_tools`：固定工具面 `get_balance` / `transfer_rtm`，W 私钥真实签名；
-- `redteam_platform.transcripts`：按 join 时 `dataConsent` 决定是否落盘。
+- `redteam_platform.transcripts`：按 join 时 `dataConsent` 决定是否落盘；
+- `redteam_platform.indexer`：链事件 → SQLite → 攻方/守方/矿工/挖矿榜（含烟测排除与 runner 停服回调）。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -237,6 +238,64 @@ PYTHONPATH="..;../rsi4safety/payment_agents" .venv/Scripts/python -m ...
 runner 不引用 `approveSale` 或旧 `accrue`。runner 信任调用方已完成链上
 join/consent/AttackPaid 校验。
 
+## Indexer 与排行榜（任务 13）
+
+`indexer.EventIndexer` 把链事件幂等写入 SQLite（主键 `(block_number, log_index)`），
+并从 Arena / RTMToken / DataMarket 事件维护聚合：
+
+| 榜 | 字段 |
+|---|---|
+| 攻方 | `wins`、`rtm_won`（Breach + ContestSettled rest）、`difficulty`（攻破时该赛付费消息数）、`current_streak`/`longest_streak` |
+| 守方 | `contests_survived`（仅 Expired）、`msgs_withstood`（Expired 赛的付费消息数）、`net_income = penalties - breach_loss`、`longest_survival`（秒） |
+| 矿工 | `joined`、`decided_joined`（settled+retired）、`wins`、`rtm_won_fixed`、`difficulty`、`breach_rate = wins/decided_joined` |
+| 挖矿 | `created/settled/retired/decided`、全局 `breach_rate`、`total_fixed_reward`、`active_versions`、`history` |
+
+- **烟测排除**：构造时传 `excluded_contest_ids={addresses["smokeContestId"]}`；
+  该类赛的原始事件仍以 `excluded=1` 入库，但不进入任何聚合/榜/回调。
+- **部署注水 mint 排除**：不索引 `MiningMinted`；发行量只看已纳入比赛的
+  `MiningSettled.reward`，因此 Faucet 1,000,000、Treasury 3、烟测补铸 1 都不计入。
+- **唯一链事件源**：`ChainEventSource.from_chain_client(...)` 按 R4 ABI 拉取
+  Arena 的 17 个事件、RTMToken 的 `Breach`、DataMarket 的发布/售出事件，并按
+  `(block, log)` 排序；缺失 ABI 事件会报错，不会静默漏索引。
+- **幂等同步**：`process_block_range(source, start, end)` 可重复执行；`last_block`
+  只在整段成功后推进，重放不会重复计数。
+- **停服回调**：构造时传 `on_mining_ended=(contest_id, event_name)->None`，在
+  挖矿 `Breach`/`MiningSettled`/`MiningRetired` **首次**入库时触发；任务 14 用它
+  调 `AgentSession.stop_for_mining`。回调抛错会回滚该事件，便于重试。
+- **范围**：只索引公开链数据，不读私钥、不写 custody 审计、不提供 HTTP。
+- **已知边界**：不处理链重组；SQLite 单写进程（进程内 RLock）；`MiningMinted`
+  不进入原始事件表。`msgs_withstood`/`contests_survived` 采用“守到到期”口径，
+  `breach_rate` 采用“已决挖矿赛”口径（见模块 docstring）。
+
+```python
+import json
+from pathlib import Path
+
+from redteam_platform.config import load_settings
+from redteam_platform.chain import ChainClient
+from redteam_platform.indexer import ChainEventSource, EventIndexer
+
+settings = load_settings()
+addresses = json.loads(settings.addresses_path.read_text(encoding="utf-8"))
+smoke = addresses.get("smokeContestId")
+chain = ChainClient(settings)
+source = ChainEventSource.from_chain_client(chain)
+
+with EventIndexer(
+    Path("data/index.sqlite3"),
+    network=addresses["network"],
+    excluded_contest_ids=({smoke} if smoke else set()),
+    on_mining_ended=lambda contest_id, name: ...,  # task 14: runners[contest_id].stop_for_mining(name)
+) as index:
+    index.process_block_range(source, 0, source.latest_block)
+    boards = index.leaderboards()
+```
+
+`leaderboards()` 返回 `{"network", "attackers": {addr: {...}}, "defenders": {...},
+"miners": {...}, "mining": {...}}`；`contest(id)`、`contest_attackers(id)`、
+`data_consent(id, addr)` 供任务 14 数据服务使用。金额一律为十进制 wei 字符串，
+避免 JS 精度与 SQLite 64 位整数溢出。
+
 ## 测试
 
 ```bash
@@ -249,8 +308,10 @@ cd platform
 较低的 scrypt 参数（`scrypt_n=2**14`，仅测试；生产默认 `2**15`）；BYOK 测试拦截
 低层 socket/`HTTPConnection.connect` 并注入假 transport / 假 HTTPS 响应；runner
 用脚本化模型、假钱包工具与假链，覆盖资格测试、线程隔离、预算、数据同意、
-停服、弃权分流和 ABI 形状断言。当前全套 **298 passed**（config 30 / custody 16 /
-chain 18 / BYOK 138 / runner 相关 96）。
+停服、弃权分流和 ABI 形状断言；indexer 用合成事件覆盖普通/挖矿/退役/到期/
+弃权/罚款/同意、烟测排除、部署注水排除、幂等重放、停服回调、链事件源与 ABI
+形状断言。当前全套 **320 passed**（config 30 / custody 16 / chain 18 / BYOK 138 /
+runner 相关 96 / indexer 22）。
 
 ## 安全约定
 
