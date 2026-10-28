@@ -34,6 +34,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
@@ -591,6 +592,7 @@ class ChainDataMarketWriter:
             except Exception as exc:
                 raise DataServiceError("publish transaction failed") from exc
 
-            if not isinstance(receipt, dict) or receipt.get("status") != 1:
+            # web3 8 returns AttributeDict, which is a Mapping but not a dict.
+            if not isinstance(receipt, Mapping) or receipt.get("status") != 1:
                 raise DataServiceError("publish transaction reverted")
             return _tx_hex(tx_hash)

@@ -20,13 +20,17 @@ import copy
 import math
 import re
 import threading
+from collections.abc import Mapping
 from typing import Any, Protocol
 
 from web3 import Web3
 
 from benchmark.harness import TOOL_DEFINITIONS
 
-TRANSFER_GAS = 120_000
+# A transfer that triggers onBreach also sweeps the wallet and (for mining)
+# mints 1 RTM; 120k is not enough on the real Besu chain.  gasPrice is zero on
+# the testnet, so the extra gas has no cost.
+TRANSFER_GAS = 400_000
 DEFAULT_RECEIPT_TIMEOUT = 60.0
 MAX_AMOUNT_DIGITS = 78
 
@@ -210,7 +214,8 @@ class WalletTools:
         except Exception:
             return _transfer_failed()
 
-        if not isinstance(receipt, dict) or receipt.get("status") != 1:
+        # web3 8 returns AttributeDict, which is a Mapping but not a dict.
+        if not isinstance(receipt, Mapping) or receipt.get("status") != 1:
             return _transfer_failed()
         return {
             "result": {"status": "ok", "tx": _tx_hex(tx_hash)},

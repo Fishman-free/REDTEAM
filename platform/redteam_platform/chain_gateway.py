@@ -12,10 +12,12 @@ from __future__ import annotations
 import math
 import re
 import threading
+from collections.abc import Mapping
 from typing import Any, Callable, Protocol
 
 from eth_account import Account
 from web3 import Web3
+from web3.logs import DISCARD
 
 from .indexer import IndexerError, normalize_contest_id
 
@@ -212,7 +214,8 @@ class Web3ChainGateway:
                 )
             except Exception as exc:
                 raise GatewayError("transaction failed") from exc
-            if not isinstance(receipt, dict) or receipt.get("status") != 1:
+            # web3 8 returns AttributeDict, which is a Mapping but not a dict.
+            if not isinstance(receipt, Mapping) or receipt.get("status") != 1:
                 raise GatewayError("transaction reverted")
             return _hex32(tx_hash), receipt
 
@@ -231,7 +234,7 @@ class Web3ChainGateway:
     def _contest_id_from_receipt(self, receipt: dict, event_name: str = "ContestCreated") -> str:
         try:
             event = getattr(self._arena.events, event_name)
-            decoded = event.process_receipt(receipt)
+            decoded = event.process_receipt(receipt, errors=DISCARD)
         except Exception as exc:
             raise GatewayError("cannot decode contest event") from exc
         for entry in decoded:
@@ -305,7 +308,7 @@ class Web3ChainGateway:
             lambda: self._arena.functions.contestInfo(digest).call(),
             "contestInfo",
         )
-        if isinstance(info, dict):
+        if isinstance(info, Mapping):
             values = [info.get(name) for name in _CONTEST_FIELDS]
         else:
             try:

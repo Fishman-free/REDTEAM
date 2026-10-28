@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 from web3 import Web3
+from web3.datastructures import AttributeDict
 
 from redteam_platform.custody import Custody
 from redteam_platform.custody_audit import AuditedCustody
@@ -501,7 +502,7 @@ class FakeEth:
         return "0xtxhash"
 
     def wait_for_transaction_receipt(self, tx_hash, timeout=None):
-        return {"status": self.status}
+        return AttributeDict({"status": self.status})
 
 
 class FakeW3:

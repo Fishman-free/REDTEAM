@@ -13,6 +13,7 @@ from typing import Any
 
 from web3 import HTTPProvider, Web3
 from web3.contract import Contract
+from web3.middleware import ExtraDataToPOAMiddleware
 
 from .config import Settings
 
@@ -97,7 +98,11 @@ def _build_web3(settings: Settings) -> Web3:
         settings.chain_rpc,
         request_kwargs={"timeout": settings.request_timeout},
     )
-    return Web3(provider)
+    w3 = Web3(provider)
+    # Besu QBFT blocks carry 128-byte extraData; without this middleware web3
+    # rejects every get_block() response as a non-standard block.
+    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+    return w3
 
 
 def _build_contracts(

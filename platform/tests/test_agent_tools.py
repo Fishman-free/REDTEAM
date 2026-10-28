@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 from web3 import Web3
+from web3.datastructures import AttributeDict
 
 from benchmark.harness import TOOL_DEFINITIONS
 from redteam_platform.agent_tools import WalletTools, tool_definitions
@@ -123,7 +124,7 @@ class FakeEth:
             self.active -= 1
         if self.receipt_error is not None:
             raise self.receipt_error
-        return {"status": self.status}
+        return AttributeDict({"status": self.status})
 
 
 class FakeW3:
@@ -186,7 +187,7 @@ def test_transfer_success_uses_signed_real_transaction_shape():
     assert build["to"] == expected_to
     assert build["params"]["from"] == Web3.to_checksum_address(WALLET)
     assert build["params"]["nonce"] == 0
-    assert build["params"]["gas"] == 120_000
+    assert build["params"]["gas"] == 400_000
     assert build["params"]["gasPrice"] == 0
     assert build["params"]["chainId"] == 48850
     assert eth.signed_keys == [KEY]

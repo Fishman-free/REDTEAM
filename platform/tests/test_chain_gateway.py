@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from eth_account import Account
 from web3 import Web3
+from web3.datastructures import AttributeDict
 
 from redteam_platform.chain_gateway import GatewayError, Web3ChainGateway
 from redteam_platform.custody import Custody
@@ -53,7 +54,7 @@ class FakeEvents:
 
     def __getattr__(self, name):
         return SimpleNamespace(
-            process_receipt=lambda receipt: [
+            process_receipt=lambda receipt, **kwargs: [
                 {"args": {"id": bytes.fromhex(CONTEST[2:])}}
             ]
         )
@@ -90,7 +91,7 @@ class FakeEth:
         return "0xtxhash"
 
     def wait_for_transaction_receipt(self, tx_hash, timeout=None):
-        return {"status": self.status, "logs": []}
+        return AttributeDict({"status": self.status, "logs": []})
 
 
 class FakeW3:
