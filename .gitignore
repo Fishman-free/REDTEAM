@@ -47,3 +47,8 @@ platform/**/__pycache__/
 # Platform runtime data: transcripts, custody audit logs and (from task 13)
 # index databases. Attacker/miner content must never be committed.
 platform/data/
+
+# local fork / visual-test workspace
+.anvil/
+# docker stack secrets
+deploy/.env.stack

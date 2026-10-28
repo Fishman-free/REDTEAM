@@ -1,0 +1,153 @@
+name: rtm-arena
+
+# One-command local/public-demo stack:
+#   ./deploy/up.sh
+# See deploy/README.md for the production topology and reset instructions.
+
+services:
+  besu-init:
+    image: hyperledger/besu:24.5.1
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/init.sh"]
+    volumes:
+      - besu-data:/shared
+      - ../infra/besu-testnet/genesis.json:/template/genesis.json:ro
+      - ./besu/init.sh:/init.sh:ro
+    restart: "no"
+
+  besu:
+    image: hyperledger/besu:25.10.0
+    user: "0:0"
+    depends_on:
+      besu-init:
+        condition: service_completed_successfully
+    command:
+      - --config-file=/shared/config.toml
+      - --min-gas-price=0
+      - --tx-pool-enable-balance-check=false
+      - --rpc-http-api=ETH,NET,WEB3,QBFT,DEBUG
+      - --host-allowlist=*
+      - --rpc-http-cors-origins=*
+    volumes:
+      - besu-data:/shared
+    ports:
+      - "127.0.0.1:${BESU_RPC_PORT:-8546}:8545"
+    restart: unless-stopped
+
+  contracts:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.contracts
+    depends_on:
+      besu:
+        condition: service_started
+    volumes:
+      - besu-data:/shared:ro
+      - rtm-registry:/registry
+      - rtm-artifacts:/artifacts
+    restart: "no"
+
+  vault-init:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    image: rtm-arena-api
+    depends_on:
+      besu-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env.stack
+    environment:
+      PLATFORM_MODEL_KEY: ${PLATFORM_MODEL_KEY:-demo-key}
+    entrypoint: ["python", "/app/deploy/init-vault.py"]
+    volumes:
+      - besu-data:/shared:ro
+      - rtm-platform-data:/data
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    image: rtm-arena-api
+    depends_on:
+      besu:
+        condition: service_started
+      contracts:
+        condition: service_completed_successfully
+      vault-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env.stack
+    environment:
+      CHAIN_RPC: http://besu:8545
+      PLATFORM_PUBLIC_RPC: /rpc
+      PLATFORM_ADDRESSES_PATH: /registry/addresses.json
+      PLATFORM_ARTIFACTS_DIR: /artifacts
+      PLATFORM_VAULT: /data/vault.json
+      PLATFORM_DATA_DIR: /data
+      PLATFORM_INDEXER_ENABLED: "true"
+      MODEL_ALLOWLIST_JSON: '{"local-mock":{"base_url":"http://127.0.0.1:18081/v1","model":"mock-defender"}}'
+      PLATFORM_MODEL_PROVIDER: local-mock
+    volumes:
+      - rtm-registry:/registry:ro
+      - rtm-artifacts:/artifacts:ro
+      - rtm-platform-data:/data
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  # Demo-only model. It shares the API network namespace so the allowlist can
+  # use a loopback HTTP URL (the production allowlist requires HTTPS otherwise).
+  mock-model:
+    image: python:3.12-slim
+    network_mode: "service:api"
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      MOCK_MODEL_HOST: 127.0.0.1
+      MOCK_MODEL_PORT: "18081"
+      MOCK_MODEL_NAME: mock-defender
+    volumes:
+      - ../tools:/app:ro
+    command: ["python", "/app/mock_model.py"]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../dapp
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_RPC_URL: /rpc
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - .env.stack
+    environment:
+      PORT: "3000"
+      PLATFORM_API_URL: http://api:8080
+      PLATFORM_RPC_URL: http://besu:8545
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 4s
+      retries: 4
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  besu-data:
+  rtm-registry:
+  rtm-artifacts:
+  rtm-platform-data:

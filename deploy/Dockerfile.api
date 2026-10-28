@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+COPY platform/pyproject.toml /app/platform/pyproject.toml
+COPY platform/README.md /app/platform/README.md
+COPY platform/redteam_platform /app/platform/redteam_platform
+RUN pip install --no-cache-dir -e /app/platform
+
+COPY benchmark /app/benchmark
+COPY rsi4safety/payment_agents /app/rsi4safety/payment_agents
+COPY deploy/init-vault.py /app/deploy/init-vault.py
+
+ENV PYTHONPATH=/app:/app/rsi4safety/payment_agents
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=15s --timeout=4s --start-period=30s --retries=4 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"
+
+CMD ["python", "-m", "uvicorn", "redteam_platform.api:app_from_env", "--factory", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
