@@ -71,7 +71,7 @@ class FakeGateway:
                 "start": 1000,
                 "end": 100_000,
                 "ended_at": 0,
-                "state": 0,
+                "state": 1,
                 "is_mining": False,
                 "attacker_count": 1,
                 "paused": False,
@@ -85,7 +85,7 @@ class FakeGateway:
                 "start": 1000,
                 "end": 2**64 - 1,
                 "ended_at": 0,
-                "state": 0,
+                "state": 1,
                 "is_mining": True,
                 "attacker_count": 1,
                 "paused": False,
@@ -861,3 +861,41 @@ def test_create_app_validates_token():
         create_app(service, "short")
     with pytest.raises(ValueError):
         create_app(service, "contains space " + "x" * 20)
+
+
+def test_meta_and_status_endpoints(api_bundle):
+    assert api_bundle.client.get("/meta").status_code == 401
+    assert api_bundle.client.get("/status").status_code == 401
+
+    meta = api_bundle.client.get("/meta", headers=auth())
+    assert meta.status_code == 200
+    assert meta.json()["network"] == "test"
+    assert "addresses" in meta.json()
+
+    status = api_bundle.client.get("/status", headers=auth())
+    assert status.status_code == 200
+    assert status.json()["status"] == "ok"
+    assert "indexer" in status.json()
+
+
+def test_create_app_accepts_public_meta_and_status(api_bundle):
+    app = create_app(
+        api_bundle.service,
+        TOKEN,
+        meta={"network": "custom", "chainId": 7},
+        status_provider=lambda: {"status": "ok", "indexer": {"running": True}},
+    )
+    client = TestClient(app)
+    assert client.get("/meta", headers=auth()).json() == {"network": "custom", "chainId": 7}
+    assert client.get("/status", headers=auth()).json()["indexer"]["running"] is True
+
+
+def test_join_intent_rejects_none_state(api_bundle):
+    api_bundle.gateway.contests[CONTEST]["state"] = 0
+    response = api_bundle.client.post(
+        f"/contests/{CONTEST}/join-intent",
+        headers=auth(),
+        json={"max_stake": "5", "data_consent": False},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "contest is not live"

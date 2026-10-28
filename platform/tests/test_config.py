@@ -266,3 +266,26 @@ def test_vault_parent_must_be_directory(base_env, tmp_path):
     env = dict(base_env, PLATFORM_VAULT=str(parent_file / "vault.json"))
     with pytest.raises(ConfigError, match="vault parent"):
         load_settings(env)
+
+
+def test_indexer_settings_from_environment(base_env):
+    env = dict(
+        base_env,
+        PLATFORM_INDEXER_ENABLED="false",
+        PLATFORM_INDEXER_INTERVAL="2.5",
+        PLATFORM_INDEXER_START_BLOCK="123",
+    )
+    settings = load_settings(env)
+    assert settings.indexer_enabled is False
+    assert settings.indexer_interval == 2.5
+    assert settings.indexer_start_block == 123
+
+
+def test_invalid_indexer_settings_are_rejected(base_env):
+    for env, message in (
+        (dict(base_env, PLATFORM_INDEXER_ENABLED="maybe"), "PLATFORM_INDEXER_ENABLED"),
+        (dict(base_env, PLATFORM_INDEXER_INTERVAL="0"), "PLATFORM_INDEXER_INTERVAL"),
+        (dict(base_env, PLATFORM_INDEXER_START_BLOCK="-1"), "PLATFORM_INDEXER_START_BLOCK"),
+    ):
+        with pytest.raises(ConfigError, match=message):
+            load_settings(env)

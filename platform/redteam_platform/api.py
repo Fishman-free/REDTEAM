@@ -25,9 +25,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 import re
 import threading
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
@@ -49,12 +51,14 @@ from .custody import Custody
 from .custody_audit import AuditedCustody
 from .data_service import ChainDataMarketWriter, DataService, DataServiceError
 from .faucet_signer import FaucetSigner, FaucetSignerError
-from .indexer import EventIndexer, IndexerError, normalize_contest_id
+from .indexer import ChainEventSource, EventIndexer, IndexerError, normalize_contest_id
+from .indexer_runner import IndexerRunner
 from .runner import AgentSession, RunnerStopped
 from .config import Settings, load_settings
 
 MINING_REWARD = 10**18
 MAX_ACTIVE_MINING = 3
+STATE_LIVE = 1  # Arena.State.Live
 ZERO_HASH = "0x" + "00" * 32
 MINING_TERMS = (
     "加入挖矿赛即视为同意平台留存全部消息、回复、工具轨迹与快照；这些数据仅用于"
@@ -463,7 +467,7 @@ class PlatformService:
         info = self._contest_info(cid)
         if info["is_mining"]:
             raise ApiError(409, "this is a mining contest")
-        if info["state"] != 0:
+        if info["state"] != STATE_LIVE:
             raise ApiError(409, "contest is not live")
         if int(self.deps.clock()) >= info["end"]:
             raise ApiError(409, "contest has ended")
@@ -493,7 +497,7 @@ class PlatformService:
         info = self._contest_info(cid)
         if not info["is_mining"]:
             raise ApiError(409, "this is not a mining contest")
-        if info["state"] != 0:
+        if info["state"] != STATE_LIVE:
             raise ApiError(409, "contest is not live")
         return {
             "contest_id": cid,
@@ -849,13 +853,20 @@ class PlatformService:
 # -- FastAPI app ---------------------------------------------------------
 
 
-def create_app(service: PlatformService, token: str) -> FastAPI:
+def create_app(
+    service: PlatformService,
+    token: str,
+    *,
+    meta: dict[str, Any] | None = None,
+    status_provider: Callable[[], dict[str, Any]] | None = None,
+    lifespan: Callable[[FastAPI], Any] | None = None,
+) -> FastAPI:
     if not isinstance(token, str) or not 24 <= len(token) <= 256:
         raise ValueError("API token must contain 24-256 characters")
     if any(not 0x21 <= ord(character) <= 0x7E for character in token):
         raise ValueError("API token must contain visible non-space ASCII")
 
-    app = FastAPI(title="REDTEAM platform API", version="0.1.0")
+    app = FastAPI(title="REDTEAM platform API", version="0.1.0", lifespan=lifespan)
     app.state.service = service
 
     def require_auth(authorization: str | None = Header(default=None)) -> None:
@@ -872,6 +883,47 @@ def create_app(service: PlatformService, token: str) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/meta", dependencies=[Depends(require_auth)])
+    def platform_meta() -> dict[str, Any]:
+        if meta is not None:
+            return meta
+        return {
+            "network": getattr(service.indexer, "network", "unknown"),
+            "chainId": None,
+            "rpc": "",
+            "addresses": {},
+            "fees": {},
+            "limits": {},
+            "providers": [],
+            "faucet": {"dripAmountWei": "0", "captchaRequired": False},
+            "features": {"mining": True, "dataMarket": True, "defenderRegistration": True},
+            "indexer": {"startBlock": 0},
+        }
+
+    @app.get("/status", dependencies=[Depends(require_auth)])
+    def platform_status() -> dict[str, Any]:
+        if status_provider is not None:
+            return status_provider()
+        last_block = None
+        try:
+            last_block = service.indexer.last_block()
+        except Exception:
+            pass
+        return {
+            "status": "ok",
+            "network": getattr(service.indexer, "network", "unknown"),
+            "indexer": {
+                "running": None,
+                "lastBlock": last_block,
+                "latestBlock": None,
+                "lag": None,
+                "lastError": None,
+                "updatedAt": int(time.time()),
+                "events": None,
+            },
+            "time": int(time.time()),
+        }
 
     @app.post("/defenders/register", status_code=201, dependencies=[Depends(require_auth)])
     def register(payload: RegisterDefender) -> dict[str, Any]:
@@ -936,6 +988,16 @@ def create_app(service: PlatformService, token: str) -> FastAPI:
         return service.mining_join_intent(payload)
 
     return app
+
+
+def _rtm_to_wei(value: Any, default: str = "0") -> str:
+    try:
+        amount = Decimal(str(value)) * (10**18)
+        if not amount.is_finite() or amount < 0 or amount != amount.to_integral_value():
+            raise InvalidOperation
+        return str(int(amount))
+    except (InvalidOperation, ValueError, TypeError):
+        return default
 
 
 def build_app(
@@ -1052,6 +1114,102 @@ def build_app(
         )
         return ByokClient(provider, key)
 
+    source = ChainEventSource.from_chain_client(chain, include_market=True)
+    start_block = settings.indexer_start_block or int(addresses.get("deployBlock", 0) or 0)
+    runner = (
+        IndexerRunner(
+            indexer,
+            source,
+            start_block=start_block,
+            interval=settings.indexer_interval,
+        )
+        if settings.indexer_enabled
+        else None
+    )
+
+    mining_reward_wei = _rtm_to_wei(addresses.get("miningReward", "1"), "1000000000000000000")
+    mining_fee_bps = int(addresses.get("miningFeeBps", 50) or 50)
+    mining_fee_wei = str(int(Decimal(mining_reward_wei) * mining_fee_bps / 10_000))
+    faucet_drip_wei = _rtm_to_wei(addresses.get("faucetDrip", "200"), "200000000000000000000")
+
+    public_meta: dict[str, Any] = {
+        "network": addresses["network"],
+        "chainId": settings.chain_id,
+        "rpc": os.environ.get("PLATFORM_PUBLIC_RPC", "").strip() or settings.chain_rpc,
+        "addresses": {
+            key: addresses[key]
+            for key in ("treasury", "arena", "rtm", "faucet", "dataMarket")
+        },
+        "fees": {
+            "attackFeeBps": 50,
+            "miningFeeBps": mining_fee_bps,
+            "miningRewardWei": mining_reward_wei,
+            "miningFeeWei": mining_fee_wei,
+        },
+        "limits": {
+            "minDurationH": 6,
+            "maxDurationH": 168,
+            "minStakeBps": 200,
+            "maxStakeBps": 2000,
+            "maxActiveMining": MAX_ACTIVE_MINING,
+        },
+        "providers": sorted(settings.model_allowlist.keys()),
+        "faucet": {
+            "dripAmountWei": faucet_drip_wei,
+            "captchaRequired": settings.faucet_captcha_required,
+        },
+        "features": {
+            "mining": bool(settings.platform_model_provider),
+            "dataMarket": True,
+            "defenderRegistration": bool(settings.model_allowlist),
+        },
+        "indexer": {"startBlock": start_block},
+    }
+
+    def indexer_status() -> dict[str, Any]:
+        if runner is not None:
+            state = runner.snapshot()
+        else:
+            try:
+                state = indexer.sync_state()
+                state = {
+                    "running": False,
+                    "lastBlock": state.get("last_block"),
+                    "latestBlock": None,
+                    "lag": None,
+                    "lastError": None,
+                    "updatedAt": int(time.time()),
+                    "events": state.get("events"),
+                }
+            except Exception:
+                state = {
+                    "running": False,
+                    "lastBlock": None,
+                    "latestBlock": None,
+                    "lag": None,
+                    "lastError": None,
+                    "updatedAt": int(time.time()),
+                    "events": None,
+                }
+        return {
+            "status": "ok",
+            "network": addresses["network"],
+            "chainId": settings.chain_id,
+            "indexer": state,
+            "time": int(time.time()),
+        }
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        if runner is not None:
+            runner.start()
+        try:
+            yield
+        finally:
+            if runner is not None:
+                runner.stop()
+            indexer.close()
+
     service = PlatformService(
         ApiDeps(
             gateway=gateway,
@@ -1067,7 +1225,13 @@ def build_app(
         )
     )
     holder["service"] = service
-    return create_app(service, settings.api_token)
+    return create_app(
+        service,
+        settings.api_token,
+        meta=public_meta,
+        status_provider=indexer_status,
+        lifespan=lifespan,
+    )
 
 
 def app_from_env() -> FastAPI:
