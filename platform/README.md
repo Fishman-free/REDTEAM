@@ -11,6 +11,7 @@ REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端�
 - `redteam_platform.agent_tools`：固定工具面 `get_balance` / `transfer_rtm`，W 私钥真实签名；
 - `redteam_platform.transcripts`：按 join 时 `dataConsent` 决定是否落盘；
 - `redteam_platform.indexer`：链事件 → SQLite → 攻方/守方/矿工/挖矿榜（含烟测排除与 runner 停服回调）；
+- `redteam_platform.indexer_runner`：API 内置后台索引循环（单进程、按 200 块分批、`/status` 可观测）；
 - `redteam_platform.faucet_signer`：Faucet EIP-712 票据签发（audited key、nonce、captcha）；
 - `redteam_platform.data_service`：consent-aware 数据集 bundle / operator publish / 切片交付；
 - `redteam_platform.rsi_export`：挖矿攻破 → RSI findings（仅 `rsi_only` 数据，不进 DataMarket）；
@@ -50,6 +51,7 @@ pip install -e ".[dev]"
 | `CHAIN_RPC` | 地址文件 `rpc`，再回退 `http://127.0.0.1:8546` | 仅接受 http(s) |
 | `CHAIN_ID` | 地址文件 `chainId`（当前 `48850`） | 正整数，支持 `0x` 前缀 |
 | `CHAIN_TIMEOUT` | `15` | RPC 超时秒数 |
+| `PLATFORM_PUBLIC_RPC` | `CHAIN_RPC` | 仅用于 `/meta` 的公开 RPC 展示；同源部署可设为 `/rpc` |
 | `OPERATOR_KEY_ENTRY` | `operator` | keystore **条目名**，不是密钥 |
 | `FAUCET_SIGNER_ENTRY` | `faucet-signer` | keystore **条目名**，不是密钥 |
 | `TREASURY_OWNER_KEY_ENTRY` | `treasury-owner` | Treasury owner EOA 的 keystore **条目名**（挖矿预打款） |
@@ -58,6 +60,9 @@ pip install -e ".[dev]"
 | `PLATFORM_API_TOKEN` | 无（API 必需） | 24–256 个可见非空格 ASCII；bearer token；不进 repr/日志 |
 | `FAUCET_CAPTCHA_REQUIRED` | `false` | `true` 时必须给 `build_app(captcha_verifier=...)`，否则启动失败 |
 | `MODEL_ALLOWLIST_JSON` | `{}` | 模型白名单 JSON object；构造 `ByokClient` 时读取（见下） |
+| `PLATFORM_INDEXER_ENABLED` | `true` | 是否随 API 启动后台事件索引器 |
+| `PLATFORM_INDEXER_INTERVAL` | `1.5` | 索引器轮询间隔秒数 |
+| `PLATFORM_INDEXER_START_BLOCK` | `0` | 显式起始块；0 时优先 addresses.json 的 `deployBlock` |
 
 生成主密钥（只在本机保存，例如密码管理器/密钥管理系统）：
 
@@ -310,6 +315,20 @@ with EventIndexer(
 `data_consent(id, addr)` 供任务 14 数据服务使用。金额一律为十进制 wei 字符串，
 避免 JS 精度与 SQLite 64 位整数溢出。
 
+### 自动索引器（API 内置）
+
+生产启动 `build_app` 时会创建 `indexer_runner.IndexerRunner`，在 API 生命周期内
+每 1.5 秒拉取一次链事件，不再需要单独的 Python 循环：
+
+- 起始块优先取 `PLATFORM_INDEXER_START_BLOCK`，否则使用 `addresses.json` 的
+  `deployBlock`；`deploy-testnet.js` 现在会写入该字段。
+- 公链 fork 上若忘记配置起始块，runner 只扫描最近 10,000 块，并在 `/status`
+  的 `lastError` 里明确警告，避免误扫数千万块。
+- `PLATFORM_INDEXER_ENABLED=false` 可关闭；`PLATFORM_INDEXER_INTERVAL` 调整轮询。
+- `/status` 返回 `running/lastBlock/latestBlock/lag/lastError/events`，供 dApp
+  显示同步状态。
+- 仍是单写进程：不要开多个 uvicorn worker，也不要同时跑外部索引循环。
+
 ## Faucet 票据（任务 14）
 
 `faucet_signer.FaucetSigner` 签 `Faucet.sol` 的 EIP-712 票据：
@@ -430,6 +449,9 @@ defender/buyer/attacker 身份仍由链上事件与服务层校验。
 
 | 路由 | 说明 |
 |---|---|
+| `GET /health` | 无鉴权，仅进程存活 |
+| `GET /meta` | 鉴权；公开链/费用/限额/provider/功能开关，供 dApp 运行时读取 |
+| `GET /status` | 鉴权；API + 自动索引器状态（last/latest block、lag、事件数） |
 | `POST /defenders/register` | `{defender, provider, api_key, defense_prompt, mandate}`；BYOK/W 入审计托管、W 预置 1 wei、资格测试；失败回滚托管条目 |
 | `POST /contests` | `{stake, duration_h, stake_bps}`（可选 `?defender=`；只有一个 defender 时自动选用）；守方先 approve，operator `createContest`；返回 contest_id/tx |
 | `POST /contests/{id}/join-intent` | `{max_stake, data_consent}`；返回 `join(id,maxStake,dataConsent)` 参数与 approve 提示 |
@@ -462,13 +484,29 @@ defender/buyer/attacker 身份仍由链上事件与服务层校验。
 - defender 记录、runner sessions、已处理 tx 均在进程内；API 重启后不能继续服务
   既有比赛的 runner，需要重新注册或由任务 19 加持久化。
 - 一次 registration 只能创建一个普通比赛（W 单场专用）。
-- indexer 不随 API 自动运行；必须另行运行任务 13 的 `process_block_range` 同步，
-  否则消息/交付会一直 409（未索引）。
+- indexer 默认随 API 自动运行；若显式设置 `PLATFORM_INDEXER_ENABLED=false`，
+  则消息/交付会一直 409（未索引），需要外部同步。
 - captcha provider 需要注入 `build_app(captcha_verifier=...)`；生产
   `FAUCET_CAPTCHA_REQUIRED=true` 且未注入时启动失败。
 - 真实 `Web3ChainGateway` 用测试网零 gas；主网需另配 gas。单 token 下
   `/downloads/{token}` 任何持 token 者可下载（token 本身是能力凭证）。
 - `msgHash` 与 `content` 的绑定由前端/运营约定，API 不重新哈希 content。
+
+## Web / BFF 部署
+
+浏览器不应直接持有 `PLATFORM_API_TOKEN`。推荐同源部署：
+
+- 生产 Web BFF（`dapp/server.mjs`）托管 `dapp/dist`，把 `/api/*` 代理到本 API，
+  并在服务端注入 `Authorization: Bearer ...`；
+- `/rpc` 代理到 Besu，浏览器只访问同源；
+- `/api/mining/contests` 与 `/api/data/:id/publish` 由 BFF 校验 `X-Admin-Key`；
+- Vite 开发服务器也在服务端读取 `platform/.env.local` 注入 token，前端 bundle
+  中不存在 token；
+- 生产只跑 **一个 uvicorn worker**；runner session、索引器、vault、faucet nonce
+  都是单进程状态。
+
+完整一键栈（Besu + 合约部署 + vault + API + Web + 演示模型）见
+`deploy/README.md`。演示模型是可被攻破的 mock，不代表真实安全性。
 
 ## 测试
 
@@ -489,7 +527,7 @@ publish/切片交付/下载 token/篡改检测、RSI 导出过滤与 schema、op
 task 15 用 FastAPI TestClient + FakeGateway/FakeRunner 覆盖鉴权、注册/资格、建赛、
 join-intent、消息收费确认/markDelivered/重复与 fault 分流、榜单、faucet、DataSold
 交付/下载、挖矿预打款/创建/恢复，以及 gateway 的 tx 构造/audit/event 解码。当前
-全套 **387 passed**（config 42 / custody 16 / chain 18 / BYOK 138 / runner 96 /
+全套 **394 passed**（config 42 / custody 16 / chain 18 / BYOK 138 / runner 96 /
 indexer 23 / faucet 10 / data 11 / rsi 7 / api 19 / gateway 7）。
 
 ### 测试网 e2e（默认不收集）
@@ -524,7 +562,7 @@ cd platform
   defender/attacker 角色，生产需在前面加角色/限流层。
 - API 不记录消息正文；`dataConsent=false` 的内容仅在 runner 内存。defender/
   session/已处理 tx 在进程内，重启后既有比赛需重新注册或加持久化。
-- indexer 不随 API 启动；必须另行运行 `process_block_range`，否则消息/交付会
-  一直等待索引。
+- indexer 默认随 API 启动（`PLATFORM_INDEXER_ENABLED=true`）；若关闭，必须另行
+  运行 `process_block_range`，否则消息/交付会一直等待索引。
 - 本阶段不实现密钥轮换/多主密钥；custody 审计已由任务 12 的 `custody_audit`
   落盘，v1 无审计查询接口。

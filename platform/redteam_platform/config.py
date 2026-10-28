@@ -39,6 +39,9 @@ ENV_PLATFORM_MODEL_ENTRY = "PLATFORM_MODEL_KEY_ENTRY"
 ENV_PLATFORM_MODEL_PROVIDER = "PLATFORM_MODEL_PROVIDER"
 ENV_API_TOKEN = "PLATFORM_API_TOKEN"
 ENV_FAUCET_CAPTCHA_REQUIRED = "FAUCET_CAPTCHA_REQUIRED"
+ENV_INDEXER_ENABLED = "PLATFORM_INDEXER_ENABLED"
+ENV_INDEXER_INTERVAL = "PLATFORM_INDEXER_INTERVAL"
+ENV_INDEXER_START_BLOCK = "PLATFORM_INDEXER_START_BLOCK"
 
 
 class ConfigError(RuntimeError):
@@ -64,6 +67,9 @@ class Settings:
     api_token: str | None = field(default=None, repr=False)
     faucet_captcha_required: bool = False
     request_timeout: float = DEFAULT_REQUEST_TIMEOUT
+    indexer_enabled: bool = True
+    indexer_interval: float = 1.5
+    indexer_start_block: int = 0
 
 
 def _env_value(env: Mapping[str, str], name: str) -> str | None:
@@ -192,6 +198,32 @@ def _resolve_api_token(env: Mapping[str, str]) -> str | None:
     return raw
 
 
+def _resolve_positive_float(env: Mapping[str, str], name: str, default: float) -> float:
+    raw = _env_value(env, name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a positive number, got {raw!r}") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ConfigError(f"{name} must be a positive number, got {raw!r}")
+    return value
+
+
+def _resolve_non_negative_int(env: Mapping[str, str], name: str, default: int) -> int:
+    raw = _env_value(env, name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw, 0)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a non-negative integer, got {raw!r}") from exc
+    if isinstance(value, bool) or value < 0:
+        raise ConfigError(f"{name} must be a non-negative integer, got {raw!r}")
+    return value
+
+
 def _resolve_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
     raw = _env_value(env, name)
     if raw is None:
@@ -244,6 +276,13 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     faucet_captcha_required = _resolve_bool(
         env_map, ENV_FAUCET_CAPTCHA_REQUIRED, False
     )
+    indexer_enabled = _resolve_bool(env_map, ENV_INDEXER_ENABLED, True)
+    indexer_interval = _resolve_positive_float(
+        env_map, ENV_INDEXER_INTERVAL, 1.5
+    )
+    indexer_start_block = _resolve_non_negative_int(
+        env_map, ENV_INDEXER_START_BLOCK, 0
+    )
 
     # Directory paths: artifacts may be absent until `npx hardhat compile`
     # runs, but if present they must be directories.  The vault parent may be
@@ -272,4 +311,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         api_token=api_token,
         faucet_captcha_required=faucet_captcha_required,
         request_timeout=request_timeout,
+        indexer_enabled=indexer_enabled,
+        indexer_interval=indexer_interval,
+        indexer_start_block=indexer_start_block,
     )

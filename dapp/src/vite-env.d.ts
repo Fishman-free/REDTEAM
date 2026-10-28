@@ -2,8 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
-  readonly VITE_API_TOKEN?: string;
   readonly VITE_RPC_URL?: string;
+  readonly VITE_EXPLORER_URL?: string;
 }
 
 interface ImportMeta {

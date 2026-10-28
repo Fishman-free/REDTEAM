@@ -1,54 +1,105 @@
-# REDTEAM dApp（任务 16）
+# RTM Arena dApp
 
-Vite + React + TypeScript + wagmi/viem。页面：概览、守方中心、攻方中心、挖矿中心、
-排行榜、水龙头、数据市场。视觉复用静态研究站的暗色/coral/mono 语言。
+React 19 + TypeScript + Vite 7 + wagmi/viem 的 RTM 红队竞技场前端。
 
-## 运行
+视觉方向是「战情室档案」：暖黑底、羊皮纸色文字、朱红与信号绿、衬线展示标题 +
+等宽数据标签。页面包含总览、竞技场、战场详情/付费对话、守方计划、挖矿中心、
+排行榜、数据市场、水龙头，以及独立的管理控制台 `/ops`。
+
+## 本地开发
+
+前置：平台 API 在 `127.0.0.1:8080`，链 RPC 在 `127.0.0.1:8546`。
 
 ```bash
 cd dapp
 npm install
-cp .env.example .env.local     # 填入本地 PLATFORM_API_TOKEN
-npm run dev                    # http://127.0.0.1:5173
+npm run dev        # http://127.0.0.1:5173
 ```
 
-Vite dev server 把 `/api` 代理到 `http://127.0.0.1:8080`（FastAPI 由任务 15 提供）。
-后端启动示例见 `platform/README.md`；indexer 需要另行同步，否则消息/交付会提示
-“未索引”。
+Vite dev proxy 会把 `/api` 转发到平台 API，并在**服务端**读取
+`../platform/.env.local` 的 `PLATFORM_API_TOKEN` 注入 `Authorization`。
+浏览器 bundle 里没有 API token，也没有 `VITE_API_TOKEN`。
+
+`/api/meta` 和 `/api/status` 提供链地址、费用、限额、provider 与索引器状态；
+前端用它们覆盖 `src/lib/contracts.ts` 里的 fallback 地址。
 
 ```bash
-npm run build                  # tsc --noEmit && vite build
+npm run build      # tsc --noEmit && vite build
+npm run preview    # 仅预览静态构建，不含 /api 代理
 ```
 
-## 链与环境变量
+## 生产运行（同源 BFF）
 
-- 链：Besu 测试网 `chainId=48850`，RPC 默认 `http://127.0.0.1:8546`（**不是 8545**）。
-- 地址：R4 `contracts/deploy/addresses.json`（`src/lib/contracts.ts`）。
-- `VITE_API_URL`：默认 `/api`；构建静态站时设为 API 源或由反向代理托管。
-- `VITE_API_TOKEN`：**只用于本地开发**。Vite 会把它打进前端 bundle；生产必须改用
-  BFF/会话/短期 token，不能把 operator/生产 token 放进 dApp。
-- `VITE_RPC_URL`：可覆盖 RPC。
+`server.mjs` 是生产用的最小 BFF：
+
+- 托管 `dist/` 的 SPA（含 history fallback）；
+- `/api/*` 反向代理到平台 API，并在服务端注入 `PLATFORM_API_TOKEN`；
+- `/rpc` 反向代理到 Besu RPC，让浏览器只访问同源；
+- `/api/mining/contests` 与 `/api/data/:id/publish` 需要 `X-Admin-Key`；
+- 对水龙头与守方注册做简单的按 IP 限流；
+- 永不把 `PLATFORM_ADMIN_KEY` 打进前端；`/ops` 页面只在 sessionStorage 保存用户输入的密钥。
+
+```bash
+npm run build
+PLATFORM_API_TOKEN=... \
+PLATFORM_ADMIN_KEY=... \
+PLATFORM_API_URL=http://127.0.0.1:8080 \
+PLATFORM_RPC_URL=http://127.0.0.1:8546 \
+npm start          # http://127.0.0.1:3000
+```
+
+生产构建默认 `VITE_RPC_URL=/rpc`（Dockerfile 传入），浏览器走同源代理。若单独部署
+静态站，请把 `VITE_RPC_URL` 指向公开 HTTPS RPC，并自行处理 CORS/鉴权。
+
+## 一键 Docker
+
+仓库根目录的完整栈：
+
+```bash
+bash deploy/up.sh
+```
+
+详见 `deploy/README.md`。默认包含一个**故意可被攻破**的 `local-mock` 演示模型，
+用于跑通加入、付费消息、攻破、数据市场与挖矿结算；它不是真实守方模型。
 
 ## 关键交互
 
-- **守方**：BYOK Key + DefensePackage.system_prompt + mandate → `POST /defenders/register`
-  （平台生成 W、跑资格测试）→ approve 质押 → `POST /contests`（operator 建赛）。
-  一次注册只能建一个普通比赛；比赛详情不展示攻击过程。
-- **攻方**：join 表单必须给出 `dataConsent` 选择（勾选=可留存/可售，不勾选=仅内存）；
-  签名前 approve 质押，再 `join(id,maxStake,dataConsent)`。每条消息先 approve
-  0.5% 费用，再 `attack`，然后轮询 `POST /contests/{id}/messages` 直到 indexer 确认。
-- **矿工**：加入前必须阅读并同意强制数据条款，只调用 `joinMining(id,true)`；无质押，
-  每条消息 0.005 RTM；固定 1 RTM，攻破后 hash 永久退役。**没有 accrue 按钮**。
-- **数据市场**：先由 operator 发布数据集（`POST /data/{id}/publish`），守方可买己方
-  或 `dataConsent=true` 的攻方数据；购买后用 `DataSold` tx 调
-  `POST /data/{id}/deliver` 拿一次性下载 token。挖矿数据不展示、不可售；没有
-  `approveSale`。
-- **水龙头**：`POST /faucet/ticket` 签 EIP-712 票据 → `Faucet.claim`；票据与 to
-  绑定，只有本人可领。
+- **钱包/网络**：注入式钱包；自动检测错误网络并支持 `wallet_addEthereumChain`；
+  顶部账户菜单展示 RTM / Gas 余额、复制地址、切链和断开。
+- **入门序列**：总览页四步检查（连接钱包 → 切测试网 → 领 RTM → 选角色）。
+- **竞技场**：状态筛选、搜索、排序、倒计时；战场详情包含加入/质押、数据同意确认、
+  付费对话、到期 `expire`、攻方 `withdrawStake`、守方 `collectPenalties`。
+- **付费对话**：一次授权最多 5 条消息费用；每条消息生成唯一 `msgHash`，
+  approve → attack → 等索引 → `POST /messages`；上链但未送达的消息会在
+  localStorage 保留，可「继续送达」或丢弃，避免重复付费。
+- **守方**：BYOK 注册、资格测试结果、一次注册一场赛、质押建赛、罚款拉取、
+  到期结算；注册摘要保存在本浏览器 localStorage。
+- **挖矿**：无质押加入、强制数据条款、固定 1 RTM 奖励、RSI-only 数据边界；
+  挖矿赛没有固定结束时间，界面显示 OPEN-ENDED。
+- **数据市场**：发布状态、守方自有数据、已同意攻方切片、已购状态、交付重试与
+  下载；购买记录保存在本浏览器。
+- **交易活动**：全局 Activity 抽屉与 toast，检查 receipt status，不再把回滚当成功。
 
-## 边界
+## 环境变量
 
-- dApp 不包含 RSI 导出页面；RSI 是平台内部安全数据。
-- 单 API token 是任务 15 v1 限制；不要把 token 提交到仓库（`.env*` 已 gitignored，
-  `.env.example` 仅占位）。
-- 测试网资产无价值；所有攻防仅用于防御研究。
+| 变量 | 用途 |
+| --- | --- |
+| `VITE_API_URL` | 默认 `/api`；同源 BFF |
+| `VITE_RPC_URL` | 浏览器 RPC；生产建议 `/rpc` 或 HTTPS RPC |
+| `VITE_EXPLORER_URL` | 可选；有浏览器时生成地址/交易链接 |
+| `PLATFORM_API_TOKEN` | 仅 dev proxy / `server.mjs` 读取，**不要加 `VITE_`** |
+| `PLATFORM_ADMIN_KEY` | 仅 `server.mjs` 校验 `/ops` 操作 |
+| `PLATFORM_API_URL` | `server.mjs` 的上游 API |
+| `PLATFORM_RPC_URL` | `server.mjs` 的 `/rpc` 上游 |
+
+`cp .env.example .env.local` 只用于覆盖公开的 `VITE_*`；不要写入服务端密钥。
+
+## 安全边界
+
+- 浏览器不包含平台 bearer token；开发与生产都由服务端代理注入。
+- `/ops` 是独立路由，公开导航不展示；生产必须设置 `PLATFORM_ADMIN_KEY`。
+- API 单 worker：runner session、索引器、vault、faucet nonce 都是进程内状态，
+  不要横向扩容。
+- 当前仍是测试网演示：单验证者零 gas Besu、共享 API token、无每用户会话；
+  公网/主网部署前需要补 per-user auth、限流、captcha 与多验证者链。
+- 测试网资产无价值；所有对话只用于防御性安全研究。
