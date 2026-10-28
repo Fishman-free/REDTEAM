@@ -1,5 +1,4 @@
 const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
-const API_TOKEN = import.meta.env.VITE_API_TOKEN || "";
 
 export class ApiClientError extends Error {
   status: number;
@@ -7,16 +6,48 @@ export class ApiClientError extends Error {
 
   constructor(status: number, detail: unknown) {
     super(typeof detail === "string" ? detail : `HTTP ${status}`);
+    this.name = "ApiClientError";
     this.status = status;
     this.detail = detail;
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+interface RequestOptions {
+  timeoutMs?: number;
+  adminKey?: string;
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  options: RequestOptions = {},
+): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? 25_000,
+  );
   const headers = new Headers(init.headers);
-  headers.set("Content-Type", "application/json");
-  if (API_TOKEN) headers.set("Authorization", `Bearer ${API_TOKEN}`);
-  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  if (init.body !== undefined) headers.set("Content-Type", "application/json");
+  headers.set("Accept", "application/json");
+  if (options.adminKey) headers.set("X-Admin-Key", options.adminKey);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiClientError(408, "request timed out");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
   const text = await response.text();
   let payload: unknown = null;
   if (text) {
@@ -34,6 +65,61 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiClientError(response.status, detail);
   }
   return payload as T;
+}
+
+export interface PlatformMeta {
+  network: string;
+  chainId: number;
+  rpc: string;
+  addresses: {
+    treasury: string;
+    arena: string;
+    rtm: string;
+    faucet: string;
+    dataMarket: string;
+  };
+  fees: {
+    attackFeeBps: number;
+    miningFeeBps: number;
+    miningRewardWei: string;
+    miningFeeWei: string;
+  };
+  limits: {
+    minDurationH: number;
+    maxDurationH: number;
+    minStakeBps: number;
+    maxStakeBps: number;
+    maxActiveMining: number;
+  };
+  providers: string[];
+  faucet: {
+    dripAmountWei: string;
+    captchaRequired: boolean;
+  };
+  features: {
+    mining: boolean;
+    dataMarket: boolean;
+    defenderRegistration: boolean;
+  };
+  indexer: {
+    startBlock: number;
+  };
+}
+
+export interface IndexerStatus {
+  status: string;
+  network?: string;
+  chainId?: number;
+  indexer?: {
+    running?: boolean;
+    lastBlock?: number | null;
+    latestBlock?: number | null;
+    lag?: number | null;
+    lastError?: string | null;
+    updatedAt?: number | null;
+    events?: number | null;
+  };
+  time?: number;
 }
 
 export interface Contest {
@@ -171,7 +257,49 @@ export interface DeliveryGrant {
   attacker: string | null;
 }
 
+export interface RegisterResult {
+  qualification: string;
+  defender: string;
+  wallet: string;
+  version?: string;
+  digest?: string;
+}
+
+export interface CreateContestResult {
+  contest_id: string;
+  tx_hash: string;
+  wallet: string;
+  defender: string;
+  approve: { token: string; spender: string; amount: string };
+}
+
+export interface MiningContestResult {
+  contest_id: string;
+  wallet: string;
+  defense_hash: string;
+  tx_hash: string;
+  version: string;
+}
+
+export interface PublishResult {
+  contest_id: string;
+  root: string;
+  tx_hash: string;
+}
+
 export const api = {
+  meta() {
+    return request<PlatformMeta>("/meta", {}, { timeoutMs: 10_000 });
+  },
+
+  status() {
+    return request<IndexerStatus>("/status", {}, { timeoutMs: 10_000 });
+  },
+
+  health() {
+    return request<{ status: string }>("/health", {}, { timeoutMs: 6_000 });
+  },
+
   registerDefender(payload: {
     defender: string;
     provider: string;
@@ -179,9 +307,10 @@ export const api = {
     defense_prompt: string;
     mandate: string;
   }) {
-    return request<{ qualification: string; defender: string; wallet: string }>(
+    return request<RegisterResult>(
       "/defenders/register",
       { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 180_000 },
     );
   },
 
@@ -189,15 +318,11 @@ export const api = {
     defender: string,
     payload: { stake: string; duration_h: number; stake_bps: number },
   ) {
-    return request<{
-      contest_id: string;
-      tx_hash: string;
-      wallet: string;
-      approve: { token: string; spender: string; amount: string };
-    }>(`/contests?defender=${encodeURIComponent(defender)}`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return request<CreateContestResult>(
+      `/contests?defender=${encodeURIComponent(defender)}`,
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 90_000 },
+    );
   },
 
   joinIntent(contestId: string, payload: { max_stake: string; data_consent: boolean }) {
@@ -215,22 +340,23 @@ export const api = {
   },
 
   sendMessage(contestId: string, payload: { tx_hash: string; content: string }) {
-    return request<MessageResponse>(`/contests/${contestId}/messages`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return request<MessageResponse>(
+      `/contests/${contestId}/messages`,
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 180_000 },
+    );
   },
 
   leaderboards() {
-    return request<Leaderboards>("/leaderboards");
+    return request<Leaderboards>("/leaderboards", {}, { timeoutMs: 35_000 });
   },
 
-  contests(limit = 200) {
-    return request<Contest[]>(`/contests?limit=${limit}`);
+  contests(limit = 500) {
+    return request<Contest[]>(`/contests?limit=${limit}`, {}, { timeoutMs: 25_000 });
   },
 
   contest(contestId: string) {
-    return request<ContestDetail>(`/contests/${contestId}`);
+    return request<ContestDetail>(`/contests/${contestId}`, {}, { timeoutMs: 20_000 });
   },
 
   faucetTicket(to: string, captchaToken?: string) {
@@ -240,31 +366,50 @@ export const api = {
     });
   },
 
-  publishDataSet(contestId: string) {
-    return request<{ contest_id: string; root: string; tx_hash: string }>(
+  publishDataSet(contestId: string, adminKey?: string) {
+    return request<PublishResult>(
       `/data/${contestId}/publish`,
       { method: "POST" },
+      { timeoutMs: 90_000, adminKey },
     );
   },
 
   deliver(contestId: string, txHash: string) {
-    return request<DeliveryGrant>(`/data/${contestId}/deliver`, {
-      method: "POST",
-      body: JSON.stringify({ tx_hash: txHash }),
-    });
+    return request<DeliveryGrant>(
+      `/data/${contestId}/deliver`,
+      { method: "POST", body: JSON.stringify({ tx_hash: txHash }) },
+      { timeoutMs: 35_000 },
+    );
+  },
+
+  createMiningContest(version: string, adminKey?: string) {
+    return request<MiningContestResult>(
+      "/mining/contests",
+      { method: "POST", body: JSON.stringify({ version }) },
+      { timeoutMs: 120_000, adminKey },
+    );
   },
 
   async download(token: string, filename: string): Promise<void> {
-    const headers = new Headers();
-    if (API_TOKEN) headers.set("Authorization", `Bearer ${API_TOKEN}`);
-    const response = await fetch(`${API_BASE}/downloads/${token}`, { headers });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 90_000);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/downloads/${encodeURIComponent(token)}`, {
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeout);
+    }
     if (!response.ok) throw new ApiClientError(response.status, "download failed");
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = filename;
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
   },
 };

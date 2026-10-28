@@ -1,257 +1,366 @@
-import { useEffect, useState } from "react";
-import { api, type Leaderboards } from "../lib/api";
-import { errorText, formatRtm, shortAddr } from "../lib/format";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  ArrowUpRight,
+  Crown,
+  Medal,
+  RefreshCw,
+  Search,
+  Skull,
+  Target,
+  Trophy,
+} from "lucide-react";
+import { useAccount } from "wagmi";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { Skeleton } from "../components/ui/Skeleton";
+import { Stat } from "../components/ui/Stat";
+import { Tabs } from "../components/ui/Tabs";
+import { Identicon } from "../components/wallet/Identicon";
+import { useLeaderboardsQuery } from "../lib/platform";
+import {
+  formatDateTime,
+  formatDuration,
+  formatPercent,
+  formatRtm,
+  outcomeLabel,
+  shortAddr,
+  timeAgo,
+} from "../lib/format";
+import { useDebouncedValue } from "../lib/hooks";
+
+type RankTab = "attackers" | "defenders" | "miners" | "mining";
+
+interface Row {
+  address: string;
+  primary: { label: string; value: string };
+  metrics: Array<{ label: string; value: string }>;
+}
+
+function PodiumCard({
+  row,
+  rank,
+}: {
+  row: Row;
+  rank: number;
+}) {
+  const tone = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
+  return (
+    <article className={`podium-card podium-card--${tone}`}>
+      <span className="podium-card__rank">
+        {rank === 1 ? <Crown size={16} /> : <Medal size={15} />}
+        <span className="mono">0{rank}</span>
+      </span>
+      <Identicon address={row.address} size={44} />
+      <p className="podium-card__address mono">{shortAddr(row.address, 8, 6)}</p>
+      <div className="podium-card__primary">
+        <strong>{row.primary.value}</strong>
+        <span>{row.primary.label}</span>
+      </div>
+      <div className="podium-card__metrics">
+        {row.metrics.slice(0, 2).map((metric) => (
+          <span key={metric.label}>
+            {metric.label} <strong>{metric.value}</strong>
+          </span>
+        ))}
+      </div>
+    </article>
+  );
+}
 
 export default function Leaderboard() {
-  const [boards, setBoards] = useState<Leaderboards | null>(null);
-  const [error, setError] = useState("");
+  const query = useLeaderboardsQuery();
+  const { address } = useAccount();
+  const [tab, setTab] = useState<RankTab>("attackers");
+  const [search, setSearch] = useState("");
+  const debounced = useDebouncedValue(search, 200);
+  const boards = query.data;
 
-  useEffect(() => {
-    let live = true;
-    api
-      .leaderboards()
-      .then((value) => {
-        if (live) setBoards(value);
-      })
-      .catch((reason) => {
-        if (live) setError(errorText(reason));
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
+  const rows = useMemo<Row[]>(() => {
+    if (!boards) return [];
+    if (tab === "attackers") {
+      return Object.entries(boards.attackers)
+        .sort((a, b) => b[1].wins - a[1].wins || b[1].difficulty - a[1].difficulty)
+        .map(([who, entry]) => ({
+          address: who,
+          primary: { label: "胜场", value: String(entry.wins) },
+          metrics: [
+            { label: "赢得", value: `${formatRtm(entry.rtm_won)} RTM` },
+            { label: "难度", value: String(entry.difficulty) },
+            { label: "当前连胜", value: String(entry.current_streak) },
+            { label: "最长连胜", value: String(entry.longest_streak) },
+          ],
+        }));
+    }
+    if (tab === "defenders") {
+      return Object.entries(boards.defenders)
+        .sort((a, b) => b[1].contests_survived - a[1].contests_survived)
+        .map(([who, entry]) => ({
+          address: who,
+          primary: { label: "守住", value: `${entry.contests_survived} 场` },
+          metrics: [
+            { label: "承受消息", value: String(entry.msgs_withstood) },
+            { label: "罚款", value: `${formatRtm(entry.penalties)} RTM` },
+            { label: "净收入", value: `${formatRtm(entry.net_income)} RTM` },
+            { label: "最长存活", value: formatDuration(entry.longest_survival) },
+          ],
+        }));
+    }
+    if (tab === "miners") {
+      return Object.entries(boards.miners)
+        .sort((a, b) => b[1].wins - a[1].wins || b[1].difficulty - a[1].difficulty)
+        .map(([who, entry]) => ({
+          address: who,
+          primary: { label: "攻破", value: `${entry.wins} 次` },
+          metrics: [
+            { label: "加入", value: String(entry.joined) },
+            { label: "已决", value: String(entry.decided_joined) },
+            { label: "固定奖励", value: `${formatRtm(entry.rtm_won_fixed)} RTM` },
+            { label: "攻破率", value: formatPercent(entry.breach_rate) },
+          ],
+        }));
+    }
+    return [];
+  }, [boards, tab]);
 
-  if (error) return <div className="alert error">{error}</div>;
-  if (!boards) return <div className="alert info">正在读取链上事件…</div>;
+  const filtered = useMemo(() => {
+    const needle = debounced.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter((row) => row.address.toLowerCase().includes(needle));
+  }, [debounced, rows]);
 
-  const attackerRows = Object.entries(boards.attackers).sort(
-    (a, b) => b[1].wins - a[1].wins || b[1].difficulty - a[1].difficulty,
-  );
-  const defenderRows = Object.entries(boards.defenders).sort(
-    (a, b) => b[1].contests_survived - a[1].contests_survived,
-  );
-  const minerRows = Object.entries(boards.miners).sort(
-    (a, b) => b[1].wins - a[1].wins || b[1].difficulty - a[1].difficulty,
-  );
+  const mining = boards?.mining;
+  const updatedAt = query.dataUpdatedAt / 1_000;
+  const self = address?.toLowerCase();
 
   return (
-    <>
-      <section className="hero">
-        <p className="eyebrow">Leaderboards / {boards.network}</p>
-        <h1>三榜与挖矿统计</h1>
-        <p className="lead">
-          由链上事件计算；烟测赛与部署注水不计入。难度 = 攻破前该靶承受的付费消息数，
-          防止刷软靶。
-        </p>
-      </section>
+    <div className="leaderboard-page">
+      <SectionHeader
+        eyebrow={`Leaderboards / ${boards?.network ?? "chain"}`}
+        title={
+          <>
+            谁在制定<em>规则</em>
+          </>
+        }
+        description="榜单完全由链上事件计算；烟测赛与部署注水不计入。难度 = 攻破前靶钱包承受的付费消息数，防止刷软靶。"
+        actions={
+          <div className="section-actions">
+            {query.dataUpdatedAt > 0 && (
+              <span className="muted small">更新于 {timeAgo(updatedAt)}</span>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              iconLeft={<RefreshCw size={12} />}
+              loading={query.isFetching}
+              onClick={() => void query.refetch()}
+            >
+              刷新
+            </Button>
+          </div>
+        }
+      />
 
-      <section className="section">
-        <div className="section-head">
-          <h2>攻方榜</h2>
-          <span className="badge">{attackerRows.length} 个地址</span>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>攻方</th>
-                <th>胜场</th>
-                <th>赢得</th>
-                <th>难度</th>
-                <th>当前连胜</th>
-                <th>最长连胜</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attackerRows.map(([address, entry]) => (
-                <tr key={address}>
-                  <td className="mono">{shortAddr(address)}</td>
-                  <td>{entry.wins}</td>
-                  <td className="mono">{formatRtm(entry.rtm_won)}</td>
-                  <td>{entry.difficulty}</td>
-                  <td>{entry.current_streak}</td>
-                  <td>{entry.longest_streak}</td>
-                </tr>
-              ))}
-              {attackerRows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="muted">
-                    暂无记录
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div className="stat-strip">
+        <Stat
+          label="攻方地址"
+          numericValue={Object.keys(boards?.attackers ?? {}).length}
+          format={(value) => String(Math.round(value))}
+          icon={<Target size={14} />}
+        />
+        <Stat
+          label="守方地址"
+          numericValue={Object.keys(boards?.defenders ?? {}).length}
+          format={(value) => String(Math.round(value))}
+          icon={<Trophy size={14} />}
+        />
+        <Stat
+          label="矿工地址"
+          numericValue={Object.keys(boards?.miners ?? {}).length}
+          format={(value) => String(Math.round(value))}
+          icon={<Skull size={14} />}
+        />
+        <Stat
+          label="挖矿攻破率"
+          value={formatPercent(mining?.breach_rate ?? 0)}
+          icon={<Target size={14} />}
+        />
+      </div>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>守方榜</h2>
-          <span className="badge">{defenderRows.length} 个地址</span>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>守方</th>
-                <th>守住</th>
-                <th>承受消息</th>
-                <th>罚款</th>
-                <th>被破损失</th>
-                <th>净收入</th>
-                <th>最长存活</th>
-              </tr>
-            </thead>
-            <tbody>
-              {defenderRows.map(([address, entry]) => (
-                <tr key={address}>
-                  <td className="mono">{shortAddr(address)}</td>
-                  <td>{entry.contests_survived}</td>
-                  <td>{entry.msgs_withstood}</td>
-                  <td className="mono">{formatRtm(entry.penalties)}</td>
-                  <td className="mono">{formatRtm(entry.breach_loss)}</td>
-                  <td className="mono">{formatRtm(entry.net_income)}</td>
-                  <td>{entry.longest_survival}s</td>
-                </tr>
-              ))}
-              {defenderRows.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="muted">
-                    暂无记录
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div className="filter-bar">
+        <Tabs
+          ariaLabel="榜单类型"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: "attackers", label: "攻方榜", count: Object.keys(boards?.attackers ?? {}).length },
+            { id: "defenders", label: "守方榜", count: Object.keys(boards?.defenders ?? {}).length },
+            { id: "miners", label: "矿工榜", count: Object.keys(boards?.miners ?? {}).length },
+            { id: "mining", label: "挖矿统计" },
+          ]}
+        />
+        {tab !== "mining" && (
+          <label className="search-box">
+            <Search size={14} aria-hidden="true" />
+            <span className="sr-only">搜索地址</span>
+            <input
+              className="search-box__input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="搜索 0x 地址"
+            />
+          </label>
+        )}
+      </div>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>矿工榜</h2>
-          <span className="badge">{minerRows.length} 个地址</span>
+      {query.isLoading ? (
+        <div className="rank-loading">
+          <Skeleton height={92} />
+          <Skeleton height={92} />
+          <Skeleton height={92} />
+          <Skeleton height={92} />
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>矿工</th>
-                <th>加入</th>
-                <th>已决</th>
-                <th>攻破</th>
-                <th>固定奖励</th>
-                <th>难度</th>
-                <th>攻破率</th>
-              </tr>
-            </thead>
-            <tbody>
-              {minerRows.map(([address, entry]) => (
-                <tr key={address}>
-                  <td className="mono">{shortAddr(address)}</td>
-                  <td>{entry.joined}</td>
-                  <td>{entry.decided_joined}</td>
-                  <td>{entry.wins}</td>
-                  <td className="mono">{formatRtm(entry.rtm_won_fixed)}</td>
-                  <td>{entry.difficulty}</td>
-                  <td>{(entry.breach_rate * 100).toFixed(1)}%</td>
-                </tr>
-              ))}
-              {minerRows.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="muted">
-                    暂无记录
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      ) : query.isError ? (
+        <EmptyState
+          title="榜单暂时不可用"
+          description="平台 API 或索引器没有响应。稍后重试。"
+          action={
+            <Button size="sm" onClick={() => void query.refetch()}>
+              重试
+            </Button>
+          }
+        />
+      ) : tab === "mining" ? (
+        <div className="mining-stats">
+          <div className="mining-stats__grid">
+            <Stat label="创建" numericValue={mining?.created ?? 0} format={(v) => String(Math.round(v))} />
+            <Stat label="已攻破" numericValue={mining?.settled ?? 0} format={(v) => String(Math.round(v))} tone="danger" />
+            <Stat label="未攻破退役" numericValue={mining?.retired ?? 0} format={(v) => String(Math.round(v))} />
+            <Stat label="已决" numericValue={mining?.decided ?? 0} format={(v) => String(Math.round(v))} />
+            <Stat label="固定奖励总额" value={formatRtm(mining?.total_fixed_reward ?? "0")} unit="RTM" />
+            <Stat label="活跃赛" numericValue={mining?.active_contests ?? 0} format={(v) => String(Math.round(v))} tone="live" />
+          </div>
 
-      <section className="section">
-        <div className="section-head">
-          <h2>挖矿</h2>
-          <span className="badge mining">固定 1 RTM / 攻破</span>
-        </div>
-        <div className="kv">
-          <div>
-            <span>创建</span>
-            <strong>{boards.mining.created}</strong>
-          </div>
-          <div>
-            <span>已攻破</span>
-            <strong>{boards.mining.settled}</strong>
-          </div>
-          <div>
-            <span>未攻破退役</span>
-            <strong>{boards.mining.retired}</strong>
-          </div>
-          <div>
-            <span>攻破率</span>
-            <strong>{(boards.mining.breach_rate * 100).toFixed(1)}%</strong>
-          </div>
-          <div>
-            <span>固定奖励总额</span>
-            <strong>{formatRtm(boards.mining.total_fixed_reward)}</strong>
-          </div>
-          <div>
-            <span>活跃赛</span>
-            <strong>{boards.mining.active_contests}</strong>
-          </div>
-        </div>
-        <div className="panel">
-          <h3>当前活跃版本</h3>
-          {boards.mining.active_versions.length === 0 ? (
-            <p className="muted small">当前没有活跃挖矿赛。</p>
-          ) : (
-            <div className="list">
-              {boards.mining.active_versions.map((version) => (
-                <div className="row-item" key={version.contest_id}>
-                  <div className="row-main">
-                    <span className="mono small">{version.contest_id}</span>
-                    <span className="muted tiny">hash {shortAddr(version.defense_hash)}</span>
+          <section className="mining-block">
+            <div className="section-heading-row">
+              <div>
+                <p className="eyebrow">Active versions</p>
+                <h2>当前活跃版本</h2>
+              </div>
+              <Badge tone="live" dot>
+                {mining?.active_versions.length ?? 0} ACTIVE
+              </Badge>
+            </div>
+            {mining && mining.active_versions.length > 0 ? (
+              <div className="version-list">
+                {mining.active_versions.map((version) => (
+                  <div className="version-row" key={version.contest_id}>
+                    <span className="version-row__dot" />
+                    <div className="version-row__main">
+                      <span className="mono">{shortAddr(version.contest_id)}</span>
+                      <span className="muted small">hash {shortAddr(version.defense_hash)}</span>
+                    </div>
+                    <span className="version-row__stat">{version.paid_messages} 条消息</span>
+                    <Link className="btn btn--ghost btn--sm" to={`/mine/${version.contest_id}`}>
+                      战场
+                      <ArrowUpRight size={12} />
+                    </Link>
                   </div>
-                  <div className="row-actions">
-                    <span className="badge">{version.paid_messages} 条付费消息</span>
-                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="没有活跃版本" description="运营创建挖矿赛后，版本会显示在这里。" />
+            )}
+          </section>
+
+          <section className="mining-block">
+            <div className="section-heading-row">
+              <div>
+                <p className="eyebrow">Settled history</p>
+                <h2>已决历史</h2>
+              </div>
+            </div>
+            {mining && mining.history.length > 0 ? (
+              <div className="history-table">
+                <div className="history-table__head">
+                  <span>比赛</span>
+                  <span>结果</span>
+                  <span>付费消息</span>
+                  <span>胜者</span>
+                  <span>结束时间</span>
                 </div>
-              ))}
-            </div>
-          )}
+                {mining.history.map((item) => (
+                  <div className="history-table__row" key={item.contest_id}>
+                    <span className="mono">{shortAddr(item.contest_id)}</span>
+                    <span>
+                      <Badge tone={item.outcome === "settled" ? "danger" : "neutral"}>
+                        {outcomeLabel(item.outcome)}
+                      </Badge>
+                    </span>
+                    <span className="tabular">{item.paid_messages}</span>
+                    <span className="mono">{shortAddr(item.winner)}</span>
+                    <span className="muted">{formatDateTime(item.ended_ts)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="还没有已决记录" description="比赛被攻破或退役后会归档在这里。" />
+            )}
+          </section>
         </div>
-        <div className="panel">
-          <h3>已决历史</h3>
-          {boards.mining.history.length === 0 ? (
-            <p className="muted small">暂无已结算/退役记录。</p>
-          ) : (
-            <div className="table-wrap" style={{ marginTop: 10 }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>赛</th>
-                    <th>结果</th>
-                    <th>hash</th>
-                    <th>付费消息</th>
-                    <th>胜者</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {boards.mining.history.map((item) => (
-                    <tr key={item.contest_id}>
-                      <td className="mono">{shortAddr(item.contest_id)}</td>
-                      <td>{item.outcome === "settled" ? "攻破" : "退役"}</td>
-                      <td className="mono">{shortAddr(item.defense_hash)}</td>
-                      <td>{item.paid_messages}</td>
-                      <td className="mono">{shortAddr(item.winner)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={search ? "没有匹配的地址" : "榜单还没有记录"}
+          description={search ? "试试缩短搜索词。" : "第一场比赛结算后，这里会出现排名。"}
+        />
+      ) : (
+        <>
+          <div className="podium">
+            {filtered.slice(0, 3).map((row, index) => (
+              <PodiumCard key={row.address} row={row} rank={index + 1} />
+            ))}
+          </div>
+          <div className="rank-list">
+            <div className="rank-list__head">
+              <span>RANK</span>
+              <span>ADDRESS</span>
+              <span>PRIMARY</span>
+              <span>METRICS</span>
             </div>
-          )}
-        </div>
-      </section>
-    </>
+            {filtered.map((row, index) => {
+              const isSelf = self && row.address.toLowerCase() === self;
+              return (
+                <div className={`rank-row ${isSelf ? "is-self" : ""}`.trim()} key={row.address}>
+                  <span className={`rank-row__rank ${index < 3 ? "is-top" : ""}`.trim()}>
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="rank-row__address">
+                    <Identicon address={row.address} size={26} />
+                    <span className="mono">{shortAddr(row.address, 8, 6)}</span>
+                    {isSelf && <Badge tone="accent">你</Badge>}
+                  </span>
+                  <span className="rank-row__primary tabular">{row.primary.value}</span>
+                  <span className="rank-row__metrics">
+                    {row.metrics.map((metric) => (
+                      <span key={metric.label}>
+                        <small>{metric.label}</small>
+                        <strong className="tabular">{metric.value}</strong>
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <p className="page-note">
+        <Badge tone="outline">计算口径</Badge>
+        胜场与难度来自链上事件；罚款按时间衰减累计；最长存活以秒计。被排除的烟测赛不参与榜单。
+      </p>
+    </div>
   );
 }
