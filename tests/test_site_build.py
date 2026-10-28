@@ -3,6 +3,7 @@ import base64
 import importlib.util
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -135,6 +136,19 @@ class SinglePageTests(unittest.TestCase):
             self.assertIn(name, excluded)
         self.assertNotIn('index.html', excluded)
         self.assertFalse((ROOT / '.nojekyll').exists())
+
+    def test_config_ignores_untracked_local_scratch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'tracked').mkdir()
+            (root / 'tracked' / 'page.txt').write_text('content', encoding='utf-8')
+            (root / 'scratch').mkdir()
+            subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
+            subprocess.run(['git', 'add', 'tracked/page.txt'], cwd=root, check=True)
+            config = site_build.jekyll_config(root).decode()
+            excluded = {json.loads(line.strip()[2:]) for line in config.splitlines() if line.startswith('  - ')}
+            self.assertIn('tracked', excluded)
+            self.assertNotIn('scratch', excluded)
 
     def test_nonempty_bundle_target_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as temp:

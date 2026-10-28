@@ -5,6 +5,7 @@ import argparse
 import base64
 import json
 import re
+import subprocess
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote
@@ -176,9 +177,22 @@ def validate_source(root: Path) -> bytes:
     return source
 
 
+def tracked_top_level(root: Path) -> set[str]:
+    """Top-level names Pages would publish: tracked files only, never local scratch."""
+    try:
+        listing = subprocess.run(
+            ['git', '-C', str(root), 'ls-files', '-z'],
+            check=True,
+            capture_output=True,
+        ).stdout.decode('utf-8', 'surrogateescape')
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    names = {path.split('/', 1)[0] for path in listing.split('\0') if path}
+    return {name for name in names if not name.startswith(('.', '_')) and name != 'index.html'}
+
+
 def jekyll_config(root: Path) -> bytes:
-    excluded = set(EXCLUDED_ROOTS)
-    excluded.update(entry.name for entry in root.iterdir() if not entry.name.startswith(('.', '_')) and entry.name != 'index.html')
+    excluded = set(EXCLUDED_ROOTS) | tracked_top_level(root)
     lines = ['# Generated: the Pages website contains only the consolidated index.html.',
              'title: REDTEAM', 'url: "https://fishman-free.github.io"', 'baseurl: "/REDTEAM"', 'exclude:']
     lines.extend('  - ' + json.dumps(name, ensure_ascii=False) for name in sorted(excluded))
