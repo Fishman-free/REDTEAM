@@ -219,6 +219,13 @@ class FakeDataService:
         self.calls = []
         self.delivery = None
         self.own_delivery = None
+        self.publish_result = SimpleNamespace(
+            root="0x" + "99" * 32, tx_hash="0xpublish"
+        )
+
+    def publish(self, contest_id):
+        self.calls.append(("publish", contest_id))
+        return self.publish_result
 
     def deliver_own(self, contest_id, buyer):
         self.calls.append(("own", contest_id, buyer))
@@ -690,6 +697,16 @@ def test_faucet_ticket_and_errors(api_bundle):
         json={"to": ATTACKER},
     )
     assert bad.status_code == 400
+
+
+def test_data_publish_route(api_bundle):
+    response = api_bundle.client.post(
+        f"/data/{CONTEST}/publish", headers=auth()
+    )
+
+    assert response.status_code == 200
+    assert response.json()["root"] == "0x" + "99" * 32
+    assert api_bundle.data.calls == [("publish", CONTEST)]
 
 
 def test_data_delivery_and_download(api_bundle):

@@ -660,6 +660,22 @@ class PlatformService:
 
     # -- data market ----------------------------------------------------
 
+    def publish_data(self, contest_id: str) -> dict[str, Any]:
+        if self.data_service is None:
+            raise ApiError(503, "data service is not configured")
+        cid = _contest_id(contest_id)
+        try:
+            result = self.data_service.publish(cid)
+        except DataServiceError as exc:
+            raise ApiError(409, str(exc)) from None
+        except Exception:
+            raise ApiError(502, "dataset publish failed") from None
+        return {
+            "contest_id": cid,
+            "root": result.root,
+            "tx_hash": result.tx_hash,
+        }
+
     def deliver_data(self, contest_id: str, payload: DeliverRequest) -> dict[str, Any]:
         if self.data_service is None:
             raise ApiError(503, "data service is not configured")
@@ -891,6 +907,10 @@ def create_app(service: PlatformService, token: str) -> FastAPI:
     @app.post("/faucet/ticket", dependencies=[Depends(require_auth)])
     def faucet_ticket(payload: FaucetTicketRequest) -> dict[str, Any]:
         return service.faucet_ticket(payload)
+
+    @app.post("/data/{contest_id}/publish", dependencies=[Depends(require_auth)])
+    def publish(contest_id: str) -> dict[str, Any]:
+        return service.publish_data(contest_id)
 
     @app.post("/data/{contest_id}/deliver", dependencies=[Depends(require_auth)])
     def deliver(contest_id: str, payload: DeliverRequest) -> dict[str, Any]:

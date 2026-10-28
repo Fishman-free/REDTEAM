@@ -434,6 +434,7 @@ defender/buyer/attacker 身份仍由链上事件与服务层校验。
 | `GET /leaderboards` | 任务 13 三榜 + 挖矿统计 |
 | `GET /contests` / `GET /contests/{id}` | 比赛列表/元数据 + 攻方列表；**不返回消息内容** |
 | `POST /faucet/ticket` | `{to, captcha_token?}`；调 `FaucetSigner`，captcha 失败 403 |
+| `POST /data/{contestId}/publish` | operator 打包并发布 consent-aware 数据集；挖矿/未结束/opt-out 排除 |
 | `POST /data/{contestId}/deliver` | `{tx_hash}`；要求 indexer 已看到 `DataSold`，按 buyer/seller 交付 `buyOwn`/`buyFromAttacker` 切片 |
 | `GET /downloads/{token}` | 用 `resolve_delivery` 返回 ZIP；token 是能力凭证，不写日志 |
 | `POST /mining/contests` | `{version}`；Treasury owner 预打款 1 RTM 到新 W（审计）→ operator `createMiningContest`；失败尝试用 W 退回 1 RTM 并报告 recovery |
@@ -485,8 +486,8 @@ publish/切片交付/下载 token/篡改检测、RSI 导出过滤与 schema、op
 task 15 用 FastAPI TestClient + FakeGateway/FakeRunner 覆盖鉴权、注册/资格、建赛、
 join-intent、消息收费确认/markDelivered/重复与 fault 分流、榜单、faucet、DataSold
 交付/下载、挖矿预打款/创建/恢复，以及 gateway 的 tx 构造/audit/event 解码。当前
-全套 **386 passed**（config 42 / custody 16 / chain 18 / BYOK 138 / runner 96 /
-indexer 23 / faucet 10 / data 11 / rsi 7 / api 18 / gateway 7）。
+全套 **387 passed**（config 42 / custody 16 / chain 18 / BYOK 138 / runner 96 /
+indexer 23 / faucet 10 / data 11 / rsi 7 / api 19 / gateway 7）。
 
 ## 安全约定
 
