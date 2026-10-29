@@ -247,6 +247,102 @@ class AgentSession:
 
     # -- state ----------------------------------------------------------
 
+    STATE_VERSION = 1
+    _STATE_ROLES = frozenset({"system", "user", "assistant", "tool"})
+
+    def export_state(self) -> dict[str, Any]:
+        """Serializable session state for restart recovery.
+
+        Threads are only exported for attackers whose join-time consent allows
+        persistence (mining sessions always do).  The turn counter and consent
+        flags are always exported so a restart cannot reset the turn budget.
+        """
+
+        with self._lock:
+            threads: dict[str, list] = {}
+            for address, thread in self._threads.items():
+                if not (self.is_mining or self._consents.get(address, False)):
+                    continue
+                threads[address] = copy.deepcopy(thread)
+            return {
+                "state_version": self.STATE_VERSION,
+                "is_mining": self.is_mining,
+                "turns": dict(self._turns),
+                "consents": dict(self._consents),
+                "threads": threads,
+                "stopped": self._stopped,
+            }
+
+    def import_state(self, state: Any) -> None:
+        """Restore a state produced by :meth:`export_state`.
+
+        Malformed state aborts the restore instead of silently starting with a
+        partial conversation: a corrupted resume is worse than no resume.
+        """
+
+        if not isinstance(state, dict):
+            raise RunnerError("session state must be an object")
+        if state.get("state_version") != self.STATE_VERSION:
+            raise RunnerError("unsupported session state version")
+        if bool(state.get("is_mining")) != self.is_mining:
+            raise RunnerError("session state contest type does not match")
+        turns = state.get("turns")
+        consents = state.get("consents")
+        threads = state.get("threads")
+        if not isinstance(turns, dict) or not isinstance(consents, dict):
+            raise RunnerError("session state requires turns and consents")
+        if not isinstance(threads, dict):
+            raise RunnerError("session state requires threads")
+
+        restored_turns: dict[str, int] = {}
+        for key, value in turns.items():
+            address = _normalize_address(key, "state.turns key")
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise RunnerError("session state turn counts must be integers")
+            if not 0 <= value <= self.max_turns:
+                raise RunnerError("session state turn count is out of range")
+            restored_turns[address] = value
+
+        restored_consents: dict[str, bool] = {}
+        for key, value in consents.items():
+            address = _normalize_address(key, "state.consents key")
+            if not isinstance(value, bool):
+                raise RunnerError("session state consents must be booleans")
+            restored_consents[address] = value
+
+        restored_threads: dict[str, list] = {}
+        limit = self.max_turns * (self.max_steps * 2 + 2)
+        for key, value in threads.items():
+            address = _normalize_address(key, "state.threads key")
+            if not isinstance(value, list) or len(value) > limit:
+                raise RunnerError("session state thread is missing or too long")
+            if not self.is_mining and not restored_consents.get(address, False):
+                raise RunnerError("session state contains an opted-out thread")
+            cleaned: list[dict] = []
+            for message in value:
+                if not isinstance(message, dict) or message.get("role") not in self._STATE_ROLES:
+                    raise RunnerError("session state thread has an invalid message")
+                content = message.get("content")
+                if content is not None and not isinstance(content, str):
+                    raise RunnerError("session state message content must be text")
+                if isinstance(content, str) and len(content) > MAX_ASSISTANT_TEXT * 4:
+                    raise RunnerError("session state message content is too long")
+                cleaned.append(copy.deepcopy(message))
+            restored_threads[address] = cleaned
+
+        stopped = state.get("stopped")
+        if stopped is not None:
+            if not isinstance(stopped, str) or not 1 <= len(stopped) <= 200:
+                raise RunnerError("session state stop reason is invalid")
+
+        with self._lock:
+            if self._threads:
+                raise RunnerError("session already has live threads")
+            self._turns = restored_turns
+            self._consents = restored_consents
+            self._threads = restored_threads
+            self._stopped = stopped
+
     @property
     def stopped(self) -> str | None:
         with self._lock:

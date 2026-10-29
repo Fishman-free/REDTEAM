@@ -58,6 +58,7 @@ from .rsi_pipeline import RepairVerifier, RsiPipelineError, RsiService
 from .rsi_export import RsiExporter
 from .runner import AgentSession, RunnerStopped
 from .signatures import config_hash, recover_defender_registration
+from .state_store import PlatformStateStore
 from .byoa.egress import EgressError, load_declaration
 from .byoa.models import ContentKind
 from .byoa.policy import PolicyError, WalletPolicy
@@ -327,6 +328,7 @@ class ApiDeps:
     data_service: Any | None = None
     version_loader: Callable[[str], AgentVersion] | None = None
     platform_client_factory: Callable[[], Any] | None = None
+    state_store: Any | None = None
     clock: Callable[[], float] = time.time
     mining_reward: int = MINING_REWARD
     max_mining: int = MAX_ACTIVE_MINING
@@ -356,6 +358,158 @@ class PlatformService:
         self._contest_defenders: dict[str, str] = {}
         self._seen_txs: set[str] = set()
         self._lock = threading.RLock()
+        self._state = deps.state_store
+        self._session_meta: dict[str, dict[str, Any]] = {}
+        self.state_warnings: list[str] = []
+        self._restore_state()
+
+    # -- restart recovery -----------------------------------------------
+
+    def _restore_state(self) -> None:
+        """Reload defenders, processed transactions and session metadata.
+
+        Only *metadata* is reloaded eagerly.  Conversations are rebuilt lazily
+        the next time a contest receives a message, so startup stays cheap and
+        a contest that already ended never rebuilds a model client.
+        """
+
+        if self._state is None:
+            return
+        loader = self.deps.version_loader
+        for item in self._state.load_defenders():
+            try:
+                if loader is None:
+                    raise ValueError("version loader is not configured")
+                version = loader(item["version_name"])
+                if version.digest != item["version_digest"]:
+                    raise ValueError("pinned version digest changed")
+                record = DefenderRecord(
+                    defender=item["defender"],
+                    provider=item["provider"],
+                    defense_prompt=item["defense_prompt"],
+                    mandate=item["mandate"],
+                    wallet=item["wallet"],
+                    wallet_entry=item["wallet_entry"],
+                    api_key_entry=item["api_key_entry"],
+                    version=version,
+                    contests=list(item["contests"]),
+                )
+            except Exception as exc:
+                # Fail closed: a defender whose pinned version no longer loads
+                # must re-register rather than run a different agent silently.
+                self.state_warnings.append(
+                    f"defender {item.get('defender')} not restored: {exc}"
+                )
+                continue
+            self._defenders[record.defender] = record
+        for item in self._state.load_sessions():
+            self._session_meta[item["contest_id"]] = item
+            self._contest_defenders.setdefault(item["contest_id"], item["defender"])
+
+    def _persist_defender(self, record: DefenderRecord) -> None:
+        if self._state is None:
+            return
+        try:
+            self._state.save_defender(
+                {
+                    "defender": record.defender,
+                    "provider": record.provider,
+                    "defense_prompt": record.defense_prompt,
+                    "mandate": record.mandate,
+                    "wallet": record.wallet,
+                    "wallet_entry": record.wallet_entry,
+                    "api_key_entry": record.api_key_entry,
+                    "version_name": record.version.name,
+                    "version_digest": record.version.digest,
+                    "contests": list(record.contests),
+                    "registered_at": self.deps.clock(),
+                }
+            )
+        except Exception as exc:
+            raise ApiError(503, f"cannot persist defender registration: {exc}") from None
+
+    def _persist_session(self, meta: dict[str, Any], session: Any | None = None) -> None:
+        if self._state is None:
+            return
+        state: dict[str, Any] | None = None
+        if session is not None:
+            try:
+                state = session.export_state()
+            except Exception:
+                state = None
+        try:
+            self._state.save_session(meta, state)
+        except Exception:
+            # Persistence must not fail a paid turn; the contest keeps running
+            # and the operator sees the warning on the next status read.
+            self.state_warnings.append(f"session {meta.get('contest_id')} not persisted")
+            return
+        self._session_meta[meta["contest_id"]] = {**meta, "state": state}
+
+    def _persist_session_state(self, contest_id: str, session: Any) -> None:
+        if self._state is None:
+            return
+        try:
+            self._state.update_session_state(contest_id, session.export_state())
+        except Exception:
+            self.state_warnings.append(f"session {contest_id} state not updated")
+
+    def _ensure_session(self, contest_id: str) -> Any:
+        """Return the live session, rebuilding it from durable state if needed."""
+
+        with self._lock:
+            session = self._sessions.get(contest_id)
+        if session is not None:
+            return session
+        meta = self._session_meta.get(contest_id)
+        if meta is None:
+            raise ApiError(503, "runner is not available for this contest")
+        loader = self.deps.version_loader
+        try:
+            if loader is None:
+                raise ValueError("version loader is not configured")
+            version = loader(meta["version_name"])
+            if version.digest != meta["version_digest"]:
+                raise ValueError("agent version changed since the contest started")
+            if not meta.get("api_key_entry"):
+                # Mining contests use the platform's own model key.
+                if self.deps.platform_client_factory is None:
+                    raise ValueError("platform model key is not configured")
+                client = self.deps.platform_client_factory()
+            else:
+                key = self._load(
+                    meta["api_key_entry"],
+                    {
+                        "purpose": "runner_byok_pending",
+                        "wallet_address": meta["wallet_address"],
+                    },
+                )
+                client = self.deps.model_factory(meta["provider"], key)
+            session = self.deps.runner_factory(
+                version=version,
+                client=client,
+                wallet_address=meta["wallet_address"],
+                wallet_entry=meta["wallet_entry"],
+                contest_id=contest_id,
+                is_mining=meta["is_mining"],
+                mandate=meta["mandate"],
+            )
+            if meta.get("state"):
+                session.import_state(meta["state"])
+        except ApiError:
+            raise
+        except Exception as exc:
+            raise ApiError(
+                503,
+                {
+                    "detail": "agent session could not be restored after a restart",
+                    "reason": str(exc)[:200],
+                },
+            ) from None
+        with self._lock:
+            self._sessions[contest_id] = session
+        self.state_warnings.append(f"session {contest_id} restored from durable state")
+        return session
 
     # -- helpers --------------------------------------------------------
 
@@ -511,6 +665,7 @@ class PlatformService:
         )
         with self._lock:
             self._defenders[defender] = record
+        self._persist_defender(record)
         return {
             "qualification": "passed",
             "defender": defender,
@@ -591,6 +746,23 @@ class PlatformService:
             self._sessions[contest_id] = session
             self._contest_defenders[contest_id] = defender
             record.contests.append(contest_id)
+        self._persist_session(
+            {
+                "contest_id": contest_id,
+                "defender": defender,
+                "version_name": record.version.name,
+                "version_digest": record.version.digest,
+                "wallet_address": record.wallet,
+                "wallet_entry": record.wallet_entry,
+                "api_key_entry": record.api_key_entry,
+                "provider": record.provider,
+                "mandate": record.mandate,
+                "is_mining": False,
+                "created_at": self.deps.clock(),
+            },
+            session,
+        )
+        self._persist_defender(record)
         return {
             "contest_id": contest_id,
             "tx_hash": tx_hash,
@@ -683,21 +855,34 @@ class PlatformService:
         elif not isinstance(consent, bool):
             raise ApiError(409, "join consent is not indexed yet")
 
-        session = self._sessions.get(cid)
-        if session is None:
-            raise ApiError(503, "runner is not available for this contest")
+        session = self._ensure_session(cid)
         if session.stopped:
             raise ApiError(410, "contest is stopped")
 
-        with self._lock:
-            if payload.tx_hash.lower() in self._seen_txs:
+        tx_key = payload.tx_hash.lower()
+        if self._state is None:
+            with self._lock:
+                if tx_key in self._seen_txs:
+                    raise ApiError(409, "this attack payment was already processed")
+                self._seen_txs.add(tx_key)
+        else:
+            try:
+                fresh = self._state.mark_seen(tx_key, cid)
+            except Exception as exc:
+                raise ApiError(503, f"cannot record attack payment: {exc}") from None
+            if not fresh:
                 raise ApiError(409, "this attack payment was already processed")
-            self._seen_txs.add(payload.tx_hash.lower())
         try:
             self.gateway.mark_delivered(cid, attacker, msg_hash)
         except Exception:
-            with self._lock:
-                self._seen_txs.discard(payload.tx_hash.lower())
+            if self._state is None:
+                with self._lock:
+                    self._seen_txs.discard(tx_key)
+            else:
+                try:
+                    self._state.forget_seen(tx_key)
+                except Exception:
+                    pass
             raise ApiError(502, "markDelivered failed") from None
 
         try:
@@ -708,6 +893,7 @@ class PlatformService:
             raise ApiError(410, "contest is stopped") from None
         except Exception:
             raise ApiError(500, "agent turn failed") from None
+        self._persist_session_state(cid, session)
 
         if result.get("stopped"):
             raise ApiError(410, "contest is stopped")
@@ -996,6 +1182,22 @@ class PlatformService:
             ) from None
         with self._lock:
             self._sessions[contest_id] = session
+        self._persist_session(
+            {
+                "contest_id": contest_id,
+                "defender": "",
+                "version_name": version.name,
+                "version_digest": version.digest,
+                "wallet_address": wallet,
+                "wallet_entry": wallet_entry,
+                "api_key_entry": "",
+                "provider": "platform",
+                "mandate": MINING_MANDATE,
+                "is_mining": True,
+                "created_at": self.deps.clock(),
+            },
+            session,
+        )
         return {
             "contest_id": contest_id,
             "wallet": wallet,
@@ -1025,6 +1227,7 @@ class PlatformService:
                 session.stop_for_mining(reason)
             except Exception:
                 pass
+            self._persist_session_state(contest_id, session)
 
 
 # -- FastAPI app ---------------------------------------------------------
@@ -1606,6 +1809,9 @@ def build_app(
             "chainId": settings.chain_id,
             "indexer": state,
             "time": int(time.time()),
+            "recoveryWarnings": (
+                holder["service"].state_warnings[-20:] if "service" in holder else []
+            ),
         }
 
     @asynccontextmanager
@@ -1633,6 +1839,7 @@ def build_app(
             data_service=data_service,
             version_loader=load_version,
             platform_client_factory=platform_client_factory,
+            state_store=PlatformStateStore(settings.data_dir / "platform-state.sqlite3"),
         )
     )
     holder["service"] = service
