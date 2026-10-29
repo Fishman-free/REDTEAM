@@ -862,6 +862,33 @@ class PlatformService:
             "defense_hash": info.get("defense_hash"),
         }
 
+    def expire_contest(self, contest_id: str) -> dict[str, Any]:
+        """Operator action: settle a standard contest that has passed its end.
+
+        ``Arena.expire`` is permissionless, but closing a contest needs a
+        transaction from somebody.  When the defender and every attacker walk
+        away, W's balance and the defender's stake stay locked until a stranger
+        pays for it.  The operator console should be able to finish the job.
+        """
+
+        cid = _contest_id(contest_id)
+        info = self._contest_info(cid)
+        if info.get("is_mining"):
+            raise ApiError(
+                409, "mining contests end by breach or are retired, never expired"
+            )
+        if info.get("state") != STATE_LIVE:
+            raise ApiError(409, "contest is not live")
+        end = int(info.get("end") or 0)
+        if int(self.deps.clock()) < end:
+            raise ApiError(409, "contest has not ended yet")
+        try:
+            tx = self.gateway.expire_contest(cid)
+        except Exception:
+            raise ApiError(502, "expire failed") from None
+        self.stop_session(cid, "expired")
+        return {"contest_id": cid, "status": "expired", "tx_hash": tx}
+
     # -- messages -------------------------------------------------------
 
     def post_message(self, contest_id: str, payload: MessageRequest) -> dict[str, Any]:
@@ -1438,6 +1465,10 @@ def create_app(
     )
     def retire_mining(contest_id: str) -> dict[str, Any]:
         return service.retire_mining_contest(contest_id)
+
+    @app.post("/contests/{contest_id}/expire", dependencies=[Depends(require_auth)])
+    def expire_contest(contest_id: str) -> dict[str, Any]:
+        return service.expire_contest(contest_id)
 
     if byoa is not None:
 

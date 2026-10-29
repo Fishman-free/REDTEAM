@@ -49,6 +49,7 @@ export default function Ops() {
   const [busy, setBusy] = useState<"mining" | "publish" | null>(null);
   const [armedRetire, setArmedRetire] = useState("");
   const [retiringId, setRetiringId] = useState<string | null>(null);
+  const [expiringId, setExpiringId] = useState<string | null>(null);
   const [rsiCasesList, setRsiCasesList] = useState<RsiCase[]>([]);
   const [rsiCandidatesList, setRsiCandidatesList] = useState<RsiCandidate[]>([]);
   const [selectedCase, setSelectedCase] = useState("");
@@ -70,6 +71,16 @@ export default function Ops() {
         .sort((a, b) => (b.ended_ts ?? b.start_ts) - (a.ended_ts ?? a.start_ts)),
     [contestsQuery.data],
   );
+
+  const expiredContests = useMemo(() => {
+    const now = Date.now() / 1000;
+    return (contestsQuery.data ?? []).filter(
+      (contest) =>
+        !contest.is_mining &&
+        contest.state === "live" &&
+        Number(contest.end) <= now,
+    );
+  }, [contestsQuery.data]);
 
   const activeMining = useMemo(
     () =>
@@ -127,6 +138,28 @@ export default function Ops() {
       setError(errorText(reason));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function expireContest(contestId: string) {
+    setError("");
+    setExpiringId(contestId);
+    try {
+      const result = await api.expireContest(contestId, adminKey);
+      toast({
+        title: t("Contest settled", "比赛已结算"),
+        description: t(
+          `W balance and remaining stake released; tx ${result.tx_hash.slice(0, 10)}…`,
+          `W 余额与剩余质押已释放；交易 ${result.tx_hash.slice(0, 10)}…`,
+        ),
+        tone: "success",
+      });
+      await contestsQuery.refetch();
+      void refetchStatus();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setExpiringId(null);
     }
   }
 
@@ -640,6 +673,39 @@ export default function Ops() {
                 <AddressChip value={publishResult.tx_hash} kind="tx" />
               </div>
             </div>
+          )}
+        </Panel>
+
+        <Panel
+          eyebrow={t("Close expired contests", "结束到期比赛")}
+          title={t("Settle contests nobody closed", "替没人收场的比赛结账")}
+          bracket
+        >
+          <p className="muted small">
+            {t(
+              "expire() is open to anyone, but it still needs one transaction. When the defender and every attacker walk away, W's balance and the stake stay locked; the operator can close it here.",
+              "expire() 任何人都能调用，但总要有一笔交易。守方和攻方都不管时，W 余额与质押会一直锁着，运营台可以直接收场。",
+            )}
+          </p>
+          {expiredContests.length === 0 ? (
+            <p className="muted small">
+              {t("No expired contest waiting for settlement.", "没有等待结算的到期比赛。")}
+            </p>
+          ) : (
+            expiredContests.slice(0, 6).map((contest) => (
+              <div className="ops-contests__row" key={contest.id}>
+                <span className="mono">{contest.id.slice(0, 12)}…</span>
+                <span className="small muted">{formatDateTime(contest.start_ts)}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={expiringId === contest.id}
+                  onClick={() => void expireContest(contest.id)}
+                >
+                  {t("Settle", "结算")}
+                </Button>
+              </div>
+            ))
           )}
         </Panel>
       </div>

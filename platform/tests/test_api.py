@@ -131,6 +131,12 @@ class FakeGateway:
         self.calls.append(("retire_mining", contest_id))
         return "0xretire"
 
+    def expire_contest(self, contest_id):
+        if self.fault_error:
+            raise GatewayError("expire tx failed")
+        self.calls.append(("expire_contest", contest_id))
+        return "0xexpire"
+
     def defense_hash_retired(self, defense_hash):
         return self.retired
 
@@ -855,6 +861,40 @@ def test_mining_creation_precondition_and_recovery(api_bundle):
     )
     assert create_failed.status_code == 502
     assert create_failed.json()["detail"]["recovery"] == "returned"
+
+
+def test_expire_contest_settles_after_end(api_bundle):
+    client = api_bundle.client
+    api_bundle.gateway.contests[CONTEST]["end"] = 900  # clock() is fixed at 1000
+
+    expired = client.post(f"/contests/{CONTEST}/expire", headers=auth())
+
+    assert expired.status_code == 200, expired.text
+    assert expired.json() == {
+        "contest_id": CONTEST,
+        "status": "expired",
+        "tx_hash": "0xexpire",
+    }
+    assert ("expire_contest", CONTEST) in api_bundle.gateway.calls
+
+
+def test_expire_rejects_mining_live_and_unfinished_contests(api_bundle):
+    client = api_bundle.client
+
+    mining = client.post(f"/contests/{MINING_CID}/expire", headers=auth())
+    assert mining.status_code == 409
+    assert "mining contests" in mining.json()["detail"]
+
+    api_bundle.gateway.contests[CONTEST]["end"] = 2**62
+    unfinished = client.post(f"/contests/{CONTEST}/expire", headers=auth())
+    assert unfinished.status_code == 409
+    assert unfinished.json()["detail"] == "contest has not ended yet"
+
+    api_bundle.gateway.contests[CONTEST]["end"] = 900
+    api_bundle.gateway.fault_error = True
+    failed = client.post(f"/contests/{CONTEST}/expire", headers=auth())
+    assert failed.status_code == 502
+    assert failed.json()["detail"] == "expire failed"
 
 
 def test_retire_mining_contest_closes_session_and_hash(api_bundle):

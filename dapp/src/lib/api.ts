@@ -377,6 +377,12 @@ export interface MiningContestResult {
   version: string;
 }
 
+export interface ContestExpireResult {
+  contest_id: string;
+  status: "expired";
+  tx_hash: string;
+}
+
 export interface MiningRetireResult {
   contest_id: string;
   status: "retired";
@@ -601,6 +607,14 @@ export const api = {
     return request<MiningContestResult>(
       "/mining/contests",
       { method: "POST", body: JSON.stringify({ version }) },
+      { timeoutMs: 120_000, adminKey },
+    );
+  },
+
+  expireContest(contestId: string, adminKey?: string) {
+    return request<ContestExpireResult>(
+      `/contests/${contestId}/expire`,
+      { method: "POST", body: JSON.stringify({}) },
       { timeoutMs: 120_000, adminKey },
     );
   },

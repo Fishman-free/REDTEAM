@@ -72,6 +72,7 @@ class ChainGatewayPort(Protocol):
     def mark_delivered(self, contest_id: str, attacker: str, msg_hash: str) -> str: ...
     def report_defender_fault(self, contest_id: str) -> str: ...
     def retire_mining(self, contest_id: str) -> str: ...
+    def expire_contest(self, contest_id: str) -> str: ...
     def create_mining_contest(
         self, wallet: str, defense_hash: str
     ) -> tuple[str, str]: ...
@@ -477,6 +478,20 @@ class Web3ChainGateway:
             purpose="retire_mining",
             context={"contest_id": cid},
             build=lambda sender: self._arena.functions.retireMining(
+                bytes.fromhex(cid[2:])
+            ),
+            gas=GAS_FAULT,
+        )
+        return tx
+
+    def expire_contest(self, contest_id: str) -> str:
+        """Close a standard contest after its end time (``expire`` is open)."""
+
+        cid = normalize_contest_id(contest_id)
+        tx, _receipt = self._send_operator(
+            purpose="expire_contest",
+            context={"contest_id": cid},
+            build=lambda sender: self._arena.functions.expire(
                 bytes.fromhex(cid[2:])
             ),
             gas=GAS_FAULT,

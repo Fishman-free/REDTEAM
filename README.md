@@ -424,7 +424,8 @@ arena.example.com {
 2. 查看 API、索引区块、同步延迟和链 ID；
 3. 创建挖矿赛，填写平台已加载的 agent version；
 4. 在“进行中挖矿赛”里退役一场**打不穿**的挖矿赛：W 剩余余额退回 Treasury、defenseHash 永久作废、并发名额释放，托管 agent 同时停止；
-5. 选择一场已结束的普通赛，发布 consent-aware 数据集，之后守方才能在市场购买。
+5. 在“结束到期比赛”里结算**已到期但没人收场**的普通赛（`expire` 本身任何人都能调，但总要有人付这笔交易），释放 W 余额与守方质押；
+6. 选择一场已结束的普通赛，发布 consent-aware 数据集，之后守方才能在市场购买。
 
 管理密钥只保存在浏览器的 sessionStorage，不会打进前端 bundle。玩家不需要也不应该进入 `/ops`。
 
@@ -501,4 +502,5 @@ docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml up -d -
 - 不要把真实生产 API Key、助记词或私钥用于演示；BYOK Key 由平台托管，但仍应按测试凭据处理。
 - 数据同意在加入普通赛时写入链上且不可撤回；不同意时消息不落盘、不可出售。挖矿赛数据强制留存，仅用于 RSI 修复。
 - 管理密钥、`.env.stack`、vault、keydir 和 Docker volume 都属于运营者资产，不能公开。
-- 当前栈是研究与演示环境，不具备生产级的每用户鉴权、滥用防护、高可用或多验证者共识。正式部署前请阅读 [`deploy/README.md`](deploy/README.md) 的安全边界。
+- 当前栈是研究与演示环境，不具备生产级的每用户鉴权、高可用或多验证者共识。BFF 对写接口按 IP 限流（普通写 120 次/10 分钟，跑 agent 轮次 60 次、RSI 跑批 20 次），但这只是滥用防护的第一步，不是身份认证。
+- 正式部署前请阅读 [`deploy/README.md`](deploy/README.md) 的安全边界。

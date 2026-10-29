@@ -48,6 +48,9 @@ const ADMIN_ROUTES = [
   // Retiring a mining contest returns W's balance to the treasury and burns
   // the defenseHash, so it is an operator action like creating one.
   { method: "POST", pattern: /^\/api\/mining\/contests\/[^/]+\/retire\/?$/ },
+  // Closing an expired standard contest moves W's balance and the stake, so
+  // the operator may do it from the console instead of hunting a wallet.
+  { method: "POST", pattern: /^\/api\/contests\/[^/]+\/expire\/?$/ },
   { method: "POST", pattern: /^\/api\/data\/[^/]+\/publish\/?$/ },
   // RSI repair loop mutates the defender version registry, so only an
   // operator with the admin key may drive it from the browser.
@@ -141,6 +144,38 @@ app.post(
   rateLimit("register", 6, 60 * 60 * 1000),
   (_req, _res, next) => next(),
 );
+
+// Every write the browser can reach also costs the platform money: a paid
+// message runs the defender agent, RSI verification replays an attack, and a
+// registration spends a qualification transfer.  Reads stay unmetered so a
+// player can browse; writes get a per-IP budget, and the model-backed ones get
+// a tighter one on top.
+const apiWriteLimit = rateLimit("api-write", 120, 10 * 60 * 1000);
+const agentTurnLimit = rateLimit("agent-turn", 60, 10 * 60 * 1000);
+const rsiRunLimit = rateLimit("rsi-run", 20, 10 * 60 * 1000);
+
+const AGENT_TURN_ROUTES = [/^\/api\/(?:mining\/)?contests\/[^/]+\/messages\/?$/];
+const RSI_RUN_ROUTES = [
+  /^\/api\/rsi\/candidates\/?$/,
+  /^\/api\/rsi\/candidates\/[^/]+\/(?:verify|promote)\/?$/,
+];
+
+app.use("/api", (req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") {
+    next();
+    return;
+  }
+  const pathname = (req.originalUrl || req.url || "").split("?")[0];
+  const extra = AGENT_TURN_ROUTES.some((pattern) => pattern.test(pathname))
+    ? agentTurnLimit
+    : RSI_RUN_ROUTES.some((pattern) => pattern.test(pathname))
+      ? rsiRunLimit
+      : null;
+  apiWriteLimit(req, res, () => {
+    if (extra) extra(req, res, next);
+    else next();
+  });
+});
 
 const apiProxy = createProxyMiddleware({
   target: API_URL,

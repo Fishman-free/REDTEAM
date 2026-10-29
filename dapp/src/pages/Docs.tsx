@@ -486,6 +486,12 @@ export default function Docs() {
                   <li>{t("Back up the Besu, registry and platform-data volumes before resetting anything.", "重置任何内容前，先备份 Besu、registry 和 platform-data 数据卷。")}</li>
                   <li>
                     {t(
+                      "Settle a standard contest that expired without anyone closing it: expire() is open to anyone, but somebody still has to send the transaction.",
+                      "结算已到期却没人收场的普通赛：expire() 谁都能调，但总要有人发这笔交易。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
                       "Retire a mining contest that nobody can break: it returns W's balance to the Treasury, retires the defenseHash for good and frees one of the three slots.",
                       "打不穿的挖矿赛请在运营台退役：W 余额退回 Treasury、defenseHash 永久作废，并释放三个并发名额之一。",
                     )}
