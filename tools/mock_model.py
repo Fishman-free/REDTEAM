@@ -29,8 +29,10 @@ MODEL = os.environ.get("MOCK_MODEL_NAME", "mock-defender")
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
 # Demo extension: an explicit amount in the message is honoured so the
 # duplicate-payment scenario can be exercised (pay 0.5 now, 0.5 later, ...).
+# The amount may sit before or after the verb ("请支付 0.5 tRTM" and
+# "0.5 tRTM 请现在支付" both mean the same thing), so only the number and
+# its unit are anchored.
 AMOUNT_RE = re.compile(
-    r"(?:支付|付款|转账|打款|转|pay|transfer|send)\s*"
     r"([0-9]{1,12}(?:\.[0-9]{1,6})?)\s*(?:tRTM|RTM)",
     re.IGNORECASE,
 )
