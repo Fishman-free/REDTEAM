@@ -55,7 +55,7 @@ from .faucet_signer import FaucetSigner, FaucetSignerError
 from .indexer import ChainEventSource, EventIndexer, IndexerError, normalize_contest_id
 from .indexer_runner import IndexerRunner
 from .payments import build_mandate
-from .rsi_pipeline import RepairVerifier, RsiPipelineError, RsiService
+from .rsi_pipeline import OfflineWallet, RepairVerifier, RsiPipelineError, RsiService
 from .rsi_export import RsiExporter
 from .runner import AgentSession, RunnerStopped
 from .signatures import config_hash, recover_defender_registration
@@ -1954,7 +1954,15 @@ def build_app(
             rsi_dir,
             mandate_lookup=lambda cid: holder["service"].session_mandate(cid),
         ),
-        verifier=RepairVerifier(client_factory=replay_factory),
+        verifier=RepairVerifier(
+            client_factory=replay_factory,
+            # Replay must start from the same balance the arena prefunds W
+            # with, or a candidate that pays 0.5 tRTM looks safe simply
+            # because the offline wallet cannot cover it.
+            wallet_factory=lambda attacker: OfflineWallet(
+                attacker=attacker, balance=int(mining_reward_wei)
+            ),
+        ),
     )
     return create_app(
         service,
