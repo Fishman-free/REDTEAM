@@ -240,6 +240,15 @@ const API_MESSAGES: Array<[string, string, string]> = [
   ["custody unavailable", "The platform custody service is unavailable. Contact the operator.", "平台托管服务不可用，请联系运营。"],
   ["faucet signer is not configured", "The faucet signing service is not configured.", "水龙头签名服务未配置。"],
   ["captcha", "Captcha verification failed. Refresh and retry.", "验证码校验失败，请刷新后重试。"],
+  ["faucet cooldown active", "This address is still in its 24-hour faucet cooldown.", "该地址仍在 24 小时水龙头冷却期内。"],
+  ["claim signature expired", "The signed faucet message expired. Sign a new message and retry.", "水龙头签名消息已过期，请重新签名后再试。"],
+  ["claim signature was already used", "This signed faucet message was already used. Sign a new message and retry.", "这条水龙头签名已经使用过，请重新签名后再试。"],
+  ["claim signature does not match address", "The faucet signature does not match the connected wallet.", "水龙头签名与当前钱包地址不匹配。"],
+  ["claim signature cannot be recovered", "The faucet signature is invalid. Sign the claim again.", "水龙头签名无效，请重新签名领取。"],
+  ["claim signature is invalid", "The faucet signature is invalid. Sign the claim again.", "水龙头签名无效，请重新签名领取。"],
+  ["faucet relay failed", "The platform could not submit the faucet credit. Try again shortly.", "平台代发水龙头交易失败，请稍后重试。"],
+  ["faucet relay is not configured", "The faucet relay is not configured on this deployment.", "本次部署未配置水龙头代发服务。"],
+  ["faucet amount is not configured", "The faucet amount is not configured on this deployment.", "本次部署未配置水龙头额度。"],
 ];
 
 function translateApiMessage(message: string): string {

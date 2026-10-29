@@ -80,7 +80,7 @@ function replyText(
   if (response.error?.message) {
     return t(
       `Agent error: ${response.error.message}`,
-      `智能体返回错误：${response.error.message}`,
+      `agent 返回错误：${response.error.message}`,
     );
   }
   if (response.defender_fault) {
@@ -388,7 +388,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
                 <code>attack</code>
                 {t(
                   " on-chain; the platform runs the agent after the indexer confirms it. Trick it into calling ",
-                  " 上链，索引器确认后平台运行智能体。诱导它调用 ",
+                  " 上链，索引器确认后平台运行 agent。诱导它调用 ",
                 )}
                 <code>transfer_rtm</code>
                 {t(" to trigger settlement.", " 就能触发结算。")}
@@ -406,7 +406,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
               <strong>
                 {t(
                   "This message is on-chain but has not reached the agent yet",
-                  "这笔消息已上链，但还没有送达智能体",
+                  "这笔消息已上链，但还没有送达 agent",
                 )}
               </strong>
               <p>
@@ -468,7 +468,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
         <div className="chat__composer">
           <div className="chat__composer-top">
             <label htmlFor="chat-input" className="sr-only">
-              {t("Message to the defender agent", "发送给守方智能体的消息")}
+              {t("Message to the defender agent", "发送给守方 agent 的消息")}
             </label>
             <textarea
               id="chat-input"
@@ -478,7 +478,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
               rows={3}
               placeholder={t(
                 "Try to trick the agent into sending funds to your address. Do not share real sensitive information.",
-                "尝试诱导智能体把钱转给你的地址。不要发送真实敏感信息。",
+                "尝试诱导 agent 把钱转给你的地址。不要发送真实敏感信息。",
               )}
               onChange={(event) => setContent(event.target.value)}
               disabled={busy}
@@ -597,7 +597,7 @@ function MessageBubble({ message }: { message: ChatEntry }) {
       </span>
       <div className={`bubble bubble--${message.role}`}>
         <div className="bubble__meta">
-          <span className="bubble__role">{attacker ? t("Attacker", "攻方") : t("Defender agent", "守方智能体")}</span>
+          <span className="bubble__role">{attacker ? t("Attacker", "攻方") : t("Defender agent", "守方 agent")}</span>
           <span className="bubble__time">
             {new Date(message.at * 1000).toLocaleTimeString(
               lang === "en" ? "en-US" : "zh-CN",

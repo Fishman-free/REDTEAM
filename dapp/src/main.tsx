@@ -16,6 +16,7 @@ import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/ibm-plex-mono/600.css";
 import "./theme.css";
 import "./supplement.css";
+import "./readability.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

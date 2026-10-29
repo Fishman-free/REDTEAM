@@ -23,10 +23,12 @@ bash deploy/up.sh
 - 应用内文档：<http://localhost:3000/docs>
 - 运营入口：<http://localhost:3000/ops>（管理密钥在 `deploy/.env.stack`）
 - API 健康检查（只绑回环）：<http://127.0.0.1:8080/health>
-- 链 RPC（只绑回环）：`http://127.0.0.1:8546`
+- 链 RPC（只绑回环）：`http://127.0.0.1:8546` 与 `BESU_RPC_PORT`（默认都指向当前 Besu）
 - 钱包推荐 RPC：`http://localhost:3000/rpc`（同源 BFF，始终指向本栈）
 
-> 本机可能同时存在多套 Chain ID 为 `48850` 的旧本地链。钱包里已有同 Chain ID 网络时，单纯“切换网络”不会改 RPC，交易可能发到别的链。请删除旧网络后从当前页面重新添加，或把 RPC 改为上面的同源 `/rpc`。
+> 一键栈会把 `BESU_ALIAS_RPC_PORT`（与主 RPC 端口不同的兼容端口，通常是 `8546`）和 `BESU_RPC_PORT` 同时发布到同一个 Besu 容器，方便旧钱包配置继续连到当前链。不要同时运行其他占用这些端口、且 Chain ID 同为 48850 的旧本地栈。
+>
+> 水龙头已改为“用户签名、平台代发”：用户不需要发送钱包交易，也不依赖钱包 RPC；游戏内的质押/消息交易仍由钱包广播。
 
 停止：
 
@@ -112,6 +114,6 @@ bash deploy/up.sh
 - **端口冲突**：编辑 `deploy/.env.stack` 的 `BESU_RPC_PORT` / `API_PORT` / `WEB_PORT`。
 - **contracts 容器失败**：`docker compose ... logs contracts`。首次构建要下载 Solidity 编译器。
 - **Web 显示 API 离线**：`docker compose ... logs api`，检查 vault/contracts 是否完成。
-- **交易一直 Pending / 钱包超时**：确认钱包 RPC 指向 `http://<host>:<WEB_PORT>/rpc`，并确认没有另一个同 Chain ID 的旧本地栈占用钱包网络配置。
+- **交易一直 Pending / 钱包超时**：水龙头不受影响，因为它由平台代发。游戏交易仍使用钱包，请确认站内网络提示已切换，并确认没有另一个占用 8546/自定义端口的旧本地栈。
 - **Windows**：在 Git Bash 中运行 `bash deploy/up.sh`，确保 Docker Desktop 已启动。
 - **重新构建前端**：`docker compose ... up -d --build web`。

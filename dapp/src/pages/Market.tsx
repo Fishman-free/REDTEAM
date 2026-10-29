@@ -114,7 +114,7 @@ export default function Market() {
           <p>
             {t(
               "The data repairs the defender's own agent, so the buyer is the defender.",
-              "数据用于修复自己的智能体；买家就是守方。",
+              "数据用于修复自己的 agent；买家就是守方。",
             )}
           </p>
         </div>

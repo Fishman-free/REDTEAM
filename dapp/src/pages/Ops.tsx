@@ -348,7 +348,7 @@ export default function Ops() {
           <p className="muted small">
             {t(
               `The platform uses its own agent and a fixed 1 tRTM reward. Concurrent limit: ${meta.limits.maxActiveMining} contests; a retired defenseHash cannot be reused.`,
-              `平台使用自持智能体与固定 1 tRTM 奖励。并发上限 ${meta.limits.maxActiveMining} 场；defenseHash 退役后不可复用。`,
+              `平台使用自持 agent 与固定 1 tRTM 奖励。并发上限 ${meta.limits.maxActiveMining} 场；defenseHash 退役后不可复用。`,
             )}
           </p>
           <TextField

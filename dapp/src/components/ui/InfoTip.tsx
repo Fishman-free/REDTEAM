@@ -35,8 +35,29 @@ export function InfoTip({ label, children, side = "top" }: InfoTipProps) {
   const [position, setPosition] = useState<Position | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLSpanElement>(null);
+  const closeTimer = useRef<number | null>(null);
+  const pinnedRef = useRef(false);
   const id = useId();
   const { t } = useI18n();
+
+  function cancelClose() {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function closeTip() {
+    cancelClose();
+    pinnedRef.current = false;
+    setOpen(false);
+  }
+
+  function scheduleClose() {
+    if (pinnedRef.current) return;
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setOpen(false), 180);
+  }
 
   useLayoutEffect(() => {
     if (!open) {
@@ -86,17 +107,20 @@ export function InfoTip({ label, children, side = "top" }: InfoTipProps) {
         !triggerRef.current?.contains(target) &&
         !panelRef.current?.contains(target)
       ) {
-        setOpen(false);
+        closeTip();
       }
     }
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        closeTip();
+      }
     }
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("keydown", onKey);
+      cancelClose();
     };
   }, [open]);
 
@@ -109,10 +133,26 @@ export function InfoTip({ label, children, side = "top" }: InfoTipProps) {
         aria-label={t(`Explain: ${label}`, `解释：${label}`)}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
+        onMouseEnter={() => {
+          cancelClose();
+          setOpen(true);
+        }}
+        onMouseLeave={scheduleClose}
+        onFocus={() => {
+          cancelClose();
+          setOpen(true);
+        }}
+        onBlur={scheduleClose}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          setOpen((value) => !value);
+          if (pinnedRef.current && open) {
+            closeTip();
+            return;
+          }
+          cancelClose();
+          pinnedRef.current = true;
+          setOpen(true);
         }}
       >
         <CircleHelp size={12} aria-hidden="true" />
@@ -124,6 +164,8 @@ export function InfoTip({ label, children, side = "top" }: InfoTipProps) {
             className={`info-tip__popover ${position?.below ? "is-below" : ""}`.trim()}
             id={id}
             role="tooltip"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
             style={
               {
                 top: position?.top ?? 0,

@@ -36,9 +36,22 @@ PLATFORM_ADMIN_KEY=$(gen_hex 24)
 PLATFORM_MODEL_KEY=demo-key
 FAUCET_CAPTCHA_REQUIRED=false
 BESU_RPC_PORT=8546
+BESU_ALIAS_RPC_PORT=9546
 API_PORT=8080
 WEB_PORT=3000
 EOF
+fi
+
+# Older .env.stack files predate the compatibility RPC alias. Add one without
+# ever colliding with the configured primary port.
+if ! grep -q '^BESU_ALIAS_RPC_PORT=' .env.stack; then
+  primary=$(grep '^BESU_RPC_PORT=' .env.stack | cut -d= -f2- || true)
+  if [ "${primary:-8546}" = "8546" ]; then
+    alias=9546
+  else
+    alias=8546
+  fi
+  printf 'BESU_ALIAS_RPC_PORT=%s\n' "$alias" >> .env.stack
 fi
 
 log "Building and starting the stack..."
@@ -51,6 +64,7 @@ log "  Ops gate:   http://localhost:$(grep '^WEB_PORT=' .env.stack | cut -d= -f2
 log "  Admin key: deploy/.env.stack (PLATFORM_ADMIN_KEY)"
 log "  API health: http://127.0.0.1:$(grep '^API_PORT=' .env.stack | cut -d= -f2-)/health"
 log "  RPC (host): http://127.0.0.1:$(grep '^BESU_RPC_PORT=' .env.stack | cut -d= -f2-)"
+log "  RPC alias:  http://127.0.0.1:$(grep '^BESU_ALIAS_RPC_PORT=' .env.stack | cut -d= -f2-)"
 log ""
 log "The included local-mock model is a deliberately vulnerable demo agent."
 log "For a real model, edit MODEL_ALLOWLIST_JSON / PLATFORM_MODEL_PROVIDER in deploy/docker-compose.yml."

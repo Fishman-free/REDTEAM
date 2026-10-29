@@ -102,7 +102,7 @@ export function AccountMenu() {
               <strong className="tabular">{formatRtm(rtm.data)}</strong>
             </div>
             <div>
-              <span>{t("Gas (G)", "Gas（G）")}</span>
+              <span>{t("Gas (G)", "gas（G）")}</span>
               <strong className="tabular">
                 {native.data ? `${Number(native.data.formatted).toFixed(3)}` : "—"}
               </strong>

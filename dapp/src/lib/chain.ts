@@ -134,8 +134,8 @@ export async function assertWalletUsesAppChain(publicClient: PublicClient): Prom
   if (walletBlock && walletBlock.hash.toLowerCase() !== appBlock.hash.toLowerCase()) {
     throw new Error(
       getLang() === "en"
-        ? `Your wallet is connected to a different local chain with the same chain ID (${CHAIN_ID}). Set the RTM Testnet RPC URL to ${walletRpcUrl()}, or remove and re-add the network from this site.`
-        : `你的钱包连接到了另一条 chainId 同为 ${CHAIN_ID} 的本地链。请把钱包里 RTM Testnet 的 RPC 改为 ${walletRpcUrl()}，或删除该网络后从本站重新添加。`,
+        ? `This wallet is on a different local chain with the same chain ID (${CHAIN_ID}). The faucet still works; for game transactions, switch to the arena network or ask the operator to align the wallet RPC.`
+        : `这个钱包连接到了另一条 chain ID 同为 ${CHAIN_ID} 的本地链。水龙头仍可正常领取；进行游戏交易前请切换到竞技场网络，或联系运营者校准钱包 RPC。`,
     );
   }
 }

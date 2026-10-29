@@ -10,22 +10,12 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import type { Address } from "viem";
-import { useAccount, useChainId } from "wagmi";
-import { api, type FaucetTicket } from "../lib/api";
-import { faucetAbi } from "../lib/contracts";
+import { useAccount, useSignMessage } from "wagmi";
+import { api } from "../lib/api";
 import { errorText, formatCountdown, formatRtm } from "../lib/format";
-import { isSupportedChain } from "../lib/chain";
 import { useI18n } from "../lib/i18n";
 import { useLocalStorage, useNow } from "../lib/hooks";
-import {
-  useFaucetDrip,
-  useFaucetNonce,
-  usePlatform,
-  useRtmBalance,
-} from "../lib/platform";
-import { useArenaWriteContract } from "../lib/useArenaWriteContract";
-import { useActivity } from "../context/ActivityContext";
+import { useFaucetDrip, usePlatform, useRtmBalance } from "../lib/platform";
 import { useToast } from "../context/ToastContext";
 import { AddressChip } from "../components/ui/Address";
 import { Alert } from "../components/ui/Alert";
@@ -35,33 +25,42 @@ import { InfoTip } from "../components/ui/InfoTip";
 import { Panel } from "../components/ui/Panel";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { Stat } from "../components/ui/Stat";
-import { TextField } from "../components/ui/Field";
 import { ConnectPrompt } from "../components/wallet/ConnectPrompt";
 
-type ClaimStep = "idle" | "ticket" | "claim" | "done";
+type ClaimStep = "idle" | "sign" | "relay" | "done";
 
 const COOLDOWN_SECONDS = 24 * 60 * 60;
 
+function randomNonce(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function claimMessage(to: string, issuedAt: number, nonce: string): string {
+  return [
+    "RTM Arena testnet faucet claim",
+    `address: ${to.toLowerCase()}`,
+    `issued-at: ${issuedAt}`,
+    `nonce: ${nonce.toLowerCase()}`,
+  ].join("\n");
+}
+
 export default function Faucet() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { signMessageAsync } = useSignMessage();
   const { meta } = usePlatform();
-  const { writeContractAsync } = useArenaWriteContract();
-  const { trackTransaction } = useActivity();
   const { toast } = useToast();
   const { t } = useI18n();
   const balance = useRtmBalance(address);
-  const nonce = useFaucetNonce(address);
   const drip = useFaucetDrip();
   const now = useNow(1_000);
-  const [captcha, setCaptcha] = useState("");
-  const [ticket, setTicket] = useState<FaucetTicket | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [step, setStep] = useState<ClaimStep>("idle");
   const [error, setError] = useState("");
   const [justClaimed, setJustClaimed] = useState(false);
   const [lastClaim, setLastClaim] = useLocalStorage<number | null>(
-    `rtm.faucet.lastClaim.v1:${chainId}:${address?.toLowerCase() ?? "guest"}`,
+    `rtm.faucet.lastClaim.v2:${meta.chainId}:${address?.toLowerCase() ?? "guest"}`,
     null,
   );
 
@@ -71,12 +70,14 @@ export default function Faucet() {
     return Math.max(0, lastClaim + COOLDOWN_SECONDS - Math.floor(now / 1_000));
   }, [lastClaim, now]);
   const cooldownActive = cooldownLeft > 0;
-  const ready = isConnected && isSupportedChain(chainId);
-  const ticketExpiry = ticket ? ticket.deadline * 1_000 - now : 0;
 
-  const ticketHelp = t(
-    "A ticket is a signed EIP-712 authorization, not a token. It is bound to this wallet, one nonce and an expiry time. It can be used for one on-chain claim before the 10-minute deadline. An expired ticket costs nothing; clicking claim again issues a new one.",
-    "票据是一张 EIP-712 签名授权，不是代币。它绑定当前钱包、一个 nonce 和到期时间；必须在 10 分钟内完成一次链上 claim。票据过期不会产生费用，重新点击领取会自动换发新票。",
+  const signatureHelp = t(
+    "You sign one human-readable message bound to this wallet and a one-time nonce. It is accepted for 5 minutes and authorizes one testnet claim. It is not a transaction: no gas and no network switch are required.",
+    "你签一条绑定当前钱包和一次性 nonce 的明文消息。签名在 5 分钟内有效，只授权一次测试网领取。它不是交易：不需要 gas，也不需要切换钱包网络。",
+  );
+  const relayHelp = t(
+    "After your signature, the platform submits the mint on the chain used by this application. Your wallet RPC is not used for the credit, so a stale local network cannot misroute it.",
+    "签名后，平台会在本站使用的正确链上代为提交增发。到账过程不使用钱包 RPC，因此旧的本地网络配置不会把交易发错链。",
   );
 
   async function claim() {
@@ -85,59 +86,39 @@ export default function Faucet() {
       setError(t("Connect a wallet first.", "请先连接钱包。"));
       return;
     }
-    if (!isSupportedChain(chainId)) {
-      setError(t("Switch to RTM Testnet (48850) first.", "请先切换到 RTM Testnet（48850）。"));
-      return;
-    }
     if (cooldownActive) {
       setError(t("This address is still in its 24-hour cooldown.", "这个地址还在 24 小时冷却期内。"));
       return;
     }
-    if (meta.faucet.captchaRequired && !captcha.trim()) {
-      setError(t("This deployment requires a captcha token.", "平台要求验证码；请填写验证码 token。"));
-      return;
-    }
     setClaiming(true);
     try {
-      let activeTicket = ticket;
-      if (
-        !activeTicket ||
-        activeTicket.to.toLowerCase() !== address.toLowerCase() ||
-        activeTicket.deadline * 1_000 <= Date.now()
-      ) {
-        setStep("ticket");
-        activeTicket = await api.faucetTicket(address, captcha.trim() || undefined);
-        setTicket(activeTicket);
-      }
-      setStep("claim");
-      const hash = await writeContractAsync({
-        address: meta.addresses.faucet as Address,
-        abi: faucetAbi,
-        functionName: "claim",
-        args: [
-          {
-            to: activeTicket.to as Address,
-            nonce: BigInt(activeTicket.nonce),
-            deadline: BigInt(activeTicket.deadline),
-          },
-          activeTicket.signature as `0x${string}`,
-        ],
+      setStep("sign");
+      const issuedAt = Math.floor(Date.now() / 1_000);
+      const nonce = randomNonce();
+      const signature = await signMessageAsync({
+        message: claimMessage(address, issuedAt, nonce),
       });
-      await trackTransaction(hash, t("Claim test tRTM", "领取测试 tRTM"), "faucet");
+      setStep("relay");
+      const result = await api.faucetClaim({
+        to: address,
+        issued_at: issuedAt,
+        nonce,
+        signature,
+      });
       setStep("done");
-      setTicket(null);
-      setLastClaim(Math.floor(Date.now() / 1_000));
+      setLastClaim(result.claimed_at || Math.floor(Date.now() / 1_000));
       setJustClaimed(true);
       window.setTimeout(() => setJustClaimed(false), 4_000);
       toast({
         title: t("Claim confirmed", "领取成功"),
         description: t(
-          `${formatRtm(dripWei)} tRTM credited to your wallet.`,
-          `${formatRtm(dripWei)} tRTM 已到账。`,
+          `${formatRtm(result.amount_wei)} tRTM credited. The platform submitted it on the correct chain.`,
+          `${formatRtm(result.amount_wei)} tRTM 已到账。交易已由平台在正确的链上提交。`,
         ),
         tone: "success",
+        duration: 6_000,
       });
-      await Promise.all([balance.refetch(), nonce.refetch()]);
+      await balance.refetch();
     } catch (reason) {
       setError(errorText(reason));
       setStep("idle");
@@ -156,12 +137,12 @@ export default function Faucet() {
           </>
         }
         description={t(
-          "Each address can claim a fixed amount every 24 hours. tRTM is a test token with no real value, and this testnet charges zero gas.",
-          "每个地址每 24 小时可领取固定额度。tRTM 是无真实价值的测试币，测试网 gas 为 0。",
+          "Sign once and the platform credits you on the correct chain. No gas, no wallet transaction and no network switching.",
+          "签一次名，平台在正确的链上代发到账。不需要 gas、不需要钱包交易，也不需要切换网络。",
         )}
         actions={
           <Badge tone="accent" dot>
-            ZERO GAS NETWORK
+            SIGN & CREDIT
           </Badge>
         }
       />
@@ -198,23 +179,11 @@ export default function Faucet() {
             </div>
             <div>
               <span>
-                {t("On-chain nonce", "链上 nonce")}
-                <InfoTip label={t("on-chain nonce", "链上 nonce")}>
-                  {t(
-                    "The faucet keeps a strictly increasing counter per wallet. A ticket must use a number greater than the last one, which prevents the same authorization from being claimed twice.",
-                    "水龙头会为每个钱包维护一个严格递增的计数器。新票据必须使用比上次更大的数字，从而防止同一张授权被重复领取。",
-                  )}
-                </InfoTip>
-              </span>
-              <strong className="tabular">{nonce.data !== undefined ? String(nonce.data) : "—"}</strong>
-            </div>
-            <div>
-              <span>
                 {t("Cooldown", "冷却")}
                 <InfoTip label={t("cooldown", "冷却")}>
                   {t(
-                    "Measured from the last successful on-chain claim, not from the button click. A wallet can claim once every 24 hours.",
-                    "从上一次链上成功 claim 的时间开始计算，不是从点击按钮开始。每个钱包每 24 小时只能领取一次。",
+                    "One successful claim per wallet every 24 hours. The timer starts after the platform confirms the credit.",
+                    "每个钱包每 24 小时只能成功领取一次。计时从平台确认到账后开始。",
                   )}
                 </InfoTip>
               </span>
@@ -224,28 +193,22 @@ export default function Faucet() {
                   : t("Available", "可领取")}
               </strong>
             </div>
+            <div>
+              <span>
+                {t("Delivery", "发放方式")}
+                <InfoTip label={t("delivery", "发放方式")}>{relayHelp}</InfoTip>
+              </span>
+              <strong>{t("Platform relays", "平台代发")}</strong>
+            </div>
           </div>
 
-          {meta.faucet.captchaRequired && (
-            <TextField
-              label={t("Captcha token", "验证码 token")}
-              value={captcha}
-              onChange={(event) => setCaptcha(event.target.value)}
-              placeholder={t("Paste the token from your captcha provider", "粘贴验证码服务返回的 token")}
-              hint={t(
-                "Production captcha widgets should fill this automatically.",
-                "生产环境应由验证码组件自动填充",
-              )}
-            />
-          )}
-
-          {!ready ? (
+          {!isConnected ? (
             <ConnectPrompt
               compact
               title={t("Connect a wallet to claim", "连接钱包领取")}
               description={t(
-                "The ticket is bound to the claiming address; only you can submit it.",
-                "票据与领取地址绑定，只能由本人 claim。",
+                "You will sign one message; the platform submits the credit on the correct chain.",
+                "你只需要签一条消息；到账交易由平台在正确的链上提交。",
               )}
             />
           ) : (
@@ -260,22 +223,24 @@ export default function Faucet() {
               {cooldownActive
                 ? `${t("Cooldown", "冷却中")} · ${formatCountdown(cooldownLeft * 1_000)}`
                 : claiming
-                  ? t("Claiming…", "领取中…")
-                  : t(`Claim ${formatRtm(dripWei)} tRTM`, `领取 ${formatRtm(dripWei)} tRTM`)}
+                  ? step === "relay"
+                    ? t("Crediting on-chain…", "平台正在上链…")
+                    : t("Waiting for signature…", "等待签名…")
+                  : t(`Sign & claim ${formatRtm(dripWei)} tRTM`, `签名领取 ${formatRtm(dripWei)} tRTM`)}
             </Button>
           )}
 
           {step !== "idle" && (
             <div className="faucet-steps" aria-label={t("Claim steps", "领取步骤")}>
               <FaucetStep
-                label={t("Issue ticket", "签发票据")}
-                active={step === "ticket"}
-                done={step === "claim" || step === "done"}
+                label={t("Sign request", "签名授权")}
+                active={step === "sign"}
+                done={step === "relay" || step === "done"}
               />
               <span className="faucet-steps__line" />
               <FaucetStep
-                label={t("On-chain claim", "链上 claim")}
-                active={step === "claim"}
+                label={t("Platform submits", "平台上链")}
+                active={step === "relay"}
                 done={step === "done"}
               />
               <span className="faucet-steps__line" />
@@ -296,13 +261,13 @@ export default function Faucet() {
             </Alert>
           )}
 
-          {ticket && ticketExpiry > 0 && (
-            <p className="faucet-ticket mono">
-              TICKET {ticket.to.slice(0, 6)}…{ticket.to.slice(-4)} · NONCE {ticket.nonce} ·{" "}
-              {t("valid for", "有效")} {formatCountdown(ticketExpiry)}
-              <InfoTip label={t("ticket validity", "票据有效期")}>{ticketHelp}</InfoTip>
-            </p>
-          )}
+          <p className="faucet-ticket mono">
+            {t(
+              "Signed message · valid 5 min · no wallet transaction",
+              "签名消息 · 5 分钟内有效 · 不需要钱包交易",
+            )}
+            <InfoTip label={t("signature validity", "签名有效期")}>{signatureHelp}</InfoTip>
+          </p>
 
           {justClaimed && (
             <div className="claim-stamp" aria-live="polite">
@@ -328,19 +293,20 @@ export default function Faucet() {
                 <Fuel size={15} />
                 <span>
                   {t(
-                    "Network gas is zero. After claiming tRTM you do not need a separate native gas token.",
-                    "网络 gas 为 0；领取 tRTM 后不需要再准备原生 gas 币。",
+                    "No gas and no wallet transaction: the platform submits the credit on this application's chain.",
+                    "不需要 gas，也不需要钱包交易：平台会在本站使用的链上代发到账。",
                   )}
+                  <InfoTip label={t("platform relay", "平台代发")}>{relayHelp}</InfoTip>
                 </span>
               </div>
               <div>
                 <Clock3 size={15} />
                 <span>
                   {t(
-                    "One claim per address every 24 hours; each signed ticket is valid for 10 minutes.",
-                    "同一地址每 24 小时只能领取一次；每张签名票据本身 10 分钟内有效。",
+                    "One signed message per address every 24 hours; each signature is valid for 5 minutes.",
+                    "同一地址每 24 小时只需签一次消息；每次签名 5 分钟内有效。",
                   )}
-                  <InfoTip label={t("ticket validity", "票据有效期")}>{ticketHelp}</InfoTip>
+                  <InfoTip label={t("signature validity", "签名有效期")}>{signatureHelp}</InfoTip>
                 </span>
               </div>
             </div>
@@ -420,8 +386,8 @@ export default function Faucet() {
               {t("Cooldown", "冷却")}
               <InfoTip label={t("cooldown", "冷却")}>
                 {t(
-                  "Starts after a successful on-chain claim; one claim per wallet per 24 hours.",
-                  "成功完成链上 claim 后开始计时；每个钱包每 24 小时可领取一次。",
+                  "Starts after a confirmed credit; one claim per wallet per 24 hours.",
+                  "平台确认到账后开始计时；每个钱包每 24 小时可领取一次。",
                 )}
               </InfoTip>
             </>
@@ -432,14 +398,14 @@ export default function Faucet() {
         <Stat
           label={
             <>
-              {t("Ticket validity", "票据有效期")}
-              <InfoTip label={t("ticket validity", "票据有效期")}>{ticketHelp}</InfoTip>
+              {t("Signature validity", "签名有效期")}
+              <InfoTip label={t("signature validity", "签名有效期")}>{signatureHelp}</InfoTip>
             </>
           }
-          value={t("10 minutes", "10 分钟")}
+          value={t("5 minutes", "5 分钟")}
           icon={<Clock3 size={14} />}
         />
-        <Stat label={t("Network gas", "网络 gas")} value="0 G" icon={<Fuel size={14} />} />
+        <Stat label={t("Gas paid", "支付 gas")} value="0 G" icon={<Fuel size={14} />} />
       </div>
     </div>
   );

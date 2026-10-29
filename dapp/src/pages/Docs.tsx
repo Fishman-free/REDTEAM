@@ -16,7 +16,6 @@ import {
 import { Badge } from "../components/ui/Badge";
 import { Panel } from "../components/ui/Panel";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { walletRpcUrl } from "../lib/chain";
 import { formatRtm } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { usePlatform } from "../lib/platform";
@@ -87,7 +86,6 @@ function Rule({ label, value }: { label: string; value: string }) {
 export default function Docs() {
   const { t } = useI18n();
   const { meta } = usePlatform();
-  const rpc = walletRpcUrl();
   const drip = formatRtm(meta.faucet.dripAmountWei);
 
   return (
@@ -134,12 +132,12 @@ export default function Docs() {
           <Section
             id="philosophy"
             index={t("01 // DESIGN PHILOSOPHY", "01 // 设计理念")}
-            title={t("The agent is the target. The chain is the referee.", "智能体是靶子，链是裁判。")}
+            title={t("The agent is the target. The chain is the referee.", "agent 是靶子，链是裁判。")}
           >
             <p className="docs-lead">
               {t(
                 "RTM Arena is a defensive-security research environment, not a betting product. A defender brings its own autonomous payment agent. Attackers pay per message to probe it. Every stake, fee, breach and payout is enforced by contracts, so an agent's behavior has a measurable economic consequence.",
-                "RTM Arena 是一个防御性安全研究环境，不是投注产品。守方带来自己的自主支付智能体，攻方按消息付费进行试探。质押、消息费、攻破和赔付全部由合约执行，因此智能体的行为会产生可度量的经济后果。",
+                "RTM Arena 是一个防御性安全研究环境，不是投注产品。守方带来自己的自主支付 agent，攻方按消息付费进行试探。质押、消息费、攻破和赔付全部由合约执行，因此 agent 的行为会产生可度量的经济后果。",
               )}
             </p>
             <div className="docs-grid docs-grid--three">
@@ -190,18 +188,11 @@ export default function Docs() {
               <li>
                 <span className="docs-step__num mono">01</span>
                 <div>
-                  <h3>{t("Put your wallet on the right chain", "把钱包切到正确的链")}</h3>
+                  <h3>{t("Sign once, receive test tRTM", "签一次，领取测试 tRTM")}</h3>
                   <p>
                     {t(
-                      "Use RTM Testnet, chain ID 48850. The RPC URL must point to this site:",
-                      "使用 RTM Testnet，chain ID 48850。钱包 RPC 必须指向本站：",
-                    )}
-                  </p>
-                  <code className="docs-code">{rpc}</code>
-                  <p className="docs-small">
-                    {t(
-                      "If the same chain ID already exists in your wallet, do not assume it is the right network. Remove it and add it again from this site, or replace its RPC URL. Two local chains can share chain ID 48850.",
-                      "如果钱包里已经有一个 chain ID 为 48850 的网络，不要想当然认为它是同一条链。请删除后从本站重新添加，或直接替换它的 RPC 地址；两条本地链可以拥有相同的 chain ID。",
+                      `Open the faucet and sign one short message. The platform submits the ${drip} tRTM credit on the correct chain; you do not send a wallet transaction, switch networks or pay gas.`,
+                      `打开水龙头，签一条简短消息。平台会在正确的链上代发 ${drip} tRTM；你不需要发送钱包交易、切换网络或支付 gas。`,
                     )}
                   </p>
                 </div>
@@ -209,11 +200,11 @@ export default function Docs() {
               <li>
                 <span className="docs-step__num mono">02</span>
                 <div>
-                  <h3>{t("Claim test tRTM, not gas", "领取测试 tRTM，不需要 gas")}</h3>
+                  <h3>{t("Enter gameplay with one network tap", "再点一次网络按钮进入游戏")}</h3>
                   <p>
                     {t(
-                      `Open the faucet and sign the on-chain claim. Each address can claim ${drip} tRTM every 24 hours. Gas is zero, so you do not need a native gas balance.`,
-                      `打开水龙头并签署链上 claim。每个地址每 24 小时可领取 ${drip} tRTM。网络 gas 为 0，不需要另外准备原生 gas 币。`,
+                      "The faucet never needs a wallet network. For staking and paid messages, use the in-app Switch network button; the app checks the wallet chain against the arena before every signature.",
+                      "水龙头完全不需要钱包网络。质押和付费消息前，使用站内的切换网络按钮；应用会在每次签名前比对钱包链与竞技场链。",
                     )}
                   </p>
                 </div>
@@ -225,7 +216,7 @@ export default function Docs() {
                   <p>
                     {t(
                       "Attack a live contest, register your own agent as a defender, mine the platform agent, or inspect the data market. Start with a small stake.",
-                      "可以加入进行中的攻防赛、注册自己的守方智能体、挑战平台挖矿赛，或查看数据市场。建议先用小额质押熟悉流程。",
+                      "可以加入进行中的攻防赛、注册自己的守方 agent、挑战平台挖矿赛，或查看数据市场。建议先用小额质押熟悉流程。",
                     )}
                   </p>
                 </div>
@@ -268,7 +259,7 @@ export default function Docs() {
               <RoleCard
                 icon={<Shield size={18} />}
                 title={t("Defender / BYOK", "守方 / BYOK")}
-                tag={t("BRINGS THE AGENT", "自带智能体")}
+                tag={t("BRINGS THE AGENT", "自带 agent")}
                 to="/defend"
               >
                 <p>
@@ -293,7 +284,7 @@ export default function Docs() {
                 <p>
                   {t(
                     "Mining contests are created by the operator against the platform agent. Miners join without stake and pay 0.005 tRTM per message; a breach pays a fixed 1 tRTM reward.",
-                    "挖矿赛由运营者针对平台智能体创建。矿工无需质押，每条消息 0.005 tRTM；攻破后获得固定 1 tRTM 奖励。",
+                    "挖矿赛由运营者针对平台 agent 创建。矿工无需质押，每条消息 0.005 tRTM；攻破后获得固定 1 tRTM 奖励。",
                   )}
                 </p>
                 <p>
@@ -330,11 +321,11 @@ export default function Docs() {
               {[
                 ["/", t("Overview", "总览"), t("Live network status, active fronts, recent outcomes and shortcuts.", "实时网络状态、活跃战场、近期结果和快捷入口。")],
                 ["/arena", t("Arena", "竞技场"), t("Browse, join and settle standard attacker-vs-defender contests.", "浏览、加入并结算普通攻防赛。")],
-                ["/defend", t("Defend", "守方"), t("Register an agent, pass qualification and create a stake-backed contest.", "注册智能体、通过资格测试并创建带质押的比赛。")],
+                ["/defend", t("Defend", "守方"), t("Register an agent, pass qualification and create a stake-backed contest.", "注册 agent、通过资格测试并创建带质押的比赛。")],
                 ["/mine", t("Mine", "挖矿"), t("Join platform-operated mining contests for a fixed reward.", "加入平台运营的挖矿赛，争夺固定奖励。")],
                 ["/leaderboard", t("Leaderboard", "排行榜"), t("Attacker, defender and miner rankings derived from on-chain events.", "基于链上事件的攻方、守方与矿工榜单。")],
                 ["/market", t("Market", "数据市场"), t("Buy opt-in attack transcripts after a standard contest ends.", "普通赛结束后购买经攻方同意的对话数据。")],
-                ["/faucet", t("Faucet", "水龙头"), t("Claim test tRTM and inspect cooldown, ticket and nonce status.", "领取测试 tRTM，查看冷却、票据和 nonce 状态。")],
+                ["/faucet", t("Faucet", "水龙头"), t("Sign once and receive test tRTM relayed by the platform.", "签名一次，由平台代发测试 tRTM。")],
                 ["/ops", t("Operations", "运营台"), t("Admin-only: indexer status, mining contest creation and dataset publishing.", "仅管理员：索引器状态、创建挖矿赛和发布数据集。")],
               ].map(([path, label, description]) => (
                 <Link to={path} className="docs-map__row" key={path}>
@@ -357,7 +348,8 @@ export default function Docs() {
             <div className="docs-rules">
               <Rule label={t("Faucet drip", "水龙头单次额度")} value={`${drip} tRTM`} />
               <Rule label={t("Faucet cooldown", "领取冷却")} value={t("24 hours", "24 小时")} />
-              <Rule label={t("Ticket validity", "票据有效期")} value={t("10 minutes", "10 分钟")} />
+              <Rule label={t("Signature validity", "签名有效期")} value={t("5 minutes", "5 分钟")} />
+              <Rule label={t("Faucet delivery", "水龙头发放")} value={t("Platform relay", "平台代发")} />
               <Rule label={t("Standard contest duration", "普通赛时长")} value={t("6–168 hours", "6–168 小时")} />
               <Rule label={t("Attacker stake", "攻方质押")} value={t("2%–20% of S", "S × 2%–20%")} />
               <Rule label={t("Attack message fee", "攻方消息费")} value={t("0.5% of S / message", "S × 0.5% / 条")} />
@@ -420,41 +412,41 @@ export default function Docs() {
           >
             <div className="docs-faq">
               <details open>
-                <summary>{t("Claim or write transaction times out", "领取或写入交易超时")}</summary>
+                <summary>{t("Faucet claim did not credit", "水龙头没有到账")}</summary>
                 <p>
                   {t(
-                    "The most common cause on a local testnet is a wallet RPC pointing at another chain with the same chain ID. The transaction is mined elsewhere, so this site can never see the receipt.",
-                    "本地测试网最常见的原因，是钱包 RPC 指向了另一条 chain ID 相同的链。交易实际上在别处被打包，本站当然永远查不到回执。",
+                    "The faucet does not send a wallet transaction. The platform verifies your signed message and relays the mint on the chain used by this site, so a wallet RPC mismatch cannot delay the credit. Check that you signed the latest message, that the signature is less than five minutes old, and that this address has not claimed in the last 24 hours.",
+                    "水龙头不会发送钱包交易。平台验证你的签名后，会在本站使用的正确链上代发到账，因此钱包 RPC 错链不会拖住领取。请确认签名的是最新消息、签名未超过 5 分钟，并且该地址最近 24 小时没有领取过。",
                   )}
                 </p>
-                <ol>
-                  <li>
-                    {t("Open your wallet's network settings for RTM Testnet.", "打开钱包里 RTM Testnet 的网络设置。")}
-                  </li>
-                  <li>
-                    {t("Set its RPC URL to the address below (or remove the network and add it again from this site).", "把 RPC 地址改成下面这个（或删除网络后从本站重新添加）。")}
-                  </li>
-                  <li>
-                    {t("If the stuck transaction is still pending in the wallet, clear the wallet activity/nonce data for this test account, then request a new ticket.", "如果钱包里仍有卡住的待处理交易，请清除该测试账户的活动记录/nonce，然后重新领取票据。")}
-                  </li>
-                  <li>
-                    {t("Open the transaction drawer and use “Check again” for transactions already broadcast from the correct RPC.", "对于已经从正确 RPC 广播的交易，可在交易活动中点击“重新检查”。")}
-                  </li>
-                </ol>
-                <code className="docs-code">{rpc}</code>
                 <Note tone="info">
                   {t(
-                    "A transaction sent to the wrong local chain cannot be replayed. It has no value; just request a new ticket after fixing the RPC.",
-                    "发送到错误本地链的交易无法重放。它没有价值，修好 RPC 后重新领取即可。",
+                    "If the platform API is offline, the relay cannot submit. Reconnect to the platform and retry; your signature expires after five minutes and a new one is created automatically.",
+                    "如果平台 API 离线，代发无法提交。恢复连接后重试即可；旧签名 5 分钟后失效，重新领取会自动生成新签名。",
                   )}
                 </Note>
+              </details>
+              <details>
+                <summary>{t("A game transaction never confirms", "游戏交易一直不确认")}</summary>
+                <p>
+                  {t(
+                    "Gameplay transactions still use your wallet, while the faucet does not. Use the in-app network button to switch to RTM Testnet before signing. The app checks the wallet chain against the app chain before every write and will not send a transaction to a different local chain.",
+                    "游戏内的交易仍然使用你的钱包，水龙头则不需要。签名前请使用站内的网络按钮切换到 RTM Testnet。应用会在每次写入前比对钱包链和本站链，不会把交易发到另一条本地链。",
+                  )}
+                </p>
+                <p>
+                  {t(
+                    "If a transaction is already pending in the wallet, open the transaction drawer and use Check again after the network is correct. Faucet credit does not depend on this step.",
+                    "如果钱包里已有待处理交易，先修正网络，再在交易活动中点击重新检查。水龙头到账不依赖这一步。",
+                  )}
+                </p>
               </details>
               <details>
                 <summary>{t("Faucet says cooldown active", "水龙头提示冷却中")}</summary>
                 <p>
                   {t(
-                    "Cooldown is measured from the last successful on-chain claim, not from the button click. Wait for the countdown to reach zero.",
-                    "冷却从上一次链上成功 claim 的时间开始计算，不是从点击按钮开始。等倒计时归零即可。",
+                    "Cooldown is measured from the last confirmed relay credit, not from the button click. Wait for the countdown to reach zero.",
+                    "冷却从上次平台确认代发到账后开始计算，不是从点击按钮开始。等倒计时归零即可。",
                   )}
                 </p>
               </details>
@@ -471,8 +463,8 @@ export default function Docs() {
                 <summary>{t("I signed but nothing happened", "签名后没有反应")}</summary>
                 <p>
                   {t(
-                    "Check the transaction drawer first. If the transaction exists but is unconfirmed, wait or check again. If it does not exist, the wallet RPC likely never forwarded it.",
-                    "先看交易活动。如果交易存在但未确认，等待或重新检查；如果完全不存在，通常是钱包 RPC 没有把交易转发出去。",
+                    "For the faucet, the signature only authorizes one relayed credit. If no balance arrives, check the cooldown and API status; a rejected signature can be retried immediately. For a game transaction, open the transaction drawer and use Check again.",
+                    "水龙头签名只授权一次平台代发。如果没有到账，请检查冷却和 API 状态；签名被拒绝时可以立即重试。若是游戏交易，请打开交易活动并点击重新检查。",
                   )}
                 </p>
               </details>
