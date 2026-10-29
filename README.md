@@ -7,6 +7,8 @@
 > **当前进度（2026-10-10）**：攻防实验原型、真实模型的限定验证、单页展示网站和 Flower 本地 NFT 原型均已完成对应实现。项目仍处于研究与产品验证阶段，**不是已交付的企业安全平台，也不是公众支付或代币交易平台**。
 >
 > **RTM Arena 测试网（2026-10-28）**：`dapp/` 已重做为面向公开演示的完整产品界面，包含守方/攻方/矿工完整链路、独立 `/ops` 管理页、同源 BFF（浏览器不持有平台 token）和自动索引器。`bash deploy/up.sh` 可一键启动 Besu + 合约部署 + vault + API + Web + 演示模型；详见 [`deploy/README.md`](deploy/README.md) 与 [`dapp/README.md`](dapp/README.md)。测试网资产无价值；演示模型不是真实安全结论。
+>
+> **想直接体验？** 见下方 [RTM Arena 测试网：启动与使用指南](#rtm-arena-guide)。如果部署者已经给你网址，你不需要安装 Docker，直接从“玩家入口”开始。
 
 ## 一、项目要解决什么问题？
 
@@ -191,3 +193,297 @@ python -m unittest discover -s tests -p test_site_build.py -v
 | `archieve/` | 历史材料与原始实验，按原目录名保留，不作为当前操作指南。 |
 
 当前主线说明优先看[资料索引](docs/INDEX.md)及对应日期的证据。[研究论文](docs/paper/payment-agent-security-rsi.md)属于历史研究稿；[商业 PDF](docs/business/redteam-business-plan.pdf)是旧快照，尚未同步后续更新，当前产品口径以商业 Markdown 为准。
+
+<a id="rtm-arena-guide"></a>
+
+## 八、RTM Arena 测试网：启动与使用指南
+
+> 这一节面向所有体验者、参赛者和部署者，不需要 Solidity、Node.js 或 Python 经验。当前是**本地单验证者测试网**，RTM、积分和链上记录都没有真实价值；演示模型故意可被攻破，不能作为真实安全结论。
+
+先选择你的场景：
+
+| 场景 | 你需要做什么 |
+|---|---|
+| 我只是来体验或参赛 | 打开部署者给你的网址；只需要浏览器和 EVM 钱包，不需要 Docker。 |
+| 我想在自己电脑上跑一套 | 安装 Docker Desktop，在项目目录执行 `bash deploy/up.sh`。 |
+| 我要部署到服务器给别人用 | 一台 Linux 服务器 + Docker；用 Caddy/Nginx 提供 HTTPS，玩家只访问域名。 |
+
+### 8.1 玩家入口
+
+**准备：** 一个现代浏览器（Chrome、Edge 或 Firefox）和一个 EVM 钱包（推荐 MetaMask）。玩家不需要安装 Docker，也不需要自己运行链。
+
+1. 打开部署者提供的网址。自己本地启动时默认是 <http://127.0.0.1:3000>。
+2. 如果页面提示 API 离线，先等待 1—2 分钟；仍然离线就联系部署者。
+3. 点击“连接钱包”。第一次连接时，钱包会提示添加 **RTM Arena Testnet**。如果钱包没有自动添加，手动填写：
+
+   | 字段 | 本地默认值 |
+   |---|---|
+   | 网络名称 | `RTM Arena Testnet` |
+   | Chain ID | `48850` |
+   | RPC URL | `http://127.0.0.1:8546`（远程部署以页面提示为准） |
+   | 货币符号 | `RTM` |
+   | 区块浏览器 | 留空 |
+
+4. 进入 **水龙头 / Faucet**，点击领取测试 RTM。每个地址每 24 小时可以领取一次；测试网 gas 为 0，不需要准备原生 gas 币。
+5. 回到总览页，按“连接钱包 → 切换测试网 → 领取 RTM → 选择角色”的引导进入对应玩法。
+
+> **安全提醒：** 只从部署者给你的地址连接钱包；不要输入助记词、私钥或种子短语。`RTM` 是测试网游戏代币，不是投资品，不能兑换真实资产。
+
+**页面地图：**
+
+| 页面 | 地址 | 用途 |
+|---|---|---|
+| 总览 | `/` | 入门步骤、实时统计、进行中的战斗和排行榜摘要 |
+| 竞技场 | `/arena` | 浏览、搜索、筛选普通攻防赛 |
+| 战场详情 | `/arena/:contestId` | 加入、质押、付费对话、结算、领取剩余质押 |
+| 守方 | `/defend` | 注册智能体、资格测试、质押建赛、罚款与结算 |
+| 挖矿 | `/mine` | 加入平台挖矿赛，固定奖励模式 |
+| 排行榜 | `/leaderboard` | 攻方、守方、矿工榜单 |
+| 数据市场 | `/market` | 赛后数据集浏览、购买与下载 |
+| 水龙头 | `/faucet` | 领取测试 RTM |
+| 运营台 | `/ops` | **仅运营者**：创建挖矿赛、发布数据集 |
+
+### 8.2 部署者：本机启动完整栈
+
+**前置条件：**
+
+- Windows 10/11、macOS 或 Linux；
+- Windows/macOS 安装 Docker Desktop；Linux 安装 Docker Engine 和 Compose v2；
+- Windows 用户使用 Git Bash；
+- 首次启动需要联网下载镜像并构建，通常需要几分钟。
+
+在项目根目录执行：
+
+```bash
+git clone https://github.com/Fishman-free/REDTEAM.git
+cd REDTEAM
+bash deploy/up.sh
+```
+
+> Windows 用户请先打开 Docker Desktop，等引擎显示 running，然后在 **Git Bash** 中运行上面三条命令。不要用 `cmd.exe` 直接执行 `up.sh`。
+
+脚本会自动完成：
+
+1. 生成 `deploy/.env.stack`，其中包含 API token、管理密钥和 vault 主密钥，不会打印密钥；
+2. 生成单验证者 Besu 链（Chain ID `48850`）和 validator key；
+3. 部署 Treasury、Arena、RTM、Faucet、DataMarket 五份合约；
+4. 初始化平台 vault；
+5. 启动 API、自动索引器、Web BFF 和演示模型。
+
+默认访问地址：
+
+- dApp：<http://127.0.0.1:3000>
+- 运营台：<http://127.0.0.1:3000/ops>
+- API 健康检查：<http://127.0.0.1:8080/health>
+- 链 RPC：<http://127.0.0.1:8546>
+
+如果你不是第一次启动，已有的 `deploy/.env.stack` 会沿用其中的端口和密钥；请以文件中的 `WEB_PORT` 为准，不要直接套用上面的默认端口。
+
+检查服务状态：
+
+```bash
+docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml ps
+curl http://127.0.0.1:3000/healthz
+```
+
+正常情况下，`besu`、`api`、`web` 显示为 `healthy` 或 `running`；`contracts`、`vault-init` 显示为 `exited (0)`，表示一次性任务已成功完成。
+
+**端口被占用时：** 编辑 `deploy/.env.stack`，例如改成：
+
+```dotenv
+WEB_PORT=3200
+API_PORT=8180
+BESU_RPC_PORT=9546
+```
+
+保存后重新执行 `bash deploy/up.sh`，再访问 <http://127.0.0.1:3200>。`API_PORT` 和 `BESU_RPC_PORT` 只用于本机排查，不要直接暴露到公网。
+
+**查看日志：**
+
+```bash
+docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml logs -f api web
+```
+
+**停止：**
+
+```bash
+bash deploy/down.sh
+```
+
+**完全重置（会删除链、合约地址、vault、索引和下载数据）：**
+
+```bash
+bash deploy/down.sh -v
+bash deploy/up.sh
+```
+
+运营管理密钥保存在 `deploy/.env.stack` 的 `PLATFORM_ADMIN_KEY`。只把它交给运营者，不要截图、提交或发给玩家。这个文件已被 `.gitignore` 排除。
+
+### 8.3 部署到服务器给其他用户使用
+
+服务器上同样只需执行：
+
+```bash
+git clone https://github.com/Fishman-free/REDTEAM.git
+cd REDTEAM
+bash deploy/up.sh
+```
+
+默认 Web 只绑定服务器的 `127.0.0.1`，玩家无法直接访问。推荐在前面放 Caddy 或 Nginx，只开放 80/443。例如 Caddy：
+
+```caddyfile
+arena.example.com {
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+然后把 `https://arena.example.com` 发给玩家。
+
+部署者需要遵守：
+
+- 使用 HTTPS，不要把 `8080`、`8546`、Besu 的内部端口或 mock model 暴露到公网；
+- 备份 Docker volumes：`rtm-arena_besu-data`、`rtm-arena_rtm-registry`、`rtm-arena_rtm-platform-data`；
+- 不要把 `deploy/.env.stack`、vault、keydir 或管理密钥放进 Git；
+- 如果反向代理后需要按真实 IP 做限流，在 `web` 服务中设置 `TRUST_PROXY=1`，并且只允许可信反代访问；
+- 当前仍是单验证者、零 gas、共享 API token 的测试网，不是生产环境。正式公网使用前需要补每用户鉴权、TLS、限流、防滥用和多验证者链。
+
+更完整的部署拓扑和运维说明见 [`deploy/README.md`](deploy/README.md)。
+
+### 8.4 玩法一：攻方（加入普通攻防赛）
+
+攻方的目标是在比赛时间内诱导守方智能体（靶钱包 W）向自己登记的钱包转账，从而触发链上攻破。
+
+1. 先在 `/faucet` 领取测试 RTM。
+2. 打开 `/arena`，选择一场状态为 **Live** 的普通赛，进入战场详情。
+3. 阅读三项关键数值：
+   - 奖池/守方质押 `S`；
+   - 你的攻方质押 = `S × stakeBps`；
+   - 每条消息费用 = `S × 0.5%`（按页面的实时计算结果为准）。
+4. 点击加入。页面会要求你确认攻方质押和**数据同意**：
+   - 同意数据留存与出售：赛后你的对话可能被打包出售，平台 70% / 你 30%；
+   - 不同意：消息只在内存处理，不落盘，也没有可出售的数据切片。
+   - **数据同意在链上 join 后不可撤回**，请确认后再签名。
+5. 授权并加入后，在战场详情打开付费对话。第一次发送会先授权最多 5 条消息的费用；之后每条消息按“授权 → 上链 → 索引器确认 → 平台运行智能体”的顺序执行。
+6. 如果交易已经上链但页面提交失败，不要重复发送。消息会保存在浏览器的待送达记录中，可以点击“继续送达”或丢弃记录。
+7. 攻破后比赛自动结算；如果时间结束仍未攻破，任何人都可以在战场详情点击“结算到期比赛”。结算后，攻方可以在页面领取剩余质押。
+
+攻方不会直接购买数据；只有该场守方可以购买赛后的数据切片。你的数据如果被购买，分成会按链上规则结算。
+
+### 8.5 玩法二：守方（自带智能体并建赛）
+
+守方需要自带一个模型提供方（BYOK），通过资格测试后质押建赛。
+
+1. 打开 `/defend`，选择 provider。演示环境使用 `local-mock`，它是故意可攻破的演示模型；生产环境需要运营者先在部署配置中接入真实 provider。
+2. 填入 BYOK API Key（至少 8 个字符）。**演示环境不要填写真实的 OpenAI 或其他生产密钥。**
+3. 点击“运行资格测试并注册”。平台会做一次 1 wei 的真实转账测试；通过后你才有开赛资格。
+4. 资格通过后创建比赛：
+   - 守方质押 `S`；
+   - 比赛时长 `6—168` 小时；
+   - 攻方质押比例 `stakeBps`：`2%—20%`；
+   - 页面会显示攻方需要质押多少、每条消息费用多少。
+5. 授权 RTM 并创建。创建后不可取消；平台会用你的质押生成靶钱包 W。一次注册只能创建一场普通赛。
+6. 比赛期间可以在“我的比赛”查看战况、拉取累计罚款；罚款按时间衰减累计，可以重复拉取差额。比赛到期后任何地址都可以结算，守方也可以发起结算。
+
+守方的对话内容不会展示给攻方。比赛结束后，数据市场只允许该场守方购买自己的数据集；运营者发布数据集后才会出现购买入口。
+
+### 8.6 玩法三：矿工（挖矿赛）
+
+挖矿赛由平台运营创建，矿工不需要质押。
+
+1. 打开 `/mine`，选择一场活跃挖矿赛。
+2. 阅读并确认矿工数据条款后加入。挖矿赛强制留存全部对话、回复和工具轨迹，数据**只用于 RSI 修复，不进入数据市场，也不出售**。
+3. 每条消息费用固定为 `0.005 RTM`；攻破后奖励固定为 `1 RTM`。
+4. 挖矿赛是开放式的，没有固定结束时间，由攻破或平台退役结束；攻破后 defenseHash 永久退役，不能复用。
+5. 平台最多同时开放 3 场挖矿赛。没有活跃比赛时，等待运营者在 `/ops` 创建。
+
+### 8.7 玩法四：数据市场
+
+数据市场只展示**已结束的普通赛**，并且需要运营者先发布数据集。
+
+1. 打开 `/market`，选择一场已结束且有数据集入口的比赛。
+2. 只有该场比赛的守方可以购买；其他地址只能浏览信息，不能下单。
+3. 可购买两类数据：
+   - 守方自有数据；
+   - 已同意出售的攻方数据切片。选择 opt-out 的攻方没有切片。
+4. 每份数据每个地址只能购买一次，购买不可撤销。守方购买自己的数据时，30% 会回到自己的地址，净付出约为 70%。
+5. 购买后等待交付，页面会提供 ZIP 下载；下载令牌有有效期，过期或失败可以点击“重试交付”。
+6. 挖矿赛数据永远不会出现在数据市场。
+
+### 8.8 排行榜与运营台
+
+**排行榜 `/leaderboard`**：分为攻方榜、守方榜和矿工榜，数据来自链上事件；烟测赛和部署注水不计入。攻方难度按攻破前靶钱包承受的付费消息数计算。
+
+**运营台 `/ops`** 仅给运营者使用：
+
+1. 打开 `/ops`，输入 `deploy/.env.stack` 中的 `PLATFORM_ADMIN_KEY`；
+2. 查看 API、索引区块、同步延迟和链 ID；
+3. 创建挖矿赛，填写平台已加载的 agent version；
+4. 选择一场已结束的普通赛，发布 consent-aware 数据集，之后守方才能在市场购买。
+
+管理密钥只保存在浏览器的 sessionStorage，不会打进前端 bundle。玩家不需要也不应该进入 `/ops`。
+
+### 8.9 默认规则速查
+
+以下是当前演示栈的默认值；页面会从 `/api/meta` 读取实时配置，若部署者修改过配置，以页面显示为准。
+
+| 项目 | 默认值 |
+|---|---|
+| 链 | 单验证者 Besu QBFT，Chain ID `48850`，零 gas |
+| 水龙头 | 每地址每 24 小时 `200 RTM`，票据 10 分钟内有效 |
+| 普通赛时长 | `6—168` 小时 |
+| 攻方质押 | `S × 2%—20%` |
+| 攻方消息费 | `S × 0.5% / 条` |
+| 挖矿奖励 | 固定 `1 RTM` |
+| 挖矿消息费 | `0.005 RTM / 条` |
+| 并发挖矿赛 | 最多 `3` 场 |
+| 数据分成 | 平台 70% / 数据提供方 30% |
+| 数据购买 | 仅该场守方，每地址每份一次 |
+
+### 8.10 常见问题
+
+**Docker 报 `cannot connect to the Docker daemon`**
+先打开 Docker Desktop，等待引擎完全启动，再运行 `bash deploy/up.sh`。
+
+**端口被占用，Web 起不来**
+修改 `deploy/.env.stack` 的 `WEB_PORT`、`API_PORT`、`BESU_RPC_PORT`，然后重新执行 `bash deploy/up.sh`。如果 `deploy/.env.stack` 不存在，先运行一次脚本生成它。
+
+**页面显示 API 离线**
+等待 `api` 和 `contracts` 完成，再刷新页面。仍然失败时查看：
+
+```bash
+docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml logs api contracts
+```
+
+**contracts 容器失败**
+通常是首次下载 Solidity 编译器失败或链没有就绪。查看 `contracts` 日志后重试；如果改了配置，先执行 `bash deploy/down.sh -v` 再启动，避免旧合约地址和新链不一致。
+
+**水龙头领不了**
+每个地址有 24 小时冷却；票据只有 10 分钟有效。确认钱包地址没有领过，并检查浏览器是否拦截了钱包签名。
+
+**钱包网络不对**
+在页面顶部网络提示中切换到 `RTM Arena Testnet`，或按 8.1 的参数手动添加。切换后刷新页面。
+
+**消息已上链但没有回复**
+等待索引器同步；不要重复发送同一消息。若页面显示待送达记录，使用“继续送达”。可在 Activity 抽屉查看交易状态。
+
+**交易失败或回滚**
+确认钱包在 Chain ID `48850`、比赛仍在 Live、RTM 余额和授权额度足够。重新打开页面读取最新状态后再试。
+
+**修改代码后页面没有变化**
+重新构建 Web：
+
+```bash
+docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml up -d --build web
+```
+
+**Windows 上脚本无法执行**
+在 Git Bash 中运行，确认 Docker Desktop 已启动；不要用 `cmd.exe` 或 PowerShell 直接执行 `bash` 脚本。
+
+### 8.11 数据与安全边界
+
+- RTM 是测试网游戏代币，没有真实价值；链上记录不能作为真实付款、身份或贡献证明。
+- 默认的 `local-mock` 模型故意可被攻破，只用于演示完整流程，不代表任何真实模型或系统的安全性。
+- 不要把真实生产 API Key、助记词或私钥用于演示；BYOK Key 由平台托管，但仍应按测试凭据处理。
+- 数据同意在加入普通赛时写入链上且不可撤回；不同意时消息不落盘、不可出售。挖矿赛数据强制留存，仅用于 RSI 修复。
+- 管理密钥、`.env.stack`、vault、keydir 和 Docker volume 都属于运营者资产，不能公开。
+- 当前栈是研究与演示环境，不具备生产级的每用户鉴权、滥用防护、高可用或多验证者共识。正式部署前请阅读 [`deploy/README.md`](deploy/README.md) 的安全边界。
