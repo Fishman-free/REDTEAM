@@ -98,8 +98,9 @@ def api(path, payload=None, *, timeout=120):
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
-        print(f"  API {path} -> {exc.code}: {exc.read().decode()[:200]}")
-        return {"__error__": exc.code}
+        detail = exc.read().decode()[:200]
+        print(f"  API {path} -> {exc.code}: {detail}")
+        return {"__error__": exc.code, "detail": detail}
 
 def send(w3, fn, acct, label):
     tx = fn.build_transaction({"from": acct.address,
@@ -154,7 +155,7 @@ for i, content in enumerate(MESSAGES, 1):
         result = api(f"/contests/{CONTEST_ID}/messages", {"tx_hash": attack_tx, "content": content})
         if "__error__" not in result:
             break
-        if "not indexed" in json.dumps(result):
+        if "not indexed" in result.get("detail", ""):
             time.sleep(1.5)
         else:
             break
