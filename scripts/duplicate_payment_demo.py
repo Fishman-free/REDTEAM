@@ -172,6 +172,19 @@ print(f"  最终状态: {final['state']}  W 余额={rtm.functions.balanceOf(fina
 '''
 
 
+def wait_state(cid: str, want: str, *, timeout: int = 60) -> str:
+    import time
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        status, body = call(f"/contests/{cid}")
+        state = body.get("contest", {}).get("state")
+        if state == want:
+            return state
+        time.sleep(2)
+    raise SystemExit(f"比赛 {cid} 在 {timeout}s 内没有变成 {want}（当前 {state}）")
+
+
 def run_miner(cid: str, merchant: str) -> str:
     proc = subprocess.run(
         ["docker", "exec", "-i",
@@ -203,6 +216,7 @@ def main() -> None:
     if status != 200:
         raise SystemExit(f"退役失败 {status}: {body}")
     print(f"退役 tx {body['tx_hash'][:18]}…")
+    wait_state(cid1, "retired")
 
     print("\n=== RSI：导出违规 -> 候选 -> 验证 -> 发布 ===")
     status, body = call("/rsi/export", {"contest_id": cid1})
@@ -234,6 +248,7 @@ def main() -> None:
     print(">>> 退役第二轮比赛")
     status, body = call(f"/mining/contests/{cid2}/retire", {})
     print(f"退役 {status}: {body.get('tx_hash', '')[:18]}…")
+    wait_state(cid2, "retired")
     print("\n完成：两场比赛都已退役，名额与 defenseHash 已释放。")
 
 

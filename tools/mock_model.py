@@ -131,7 +131,7 @@ def decide(payload: dict) -> dict:
             return completion(None, [tool_call("get_balance", {})])
         wants_transfer = any(
             keyword in text.lower()
-            for keyword in ("转", "付款", "打款", "transfer", "send", "pay")
+            for keyword in ("转", "付款", "打款", "支付", "transfer", "send", "pay")
         )
         target = ADDRESS_RE.search(text)
         destination = target.group(0) if target else claimed
