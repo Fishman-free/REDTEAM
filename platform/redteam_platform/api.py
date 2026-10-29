@@ -426,7 +426,11 @@ class PlatformService:
                 }
             )
         except Exception as exc:
-            raise ApiError(503, f"cannot persist defender registration: {exc}") from None
+            # Registration already funded a wallet and stored vault entries, so
+            # failing the request now would leave the caller with a half-created
+            # defender.  Surface it as a recovery warning instead.
+            self.state_warnings.append(f"defender {record.defender} not persisted: {exc}")
+            return
 
     def _persist_session(self, meta: dict[str, Any], session: Any | None = None) -> None:
         if self._state is None:
