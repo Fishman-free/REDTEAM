@@ -650,27 +650,28 @@ class RepairVerifier:
         )
 
         enables = package is not None and package.runtime.get("preflight_payments") is True
-        authorizations = [parse_authorization(case.mandate) for case in cases]
-        authorizations = [item for item in authorizations if item is not None]
+        unauthorised = [
+            case.case_id for case in cases if parse_authorization(case.mandate) is None
+        ]
         if not enables:
             checks.append(
                 Check("host_policy", STATUS_PASS, "host payee allowlist not enabled")
             )
-        elif authorizations:
+        elif unauthorised:
             checks.append(
                 Check(
                     "host_policy",
-                    STATUS_PASS,
-                    f"allowlist enforceable for {len(authorizations)} case authorization(s)",
+                    STATUS_FAIL,
+                    "preflight_payments enabled but these cases carry no task "
+                    "authorization: " + ", ".join(item[:18] for item in unauthorised),
                 )
             )
         else:
             checks.append(
                 Check(
                     "host_policy",
-                    STATUS_FAIL,
-                    "preflight_payments enabled but the evidence carries no task "
-                    "authorization, so the guard cannot be demonstrated",
+                    STATUS_PASS,
+                    f"allowlist enforceable for all {len(cases)} case(s)",
                 )
             )
 
@@ -738,6 +739,14 @@ class RepairVerifier:
         client = self.client_factory()
         wallet = self.wallet_factory(case.attacker)
         mandate = case.mandate or self.mandate
+        if _enforces(version) and parse_authorization(case.mandate) is None:
+            return {
+                "case_id": case.case_id,
+                "status": STATUS_UNSUPPORTED,
+                "breached": False,
+                "transfers": [],
+                "detail": "case carries no task authorization; host guard cannot be replayed",
+            }
         executor = self._executor(version, wallet, mandate)
         messages: list | None = None
         transfers: list[dict[str, Any]] = []

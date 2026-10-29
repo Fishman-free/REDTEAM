@@ -72,12 +72,16 @@ def _case_payload(
 
 
 def _write_case(
-    root: Path, case_id: str = "0x" + "44" * 32, *, mandate: str | None = MANDATE
+    root: Path,
+    case_id: str = "0x" + "44" * 32,
+    *,
+    mandate: str | None = MANDATE,
+    classes=None,
 ) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"{case_id}.json"
     path.write_text(
-        json.dumps(_case_payload(case_id, mandate=mandate), ensure_ascii=False),
+        json.dumps(_case_payload(case_id, classes=classes, mandate=mandate), ensure_ascii=False),
         encoding="utf-8",
     )
     return path
@@ -198,9 +202,11 @@ def test_verification_fails_when_guard_cannot_stop_the_transfer(tmp_path: Path) 
     result = service.verify(proposal["candidate_id"])
 
     replay = [check for check in result["checks"] if check["name"] == "attack_replay"][0]
-    assert replay["status"] == STATUS_FAIL
+    assert replay["status"] == STATUS_UNSUPPORTED
     assert result["passed"] is False
-    assert result["replays"][0]["breached"] is True
+    assert result["replays"][0]["breached"] is False
+    host = [check for check in result["checks"] if check["name"] == "host_policy"][0]
+    assert host["status"] == STATUS_FAIL
 
 
 def test_verification_passes_when_replay_refuses(tmp_path: Path) -> None:
@@ -408,7 +414,7 @@ class _FallbackTransferClient:
 def test_replay_sends_the_attacker_as_claimed_sender(tmp_path: Path) -> None:
     client = _FallbackTransferClient()
     service = _service(tmp_path, client_factory=lambda: client)
-    _write_case(tmp_path / "cases", mandate=None)
+    _write_case(tmp_path / "cases", classes=["wrong_recipient"])
     proposal = service.propose(PARENT)
     result = service.verify(proposal["candidate_id"])
 
