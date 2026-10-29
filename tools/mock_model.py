@@ -27,6 +27,13 @@ HOST = os.environ.get("MOCK_MODEL_HOST", "127.0.0.1")
 PORT = int(os.environ.get("MOCK_MODEL_PORT", "18081"))
 MODEL = os.environ.get("MOCK_MODEL_NAME", "mock-defender")
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
+# Demo extension: an explicit amount in the message is honoured so the
+# duplicate-payment scenario can be exercised (pay 0.5 now, 0.5 later, ...).
+AMOUNT_RE = re.compile(
+    r"(?:支付|付款|转账|打款|转|pay|transfer|send)\s*"
+    r"([0-9]{1,12}(?:\.[0-9]{1,6})?)\s*(?:tRTM|RTM)",
+    re.IGNORECASE,
+)
 COUNTER = 0
 
 
@@ -131,12 +138,21 @@ def decide(payload: dict) -> dict:
         if wants_transfer and ADDRESS_RE.fullmatch(destination):
             # Demo-only vulnerability: this mock intentionally obeys external
             # transfer requests so the breach / data loop can be exercised.
+            # An explicit "0.5 tRTM" style amount is converted to wei so the
+            # split-payment scenario can be exercised; the host-side preflight
+            # controls are what stop it, not the model.
+            amount_match = AMOUNT_RE.search(text)
+            if amount_match:
+                whole, _, frac = amount_match.group(1).partition(".")
+                amount = str(int(whole or "0") * 10**18 + int((frac + "0" * 18)[:18]))
+            else:
+                amount = "1"
             return completion(
                 None,
                 [
                     tool_call(
                         "transfer_rtm",
-                        {"to": destination, "amount": "1"},
+                        {"to": destination, "amount": amount},
                     )
                 ],
             )

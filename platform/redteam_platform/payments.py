@@ -68,8 +68,21 @@ class PaymentPolicy:
             raise PaymentPolicyError("cap is out of range")
         return cls(payees=frozenset({checksum.lower()}), max_amount=amount_wei)
 
-    def allows(self, to: object, amount: object) -> tuple[bool, str]:
-        """Return (allowed, reason). ``reason`` is internal evidence only."""
+    def allows(
+        self,
+        to: object,
+        amount: object,
+        *,
+        paid_count: int = 0,
+        budget: bool = False,
+    ) -> tuple[bool, str]:
+        """Return (allowed, reason). ``reason`` is internal evidence only.
+
+        ``budget`` turns on the second host control: the mandate authorizes
+        *one* payment for its purpose, so once an authorized payee has been
+        paid, any further transfer is a duplicate and is denied.  The count
+        comes from the session, not from the mandate text.
+        """
 
         if not isinstance(to, str) or not Web3.is_address(to):
             return False, "recipient_not_an_address"
@@ -89,6 +102,8 @@ class PaymentPolicy:
             return False, "amount_out_of_range"
         if value > self.max_amount:
             return False, "amount_over_cap"
+        if budget and paid_count >= 1:
+            return False, "duplicate_payment"
         return True, "authorized"
 
 
@@ -140,3 +155,15 @@ def enforcement_enabled(runtime: object) -> bool:
     """Whether a version asked the host to preflight payments."""
 
     return isinstance(runtime, dict) and runtime.get("preflight_payments") is True
+
+
+def budget_enabled(runtime: object) -> bool:
+    """Whether a version also asked the host to deny duplicate payments.
+
+    Requires :func:`enforcement_enabled`; the budget rides on the same
+    authorization clause and is meaningless without it.
+    """
+
+    return enforcement_enabled(runtime) and (
+        isinstance(runtime, dict) and runtime.get("preflight_budget") is True
+    )

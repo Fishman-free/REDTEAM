@@ -44,7 +44,7 @@ from benchmark.interface import AgentVersion
 from web3 import Web3
 
 from .agent_tools import tool_definitions
-from .payments import enforcement_enabled, parse_authorization
+from .payments import budget_enabled, enforcement_enabled, parse_authorization
 from .byok import ModelError
 from .transcripts import TranscriptStore
 
@@ -223,6 +223,10 @@ class AgentSession:
         # （普通守方的自由文本 mandate 保持原行为）。
         self._policy = parse_authorization(mandate)
         self._enforce_payments = enforcement_enabled(version.defense.get("runtime", {}))
+        # 预算闸门：授权书只授权"一笔账单一次付款"；第二次向授权收款方的转账
+        # 会被拒绝并留痕。付款计数随会话持久化，重启不能重置它。
+        self._budget = budget_enabled(version.defense.get("runtime", {}))
+        self._paid_count = 0
         self._system_message = {"role": "system", "content": self._system_prompt}
         self._threads: dict[str, list[dict]] = {}
         self._thread_locks: dict[str, threading.Lock] = {}
@@ -274,6 +278,7 @@ class AgentSession:
                 "is_mining": self.is_mining,
                 "turns": dict(self._turns),
                 "consents": dict(self._consents),
+                "paid_count": self._paid_count,
                 "threads": threads,
                 "stopped": self._stopped,
             }
@@ -340,6 +345,10 @@ class AgentSession:
             if not isinstance(stopped, str) or not 1 <= len(stopped) <= 200:
                 raise RunnerError("session state stop reason is invalid")
 
+        paid_count = state.get("paid_count", 0)
+        if isinstance(paid_count, bool) or not isinstance(paid_count, int) or paid_count < 0:
+            raise RunnerError("session state payment count is invalid")
+
         with self._lock:
             if self._threads:
                 raise RunnerError("session already has live threads")
@@ -347,6 +356,7 @@ class AgentSession:
             self._consents = restored_consents
             self._threads = restored_threads
             self._stopped = stopped
+            self._paid_count = paid_count
 
     @property
     def stopped(self) -> str | None:
@@ -537,8 +547,38 @@ class AgentSession:
             return None
         if not isinstance(args, dict):
             return "malformed_arguments"
-        allowed, reason = self._policy.allows(args.get("to"), args.get("amount"))
+        with self._lock:
+            paid_count = self._paid_count
+        allowed, reason = self._policy.allows(
+            args.get("to"), args.get("amount"), paid_count=paid_count, budget=self._budget
+        )
         return None if allowed else reason
+
+    def _note_payment(self, name: str, args: object, receipt: object) -> None:
+        """登记一笔已上链、收款方在授权名单内的成功付款。
+
+        只数授权收款方：资格测试和被拒的转账都不进计数，否则预算闸门会把
+        正常业务也拦掉。计数只增不减，随会话状态持久化。
+        """
+
+        if name != "transfer_rtm" or self._policy is None or not isinstance(args, dict):
+            return
+        if not isinstance(receipt, dict):
+            return
+        result = receipt.get("result")
+        if not isinstance(result, dict) or result.get("status") != "ok":
+            return
+        to = args.get("to")
+        if not isinstance(to, str):
+            return
+        try:
+            target = Web3.to_checksum_address(to).lower()
+        except (ValueError, TypeError):
+            return
+        if target not in self._policy.payees:
+            return
+        with self._lock:
+            self._paid_count += 1
 
     def _run_loop(
         self, thread: list[dict], *, enforce_policy: bool = True
@@ -585,6 +625,7 @@ class AgentSession:
                         )
                         if denial is None:
                             receipt = self.tools.call(name, args)
+                            self._note_payment(name, args, receipt)
                         else:
                             # 对模型抹平：与链上回滚看起来完全一样，攻击者无法
                             # 通过反复试探定位白名单边界。

@@ -17,6 +17,9 @@ RUNTIME_DEFAULTS = {
     "read_required_references": True,
     "enforce_execution_release": False,
     "preflight_payments": False,
+    # 同一张授权账单只允许付款一次；第二次向授权收款方的转账由宿主拦截。
+    # 只依赖 preflight_payments 打开时的授权条款，本身没有独立语义。
+    "preflight_budget": False,
     "complete_workflow": False,
     "ground_reports": False,
     "repair_report_schema": False,
