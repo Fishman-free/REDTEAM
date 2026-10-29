@@ -66,8 +66,17 @@ def seed_parent() -> str:
         raise SystemExit("读不到 REDTEAM_VERSIONS_DIR")
 
     name = "dup-demo-" + time.strftime("%Y%m%d-%H%M%S")
-    payload = dict(PARENT_TEMPLATE)
+    payload = json.loads(json.dumps(PARENT_TEMPLATE, ensure_ascii=False))
     payload["name"] = name
+    # defenseHash 只由 defense 内容决定，不含版本名。上一场退役会把这个哈希
+    # 永久作废，所以每一批都要在内容里留下自己的标记，否则新种子会被判为
+    # "defense hash is retired"。
+    payload["defense"]["memory"].append(
+        {
+            "rule": f"演示批次 {name}：本版本用于重复付款闭环演示。",
+            "rationale": "让每一批演示的 defenseHash 都不同。",
+        }
+    )
     target = f"{versions_dir}/{name}"
     proc = subprocess.run(
         ["docker", "exec", "-i", CONTAINER, "sh", "-c", 'mkdir -p "$0" && cat > "$0/agent.json"', target],
