@@ -1,16 +1,7 @@
 import { parseAbi } from "viem";
 
-/**
- * Fallback addresses for the current Anvil / Base Sepolia fork deployment.
- * Runtime values come from GET /meta and override these defaults.
- */
-export const ADDRESSES = {
-  treasury: "0x2E88565fA4A126Fcd5a219fBE9Fdb6366898862E",
-  arena: "0x5a8E8B7D1B52b1fA3B8bdcb0b38d9b55AAFBbe68",
-  rtm: "0x7f48B5FD805c70A95ed9cB7A6280F52A5323fD33",
-  faucet: "0xD30D8d0A2bcf5624BbC3Aa0C802D0CD7AB7faEDF",
-  dataMarket: "0x1848eb5131db8E35423138e8e88E12f983604781",
-} as const;
+// Contract addresses are not bundled: they come only from GET /meta
+// (see usePlatform().addresses), because every deployment gets fresh ones.
 
 export const ZERO_HASH =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
@@ -36,9 +27,13 @@ export const arenaAbi = parseAbi([
   "function penaltyDue(bytes32 id, address who) view returns (uint256)",
   "function dataConsent(bytes32 id, address who) view returns (bool)",
   "function contestState(bytes32 id) view returns (uint8)",
+  "function contestEnd(bytes32 id) view returns (uint64)",
   "function contestWallet(bytes32 id) view returns (address)",
   "function activeMiningCount() view returns (uint256)",
-  "function contestInfo(bytes32 id) view returns (address defender, address wallet, uint256 stake, uint32 stakeBps, bytes32 defenseHash, uint64 start, uint64 end, uint64 endedAt, uint8 state, bool isMining, uint32 attackerCount, bool paused)",
+  "function contestInfo(bytes32 id) view returns (address defender, address wallet, uint256 stake, uint32 stakeBps, bytes32 defenseHash, uint64 start, uint64 end, uint64 endedAt, uint8 state, bool isMining, uint32 attackerCount, bool paused, bool isByoa)",
+  "function byoaContestInfo(bytes32 id) view returns (bool isByoa, address teeSigner, bytes32 teePubKey, bytes32 runtimeMeasurement, bytes32 configCommitment, uint8 attestationTier, bool defenderDataConsent, uint16 utilityMissThreshold, uint16 utilityPenaltyBps)",
+  "function reportByoaUtilityBreach(bytes32 id)",
+  "function byoaNonce(address defender) view returns (uint64)",
 ]);
 
 export const faucetAbi = parseAbi([

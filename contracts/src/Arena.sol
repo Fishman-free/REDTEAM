@@ -6,7 +6,14 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {RTMToken, IRTMArena} from "./RTMToken.sol";
+
+/// @notice BYOA 委托任务存根的最小结算接口。
+interface ITaskSink {
+    function settle(bytes32 contestId, address to) external;
+    function expiredTaskCount(bytes32 contestId) external view returns (uint256);
+}
 
 /// @title Arena —— 攻守比赛全生命周期
 /// @notice 普通赛：质押、惰性罚款（每 2h 保留 75%）、付费消息、攻破/到期/弃权结算，
@@ -43,6 +50,20 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     uint256 public constant PRECISION = 1e18;
     uint32 public constant MAX_ACTIVE_MINING = 3;
 
+    // ---- BYOA / EIP-712 ----
+    uint8 public constant ATTESTATION_SIMULATED = 0;
+    uint8 public constant ATTESTATION_HARDWARE = 1;
+    /// @dev 字段顺序必须与 `_mandateHash` 的 abi.encode 完全一致。
+    bytes32 public constant BYOA_MANDATE_TYPEHASH = keccak256(
+        "ByoaMandate(address defender,address wallet,address teeSigner,uint256 stake,uint64 duration,uint32 stakeBps,bytes32 configCommitment,bytes32 runtimeMeasurement,bytes32 teePubKey,uint8 attestationTier,bool defenderDataConsent,uint16 utilityMissThreshold,uint16 utilityPenaltyBps,uint64 nonce,uint64 deadline)"
+    );
+    bytes32 public constant TEE_WALLET_BINDING_TYPEHASH = keccak256(
+        "TeeWalletBinding(address defender,address wallet,bytes32 configCommitment,bytes32 runtimeMeasurement,bytes32 teePubKey,uint64 nonce,uint64 deadline)"
+    );
+    bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
     enum State {
         None,
         Live,
@@ -63,6 +84,47 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         uint32 attackerCount;
         uint256 pausedTotal;
         uint64 lastPauseAt;
+        // ---- BYOA ----
+        bool isByoa;
+        address teeSigner;
+        bytes32 teePubKey;
+        bytes32 runtimeMeasurement;
+        uint8 attestationTier;
+        bool defenderDataConsent;
+        uint16 utilityMissThreshold;
+        uint16 utilityPenaltyBps;
+    }
+
+    /// @notice BYOA 创建参数；configCommitment 复用 defenseHash 槽位。
+    struct ByoaParams {
+        address defender;
+        address wallet;
+        address teeSigner;
+        uint256 stake;
+        uint64 duration;
+        uint32 stakeBps;
+        bytes32 configCommitment;
+        bytes32 runtimeMeasurement;
+        bytes32 teePubKey;
+        uint8 attestationTier;
+        bool defenderDataConsent;
+        uint16 utilityMissThreshold;
+        uint16 utilityPenaltyBps;
+        uint64 nonce;
+        uint64 deadline;
+    }
+
+    /// @notice BYOA 公开运行时信息（不含私有配置原文）。
+    struct ByoaInfo {
+        bool isByoa;
+        address teeSigner;
+        bytes32 teePubKey;
+        bytes32 runtimeMeasurement;
+        bytes32 configCommitment;
+        uint8 attestationTier;
+        bool defenderDataConsent;
+        uint16 utilityMissThreshold;
+        uint16 utilityPenaltyBps;
     }
 
     struct Attacker {
@@ -93,6 +155,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         bool isMining;
         uint32 attackerCount;
         bool paused;
+        bool isByoa;
     }
 
     RTMToken public rtm;
@@ -100,6 +163,15 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     address public operator;
     bool public immutable testnet;
     uint32 public activeMiningCount;
+    /// @notice BYOA 任务存根；旧部署保持为 0。
+    address public taskSink;
+
+    /// @notice EIP-712 域分隔符（在构造时固定 chainId 与合约地址）。
+    bytes32 public immutable domainSeparator;
+    /// @notice 每个守方的下一个 BYOA 创建 nonce（防重放）。
+    mapping(address => uint64) public byoaNonce;
+    /// @notice 已送达消息的密文回复 hash（BYOA 强制非零）。
+    mapping(bytes32 => mapping(address => mapping(bytes32 => bytes32))) public replyHashOf;
 
     mapping(bytes32 => Contest) internal contests;
     mapping(bytes32 => address[]) public contestAttackers;
@@ -149,7 +221,25 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         bytes32 indexed id,
         address indexed attacker,
         bytes32 indexed msgHash,
-        uint256 delivered
+        uint256 delivered,
+        bytes32 replyHash
+    );
+    event ByoaContestCreated(
+        bytes32 indexed id,
+        address indexed defender,
+        address indexed wallet,
+        address teeSigner,
+        bytes32 configCommitment,
+        bytes32 runtimeMeasurement,
+        bytes32 teePubKey,
+        uint8 attestationTier,
+        bool defenderDataConsent
+    );
+    event TaskSinkUpdated(address indexed sink);
+    event ByoaUtilityBreach(
+        bytes32 indexed id,
+        uint256 expiredTasks,
+        uint256 penalty
     );
     event PenaltiesCollected(bytes32 indexed id, address indexed recipient, uint256 amount);
     event Paused(bytes32 indexed id);
@@ -209,6 +299,15 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     error WalletNotFresh(address wallet);
     error WrongPrizeBalance(uint256 balance);
     error ZeroHash();
+    error TaskSinkNotSet();
+    error TaskSinkAlreadySet();
+    error InvalidTaskSink();
+    error BadSignature();
+    error SignatureExpired();
+    error BadNonce();
+    error ReplyHashRequired();
+    error UtilitySatisfied(uint256 expiredTasks, uint16 threshold);
+    error NotByoaContest();
 
     modifier onlyOperator() {
         if (msg.sender != operator) revert NotOperator();
@@ -220,6 +319,15 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (treasury_ == address(this) || treasury_.code.length == 0) revert InvalidTreasury();
         treasury = treasury_;
         testnet = testnet_;
+        domainSeparator = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256(bytes("RTM Arena")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     // ------------------------------------------------------------------
@@ -241,6 +349,17 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (op == address(0)) revert ZeroAddress();
         operator = op;
         emit OperatorUpdated(op);
+    }
+
+    /// @notice 绑定 BYOA 的 TaskSink 并同步到 RTMToken；只能设置一次。
+    /// @dev 必须在 createByoaContest 之前调用；不影响普通赛与挖矿赛。
+    function setTaskSink(address sink) external onlyOwner {
+        if (address(rtm) == address(0)) revert NotInitialized();
+        if (taskSink != address(0)) revert TaskSinkAlreadySet();
+        if (sink == address(0) || sink.code.length == 0) revert InvalidTaskSink();
+        taskSink = sink;
+        rtm.setTaskSink(sink);
+        emit TaskSinkUpdated(sink);
     }
 
     /// @notice 测试网注水：仅 testnet=true 的部署可用。
@@ -322,6 +441,133 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         emit ContestCreated(
             id, treasury, wallet, 0, type(uint64).max, true, 0, defenseHash
         );
+    }
+
+    /// @notice 创建 BYOA 赛：守方 EIP-712 委托 + TEE 钱包绑定签名都必须有效。
+    /// @param p 运行时公开参数；`configCommitment` 写入 defenseHash 槽位。
+    /// @param defenderSignature 守方对 ByoaMandate 的 EIP-712 签名。
+    /// @param teeSignature TEE 对 TeeWalletBinding 的 EIP-712 签名。
+    function createByoaContest(
+        ByoaParams calldata p,
+        bytes calldata defenderSignature,
+        bytes calldata teeSignature
+    ) external onlyOperator nonReentrant returns (bytes32 id) {
+        if (address(rtm) == address(0)) revert NotInitialized();
+        if (taskSink == address(0)) revert TaskSinkNotSet();
+        if (p.defender == address(0) || p.teeSigner == address(0)) {
+            revert ZeroAddress();
+        }
+        if (p.stake == 0) revert BadParams();
+        if (p.duration < MIN_DURATION || p.duration > MAX_DURATION) revert BadParams();
+        if (p.stakeBps < MIN_STAKE_BPS || p.stakeBps > MAX_STAKE_BPS) revert BadParams();
+        if (
+            p.configCommitment == bytes32(0) || p.runtimeMeasurement == bytes32(0)
+                || p.teePubKey == bytes32(0)
+        ) revert BadParams();
+        if (p.attestationTier > ATTESTATION_HARDWARE) revert BadParams();
+        if (p.utilityMissThreshold > 64) revert BadParams();
+        if (p.utilityPenaltyBps > 5000) revert BadParams();
+        if (p.deadline < block.timestamp) revert SignatureExpired();
+        if (p.nonce != byoaNonce[p.defender]) revert BadNonce();
+        _checkWallet(p.wallet, p.defender, true);
+
+        if (_recover(_digest(_mandateHash(p)), defenderSignature) != p.defender) {
+            revert BadSignature();
+        }
+        if (_recover(_digest(_bindingHash(p)), teeSignature) != p.teeSigner) {
+            revert BadSignature();
+        }
+
+        byoaNonce[p.defender] = p.nonce + 1;
+
+        id = _contestId(p.defender, p.wallet);
+        Contest storage c = contests[id];
+        c.defender = p.defender;
+        c.wallet = p.wallet;
+        c.stake = p.stake;
+        c.stakeBps = p.stakeBps;
+        c.defenseHash = p.configCommitment;
+        c.start = uint64(block.timestamp);
+        c.end = uint64(block.timestamp) + p.duration;
+        c.state = State.Live;
+        c.isByoa = true;
+        c.teeSigner = p.teeSigner;
+        c.teePubKey = p.teePubKey;
+        c.runtimeMeasurement = p.runtimeMeasurement;
+        c.attestationTier = p.attestationTier;
+        c.defenderDataConsent = p.defenderDataConsent;
+        c.utilityMissThreshold = p.utilityMissThreshold;
+        c.utilityPenaltyBps = p.utilityPenaltyBps;
+        contestList.push(id);
+
+        rtm.transferFrom(p.defender, p.wallet, p.stake);
+        rtm.registerTarget(p.wallet, id);
+        emit ContestCreated(
+            id, p.defender, p.wallet, p.stake, c.end, false, p.stakeBps, p.configCommitment
+        );
+        emit ByoaContestCreated(
+            id,
+            p.defender,
+            p.wallet,
+            p.teeSigner,
+            p.configCommitment,
+            p.runtimeMeasurement,
+            p.teePubKey,
+            p.attestationTier,
+            p.defenderDataConsent
+        );
+    }
+
+    /// @dev 分块拼装 EIP-712 编码，避免 14 个字段同时占用栈槽。
+    ///      abi.encode 的每个标量都按 32 字节右对齐，与 TypedDataEncoder 一致。
+    function _mandateHash(ByoaParams calldata p) internal pure returns (bytes32) {
+        bytes memory data = abi.encodePacked(
+            BYOA_MANDATE_TYPEHASH,
+            abi.encode(p.defender, p.wallet, p.teeSigner, p.stake)
+        );
+        data = abi.encodePacked(
+            data, abi.encode(p.duration, p.stakeBps, p.configCommitment)
+        );
+        data = abi.encodePacked(
+            data,
+            abi.encode(
+                p.runtimeMeasurement,
+                p.teePubKey,
+                p.attestationTier,
+                p.defenderDataConsent,
+                p.utilityMissThreshold,
+                p.utilityPenaltyBps
+            )
+        );
+        data = abi.encodePacked(data, abi.encode(p.nonce, p.deadline));
+        return keccak256(data);
+    }
+
+    function _bindingHash(ByoaParams calldata p) internal pure returns (bytes32) {
+        bytes memory data = abi.encodePacked(
+            TEE_WALLET_BINDING_TYPEHASH,
+            abi.encode(p.defender, p.wallet, p.configCommitment)
+        );
+        data = abi.encodePacked(
+            data, abi.encode(p.runtimeMeasurement, p.teePubKey, p.nonce, p.deadline)
+        );
+        return keccak256(data);
+    }
+
+    function _digest(bytes32 structHash) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+    }
+
+    function _recover(bytes32 digest, bytes calldata signature)
+        internal
+        pure
+        returns (address signer)
+    {
+        (address recovered, ECDSA.RecoverError error, ) = ECDSA.tryRecover(
+            digest, signature
+        );
+        if (error != ECDSA.RecoverError.NoError) revert BadSignature();
+        return recovered;
     }
 
     function _contestId(address defender, address wallet) internal view returns (bytes32) {
@@ -442,13 +688,34 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     }
 
     /// @notice operator 标记一条已付费消息送达；msgHash 必须已付费且只能计一次。
+    /// @dev 普通赛/挖矿赛的兼容入口；BYOA 赛必须使用带 replyHash 的重载。
     function markDelivered(bytes32 id, address attacker, bytes32 msgHash)
         external
         onlyOperator
     {
+        _markDelivered(id, attacker, msgHash, bytes32(0));
+    }
+
+    /// @notice BYOA 送达入口：附带 TEE 加密回复的 hash（必须是密文 keccak）。
+    function markDelivered(
+        bytes32 id,
+        address attacker,
+        bytes32 msgHash,
+        bytes32 replyHash
+    ) external onlyOperator {
+        _markDelivered(id, attacker, msgHash, replyHash);
+    }
+
+    function _markDelivered(
+        bytes32 id,
+        address attacker,
+        bytes32 msgHash,
+        bytes32 replyHash
+    ) internal {
         Contest storage c = contests[id];
         if (c.state != State.Live) revert NotLive(id);
         if (block.timestamp >= c.end) revert ContestExpired(id);
+        if (c.isByoa && replyHash == bytes32(0)) revert ReplyHashRequired();
         Attacker storage a = attackers[id][attacker];
         if (!a.joined) revert NotJoined();
         if (a.delivered >= a.attackCount) revert NothingToMark();
@@ -457,8 +724,9 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (paidFee[id][attacker][msgHash] == 0) revert BadParams();
         if (deliveredMsg[id][attacker][msgHash]) revert BadParams();
         deliveredMsg[id][attacker][msgHash] = true;
+        replyHashOf[id][attacker][msgHash] = replyHash;
         a.delivered += 1;
-        emit MarkDelivered(id, attacker, msgHash, a.delivered);
+        emit MarkDelivered(id, attacker, msgHash, a.delivered, replyHash);
     }
 
     /// @notice operator 退还一条未送达消息的费用（Treasury 需预先授权 Arena）。
@@ -605,7 +873,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
 
     /// @dev 所有结束路径统一走这里：冻结暂停、写 endedAt、注销靶。
     ///      挖矿赛额外释放并发名额并永久退役 defenseHash。
-    function _end(Contest storage c, uint256 at) internal {
+    function _end(bytes32 id, Contest storage c, uint256 at) internal {
         _finalizePause(c, at);
         c.state = State.Ended;
         c.endedAt = uint64(at);
@@ -617,6 +885,11 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
             activeDefenseHash[hash] = bytes32(0);
         }
         rtm.unregisterTarget(c.wallet);
+        // BYOA：暂存在 TaskSink 的合法付款原路退回守方（不进入奖池）。
+        if (c.isByoa) {
+            address sink = taskSink;
+            if (sink != address(0)) ITaskSink(sink).settle(id, c.defender);
+        }
     }
 
     /// @notice 普通赛到期结算：任何人可调；W 余额归 defender，零余额也正常结束。
@@ -626,7 +899,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (c.state != State.Live) revert NotLive(id);
         if (block.timestamp < c.end) revert NotExpired(id);
 
-        _end(c, block.timestamp);
+        _end(id, c, block.timestamp);
         uint256 amount = rtm.balanceOf(c.wallet);
         if (amount > 0) rtm.controllerTransfer(c.wallet, c.defender, amount);
         emit Expired(id, c.defender, amount);
@@ -643,7 +916,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (!c.isMining && block.timestamp >= c.end) revert ContestExpired(id);
         if (!attackers[id][winner].joined) revert NotJoined();
 
-        _end(c, block.timestamp);
+        _end(id, c, block.timestamp);
         uint256 rest = rtm.balanceOf(c.wallet);
         if (rest > 0) rtm.controllerTransfer(c.wallet, winner, rest);
 
@@ -662,7 +935,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (c.isMining) revert NotNormalContest();
         if (c.state != State.Live) revert NotLive(id);
         if (block.timestamp >= c.end) revert ContestExpired(id);
-        _end(c, block.timestamp);
+        _end(id, c, block.timestamp);
 
         address[] memory list = contestAttackers[id];
         _waiveAll(id, list);
@@ -674,6 +947,30 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
             _distributeByDelivered(c, id, list, totalDelivered);
         }
         emit DefenderFault(id);
+    }
+
+    /// @notice 效用义务违约：过期任务数严格超过阈值时，扣罚质押给 Treasury。
+    /// @dev 只适用于 BYOA；任务资金先由 `_end` 退回守方，罚没只针对 W 剩余余额。
+    ///      攻击方质押不受影响，赛后可正常 withdrawStake。
+    function reportByoaUtilityBreach(bytes32 id) external onlyOperator nonReentrant {
+        Contest storage c = contests[id];
+        if (!c.isByoa) revert NotByoaContest();
+        if (c.state != State.Live) revert NotLive(id);
+        address sink = taskSink;
+        if (sink == address(0)) revert TaskSinkNotSet();
+        uint256 expired = ITaskSink(sink).expiredTaskCount(id);
+        if (expired <= c.utilityMissThreshold) {
+            revert UtilitySatisfied(expired, c.utilityMissThreshold);
+        }
+
+        _end(id, c, block.timestamp);
+        uint256 balance = rtm.balanceOf(c.wallet);
+        uint256 penalty = (c.stake * c.utilityPenaltyBps) / 10_000;
+        if (penalty > balance) penalty = balance;
+        if (penalty > 0) rtm.controllerTransfer(c.wallet, treasury, penalty);
+        balance = rtm.balanceOf(c.wallet);
+        if (balance > 0) rtm.controllerTransfer(c.wallet, c.defender, balance);
+        emit ByoaUtilityBreach(id, expired, penalty);
     }
 
     function _waiveAll(bytes32 id, address[] memory list) internal {
@@ -759,7 +1056,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         if (c.state != State.Live) revert NotLive(id);
         if (!c.isMining) revert NotMiningContest();
 
-        _end(c, block.timestamp);
+        _end(id, c, block.timestamp);
         uint256 returned = rtm.balanceOf(c.wallet);
         if (returned > 0) rtm.controllerTransfer(c.wallet, treasury, returned);
         emit MiningRetired(id, c.defenseHash, returned);
@@ -792,6 +1089,46 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         return uint8(contests[id].state);
     }
 
+    function contestEnd(bytes32 id) external view returns (uint64) {
+        return contests[id].end;
+    }
+
+    function isByoaContest(bytes32 id) external view returns (bool) {
+        return contests[id].isByoa;
+    }
+
+    function contestTeeSigner(bytes32 id) external view returns (address) {
+        return contests[id].teeSigner;
+    }
+
+    /// @notice 任务签发人：operator，或该场 BYOA 的 TEE signer。
+    function isContestTaskIssuer(bytes32 id, address who)
+        public
+        view
+        returns (bool)
+    {
+        Contest storage c = contests[id];
+        if (c.state != State.Live) return false;
+        if (who == operator) return true;
+        return c.isByoa && c.teeSigner != address(0) && who == c.teeSigner;
+    }
+
+    /// @notice BYOA 公开运行时信息；非 BYOA 场次 isByoa=false 且字段为零。
+    function byoaContestInfo(bytes32 id) external view returns (ByoaInfo memory) {
+        Contest storage c = contests[id];
+        return ByoaInfo({
+            isByoa: c.isByoa,
+            teeSigner: c.teeSigner,
+            teePubKey: c.teePubKey,
+            runtimeMeasurement: c.runtimeMeasurement,
+            configCommitment: c.defenseHash,
+            attestationTier: c.attestationTier,
+            defenderDataConsent: c.defenderDataConsent,
+            utilityMissThreshold: c.utilityMissThreshold,
+            utilityPenaltyBps: c.utilityPenaltyBps
+        });
+    }
+
     /// @notice 返回后端/前端需要的比赛核心参数。
     function contestInfo(bytes32 id) external view returns (ContestInfo memory) {
         Contest storage c = contests[id];
@@ -807,7 +1144,8 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
             state: uint8(c.state),
             isMining: c.isMining,
             attackerCount: c.attackerCount,
-            paused: c.lastPauseAt != 0
+            paused: c.lastPauseAt != 0,
+            isByoa: c.isByoa
         });
     }
 }

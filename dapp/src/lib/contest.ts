@@ -14,7 +14,7 @@ export function contestStartMs(contest: Contest): number {
   return Number(contest.start_ts) * 1_000;
 }
 
-export function attackFeeWei(contest: Contest, meta: PlatformMeta): bigint {
+export function attackFeeWei(contest: Contest, meta: Pick<PlatformMeta, "fees">): bigint {
   if (contest.is_mining) {
     try {
       return BigInt(meta.fees.miningFeeWei);

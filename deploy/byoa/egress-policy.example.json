@@ -1,0 +1,12 @@
+{
+  "_comment": "Public egress declaration shown to attackers. The CVM proxy only forwards declared model hosts and schema-approved oracle requests; everything else is denied and recorded.",
+  "models": ["models.example"],
+  "oracles": [
+    {
+      "name": "risk",
+      "host": "risk.example",
+      "pathPrefix": "/check",
+      "fields": ["payee", "amount", "currency"]
+    }
+  ]
+}

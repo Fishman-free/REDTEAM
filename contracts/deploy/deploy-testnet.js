@@ -529,6 +529,10 @@ async function main() {
   console.log('\nWiring...');
   await send('arena.initialize(rtm)', arena.initialize(rtmAddress));
   await send('arena.setOperator(operator)', arena.setOperator(operator));
+  // BYOA 委托任务存根必须在任何 createByoaContest 之前绑定；不影响普通/挖矿赛。
+  const taskSink = await deploy('TaskSink', [arenaAddress, rtmAddress]);
+  const taskSinkAddress = await taskSink.getAddress();
+  await send('arena.setTaskSink(taskSink)', arena.setTaskSink(taskSinkAddress));
 
   // Faucet/DataMarket 在 Arena 初始化后部署，参数固定且不可变。
   const faucet = await deploy('Faucet', [
@@ -584,6 +588,8 @@ async function main() {
   assertAddressEq('arena.rtm()', await arena.rtm(), rtmAddress);
   assertEq('arena.testnet()', await arena.testnet(), true);
   assertAddressEq('arena.operator()', await arena.operator(), operator);
+  assertAddressEq('arena.taskSink()', await arena.taskSink(), taskSinkAddress);
+  assertAddressEq('rtm.taskSink()', await rtm.taskSink(), taskSinkAddress);
   assertAddressEq('market.operator()', await market.operator(), operator);
   assertAddressEq('faucet.ticketSigner()', await faucet.ticketSigner(), ticketSigner);
   assertEq('faucet.dripAmount()', await faucet.dripAmount(), faucetDrip);
@@ -641,6 +647,8 @@ async function main() {
   assertAddressEq('arena.rtm()', await arena.rtm(), rtmAddress);
   assertEq('arena.testnet()', await arena.testnet(), true);
   assertAddressEq('arena.operator()', await arena.operator(), operator);
+  assertAddressEq('arena.taskSink()', await arena.taskSink(), taskSinkAddress);
+  assertAddressEq('rtm.taskSink()', await rtm.taskSink(), taskSinkAddress);
   assertAddressEq('market.operator()', await market.operator(), operator);
   assertAddressEq('faucet.ticketSigner()', await faucet.ticketSigner(), ticketSigner);
   assertEq('faucet.dripAmount()', await faucet.dripAmount(), faucetDrip);
@@ -681,6 +689,7 @@ async function main() {
     rtm: rtmAddress,
     faucet: faucetAddress,
     dataMarket: marketAddress,
+    taskSink: taskSinkAddress,
     faucetDrip: formatRtm(faucetDrip),
     faucetFunding: formatRtm(faucetFunding),
     treasuryMiningFund: formatRtm(treasuryMiningFund),
@@ -716,6 +725,7 @@ async function main() {
         rtm: registry.rtm,
         faucet: registry.faucet,
         dataMarket: registry.dataMarket,
+        taskSink: registry.taskSink,
         totalSupply: registry.totalSupply,
       },
       null,

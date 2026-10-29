@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import redteam_platform.config as config_module
 from redteam_platform.config import (
     DEFAULT_CHAIN_ID,
     DEFAULT_CHAIN_RPC,
@@ -41,15 +42,22 @@ def base_env(tmp_path):
     }
 
 
-def test_default_settings_from_repo():
+def test_default_settings_from_repo(tmp_path, monkeypatch):
+    # contracts/deploy/addresses.json is a gitignored host copy written by
+    # deploy/sync-registry.sh, so build the default layout under tmp_path.
+    monkeypatch.setattr(config_module, "REPO_ROOT", tmp_path)
+    (tmp_path / "contracts" / "deploy").mkdir(parents=True)
+    (tmp_path / "platform").mkdir()
+    write_addresses(tmp_path / "contracts" / "deploy" / "addresses.json")
+
     settings = load_settings({})
 
     assert isinstance(settings, Settings)
     assert settings.addresses_path == (
-        REPO_ROOT / "contracts" / "deploy" / "addresses.json"
+        tmp_path / "contracts" / "deploy" / "addresses.json"
     ).resolve()
-    assert settings.artifacts_dir == (REPO_ROOT / "contracts" / "artifacts").resolve()
-    assert settings.vault_path == (REPO_ROOT / "platform" / "vault.json").resolve()
+    assert settings.artifacts_dir == (tmp_path / "contracts" / "artifacts").resolve()
+    assert settings.vault_path == (tmp_path / "platform" / "vault.json").resolve()
     assert settings.chain_rpc == DEFAULT_CHAIN_RPC
     assert settings.chain_id == DEFAULT_CHAIN_ID
     assert settings.request_timeout == DEFAULT_REQUEST_TIMEOUT
@@ -113,8 +121,18 @@ def test_chain_rpc_accepts_https(base_env):
 
 def test_missing_addresses_file(base_env, tmp_path):
     env = dict(base_env, PLATFORM_ADDRESSES_PATH=str(tmp_path / "nope.json"))
-    with pytest.raises(ConfigError, match="addresses file not found"):
+    with pytest.raises(ConfigError, match="addresses file not found") as excinfo:
         load_settings(env)
+    assert "deploy/sync-registry.sh" in str(excinfo.value)
+
+
+def test_example_registry_has_the_shape_the_platform_loads():
+    example = REPO_ROOT / "contracts" / "deploy" / "addresses.example.json"
+    data = json.loads(example.read_text(encoding="utf-8"))
+
+    assert data["chainId"] == DEFAULT_CHAIN_ID
+    for field in ADDRESS_FIELDS:
+        assert data[field].startswith("0x") and len(data[field]) == 42
 
 
 def test_invalid_addresses_json(base_env, tmp_path):

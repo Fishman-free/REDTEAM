@@ -17,8 +17,8 @@ export function OfflineBanner() {
         <strong>{t("Platform API is offline", "平台 API 暂未连接")}</strong>
         <span>
           {t(
-            "Wallet and on-chain reads still work; lists, chat and indexing require the API.",
-            "钱包与链上只读功能仍可用；列表、聊天与索引数据需要 API。",
+            "Contract addresses come only from the API, so on-chain reads and writes are paused until it reconnects; the wallet itself is unaffected.",
+            "合约地址只从 API 获取，API 恢复前链上读写已暂停，避免发到错误合约；钱包本身不受影响。",
           )}
         </span>
       </div>

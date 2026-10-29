@@ -62,6 +62,11 @@ async function deployGame({ testnet = true, mint = true } = {}) {
   );
   await arena.initialize(rtm.target);
   await arena.setOperator(operator.address);
+  const taskSink = await (await ethers.getContractFactory('TaskSink')).deploy(
+    arena.target,
+    rtm.target
+  );
+  await arena.setTaskSink(taskSink.target);
 
   if (testnet && mint) {
     await arena.mintForTest(defender.address, RTM(10000));
@@ -86,7 +91,8 @@ async function deployGame({ testnet = true, mint = true } = {}) {
     wallet2Signer: w2,
     treasury,
     arena,
-    rtm
+    rtm,
+    taskSink
   };
 }
 

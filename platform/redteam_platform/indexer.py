@@ -61,6 +61,7 @@ ARENA_EVENTS = (
     "MiningSettled",
     "MiningRetired",
     "OperatorUpdated",
+    "ByoaContestCreated",
 )
 TOKEN_EVENTS = ("Breach",)
 MARKET_EVENTS = ("DatasetPublished", "DataSold")
@@ -78,9 +79,21 @@ _ADDRESS_KEYS = frozenset(
         "operator",
         "previous",
         "next",
+        "teeSigner",
     }
 )
-_ID_KEYS = frozenset({"id", "contestId", "msgHash", "defenseHash", "root"})
+_ID_KEYS = frozenset(
+    {
+        "id",
+        "contestId",
+        "msgHash",
+        "defenseHash",
+        "root",
+        "configCommitment",
+        "runtimeMeasurement",
+        "teePubKey",
+    }
+)
 _CONTEST_ID_RE = re.compile(r"^0x[0-9a-f]{64}$")
 _VISIBLE_RE = re.compile(r"^[\x20-\x7e]{1,128}$")
 
@@ -215,6 +228,7 @@ class EventIndexer:
         "DataConsentRecorded": "_handle_data_consent",
         "AttackPaid": "_handle_attack_paid",
         "MarkDelivered": "_handle_mark_delivered",
+        "ByoaContestCreated": "_handle_byoa_contest_created",
         "Breach": "_handle_breach",
         "ContestSettled": "_handle_contest_settled",
         "Expired": "_handle_expired",
@@ -321,6 +335,15 @@ class EventIndexer:
                 settled INTEGER NOT NULL DEFAULT 0,
                 excluded INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS byoa_contests (
+                id TEXT PRIMARY KEY,
+                tee_signer TEXT NOT NULL,
+                tee_pubkey TEXT NOT NULL,
+                runtime_measurement TEXT NOT NULL,
+                config_commitment TEXT NOT NULL,
+                attestation_tier INTEGER NOT NULL,
+                defender_data_consent INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS contest_attackers (
                 contest_id TEXT NOT NULL,
                 attacker TEXT NOT NULL,
@@ -363,6 +386,15 @@ class EventIndexer:
                 ON contest_attackers(attacker);
             """
         )
+        # Rolling upgrade: older index files predate BYOA.
+        columns = {
+            row["name"]
+            for row in self._conn.execute("PRAGMA table_info(contests)").fetchall()
+        }
+        if "is_byoa" not in columns:
+            self._conn.execute(
+                "ALTER TABLE contests ADD COLUMN is_byoa INTEGER NOT NULL DEFAULT 0"
+            )
 
     def _ensure_meta(self) -> None:
         assert self._conn is not None
@@ -624,6 +656,32 @@ class EventIndexer:
         )
         if cursor.rowcount and not is_mining:
             self._upsert_defender(defender)
+
+    def _handle_byoa_contest_created(
+        self, args: Mapping[str, Any], ts: int
+    ) -> None:
+        contest_id = normalize_contest_id(args["id"])
+        self._contest(contest_id)
+        self._db().execute(
+            """
+            INSERT OR REPLACE INTO byoa_contests(
+                id, tee_signer, tee_pubkey, runtime_measurement,
+                config_commitment, attestation_tier, defender_data_consent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                contest_id,
+                args["teeSigner"],
+                str(args["teePubKey"]).lower(),
+                str(args["runtimeMeasurement"]).lower(),
+                str(args["configCommitment"]).lower(),
+                int(args.get("attestationTier", 0)),
+                1 if bool(args.get("defenderDataConsent", False)) else 0,
+            ),
+        )
+        self._db().execute(
+            "UPDATE contests SET is_byoa = 1 WHERE id = ?", (contest_id,)
+        )
 
     def _handle_joined(self, args: Mapping[str, Any], ts: int) -> None:
         contest = self._contest(normalize_contest_id(args["id"]))
@@ -1025,6 +1083,7 @@ class EventIndexer:
             "breach_amount": str(row["breach_amount"]),
             "reward": str(row["reward"]),
             "settled": bool(row["settled"]),
+            "is_byoa": bool(row["is_byoa"] if "is_byoa" in row.keys() else 0),
         }
 
     def contest(self, contest_id: str) -> dict[str, Any] | None:
@@ -1035,6 +1094,23 @@ class EventIndexer:
                 (contest_id,),
             ).fetchone()
             return None if row is None else self._contest_dict(row)
+
+    def byoa_info(self, contest_id: str) -> dict[str, Any] | None:
+        contest_id = normalize_contest_id(contest_id)
+        with self._lock:
+            row = self._db().execute(
+                "SELECT * FROM byoa_contests WHERE id = ?", (contest_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "tee_signer": row["tee_signer"],
+            "tee_pubkey": row["tee_pubkey"],
+            "runtime_measurement": row["runtime_measurement"],
+            "config_commitment": row["config_commitment"],
+            "attestation_tier": int(row["attestation_tier"]),
+            "defender_data_consent": bool(row["defender_data_consent"]),
+        }
 
     def contests(self, *, limit: int = 200) -> list[dict[str, Any]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:

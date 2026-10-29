@@ -46,6 +46,7 @@ _CONTEST_FIELDS = (
     "isMining",
     "attackerCount",
     "paused",
+    "isByoa",
 )
 
 
@@ -110,6 +111,31 @@ def _hex32(value: Any) -> str:
     return text if text.startswith("0x") else "0x" + text
 
 
+def _signature_bytes(value: Any, field: str) -> bytes:
+    if isinstance(value, (bytes, bytearray)):
+        data = bytes(value)
+    elif isinstance(value, str) and re.fullmatch(r"(?:0x)?[0-9a-fA-F]{130}", value):
+        data = bytes.fromhex(value[2:] if value.startswith("0x") else value)
+    else:
+        raise GatewayError(f"{field} must be 65-byte hex")
+    if len(data) != 65:
+        raise GatewayError(f"{field} must be 65-byte hex")
+    return data
+
+
+def _task_id_from_receipt(contract: Any, receipt: Mapping[str, Any]) -> str:
+    try:
+        event = getattr(contract.events, "TaskIssued")
+        decoded = event.process_receipt(receipt, errors=DISCARD)
+    except Exception as exc:
+        raise GatewayError("cannot decode TaskIssued event") from exc
+    for entry in decoded:
+        args = entry.get("args", {})
+        if args.get("taskId") is not None:
+            return _hex32(args["taskId"])
+    raise GatewayError("TaskIssued event missing from receipt")
+
+
 def _require_amount(value: Any, field: str) -> int:
     if isinstance(value, bool):
         raise GatewayError(f"{field} must be a non-negative integer")
@@ -158,6 +184,7 @@ class Web3ChainGateway:
         self._arena = contracts["Arena"]
         self._rtm = contracts["RTMToken"]
         self._treasury = contracts["Treasury"]
+        self._task_sink = contracts.get("TaskSink")
         self._custody = custody
         self.operator_entry = operator_entry
         self.treasury_owner_entry = treasury_owner_entry
@@ -171,6 +198,11 @@ class Web3ChainGateway:
         self.arena_address = _require_address(arena_address, "arena_address")
         self.receipt_timeout = timeout
         self._lock = threading.RLock()
+
+    @property
+    def task_sink_address(self) -> str | None:
+        contract = self._task_sink
+        return None if contract is None else str(contract.address)
 
     # -- key/transaction helpers ---------------------------------------
 
@@ -332,6 +364,7 @@ class Web3ChainGateway:
             "is_mining": bool(values[9]),
             "attacker_count": int(values[10]),
             "paused": bool(values[11]),
+            "is_byoa": bool(values[12]),
         }
 
     # -- writes ---------------------------------------------------------
@@ -384,15 +417,44 @@ class Web3ChainGateway:
         return self._contest_id_from_receipt(receipt), tx
 
     def mark_delivered(self, contest_id: str, attacker: str, msg_hash: str) -> str:
+        return self._mark_delivered(contest_id, attacker, msg_hash, None)
+
+    def mark_delivered_reply(
+        self, contest_id: str, attacker: str, msg_hash: str, reply_hash: str
+    ) -> str:
+        """BYOA 送达：附带 TEE 加密回复的 keccak hash。"""
+
+        return self._mark_delivered(contest_id, attacker, msg_hash, reply_hash)
+
+    def _mark_delivered(
+        self,
+        contest_id: str,
+        attacker: str,
+        msg_hash: str,
+        reply_hash: str | None,
+    ) -> str:
         cid = normalize_contest_id(contest_id)
         attacker = _require_address(attacker, "attacker")
         digest = _bytes32(msg_hash, "msg_hash")
+        if reply_hash is None:
+            function = self._arena.get_function_by_signature(
+                "markDelivered(bytes32,address,bytes32)"
+            )
+            args: tuple[Any, ...] = (bytes.fromhex(cid[2:]), attacker, digest)
+        else:
+            function = self._arena.get_function_by_signature(
+                "markDelivered(bytes32,address,bytes32,bytes32)"
+            )
+            args = (
+                bytes.fromhex(cid[2:]),
+                attacker,
+                digest,
+                _bytes32(reply_hash, "reply_hash"),
+            )
         tx, _receipt = self._send_operator(
             purpose="mark_delivered",
             context={"contest_id": cid, "wallet_address": attacker},
-            build=lambda sender: self._arena.functions.markDelivered(
-                bytes.fromhex(cid[2:]), attacker, digest
-            ),
+            build=lambda sender: function(*args),
             gas=GAS_MARK_DELIVERED,
         )
         return tx
@@ -420,6 +482,163 @@ class Web3ChainGateway:
             gas=GAS_FAULT,
         )
         return tx
+
+    # -- BYOA -----------------------------------------------------------
+
+    def byoa_nonce(self, defender: str) -> int:
+        defender = _require_address(defender, "defender")
+        return _require_amount(
+            self._call(
+                lambda: self._arena.functions.byoaNonce(defender).call(),
+                "byoaNonce",
+            ),
+            "byoaNonce",
+        )
+
+    def create_byoa_contest(
+        self,
+        params: Mapping[str, Any],
+        defender_signature: str,
+        tee_signature: str,
+    ) -> tuple[str, str]:
+        """Submit a fully signed BYOA contest; the TEE signature is unforgeable here."""
+
+        if self._task_sink is None:
+            raise GatewayError("TaskSink is not deployed in this registry")
+        required = (
+            "defender",
+            "wallet",
+            "teeSigner",
+            "stake",
+            "duration",
+            "stakeBps",
+            "configCommitment",
+            "runtimeMeasurement",
+            "teePubKey",
+            "attestationTier",
+            "defenderDataConsent",
+            "utilityMissThreshold",
+            "utilityPenaltyBps",
+            "nonce",
+            "deadline",
+        )
+        missing = [name for name in required if name not in params]
+        if missing:
+            raise GatewayError("BYOA params missing: " + ", ".join(missing))
+        tuple_params = (
+            _require_address(params["defender"], "defender"),
+            _require_address(params["wallet"], "wallet"),
+            _require_address(params["teeSigner"], "teeSigner"),
+            _require_amount(params["stake"], "stake"),
+            _require_amount(params["duration"], "duration"),
+            _require_amount(params["stakeBps"], "stakeBps"),
+            _bytes32(params["configCommitment"], "configCommitment"),
+            _bytes32(params["runtimeMeasurement"], "runtimeMeasurement"),
+            _bytes32(params["teePubKey"], "teePubKey"),
+            int(params["attestationTier"]),
+            bool(params["defenderDataConsent"]),
+            _require_amount(params["utilityMissThreshold"], "utilityMissThreshold"),
+            _require_amount(params["utilityPenaltyBps"], "utilityPenaltyBps"),
+            _require_amount(params["nonce"], "nonce"),
+            _require_amount(params["deadline"], "deadline"),
+        )
+        if tuple_params[9] not in (0, 1):
+            raise GatewayError("attestationTier must be 0 or 1")
+        defender_bytes = _signature_bytes(defender_signature, "defender_signature")
+        tee_bytes = _signature_bytes(tee_signature, "tee_signature")
+        tx, receipt = self._send_operator(
+            purpose="create_byoa_contest",
+            context={"wallet_address": tuple_params[1]},
+            build=lambda sender: self._arena.functions.createByoaContest(
+                tuple_params, defender_bytes, tee_bytes
+            ),
+            gas=GAS_CREATE_CONTEST,
+        )
+        return self._contest_id_from_receipt(receipt), tx
+
+    def issue_task(
+        self,
+        contest_id: str,
+        amount: int,
+        deadline: int,
+        task_hash: str,
+    ) -> tuple[str, str]:
+        """Issue an on-chain TaskSink task and return ``(taskId, txHash)``."""
+
+        if self._task_sink is None:
+            raise GatewayError("TaskSink is not deployed in this registry")
+        cid = normalize_contest_id(contest_id)
+        digest = _bytes32(task_hash, "task_hash")
+        amount = _require_amount(amount, "amount")
+        deadline = _require_amount(deadline, "deadline")
+        if amount == 0 or deadline == 0:
+            raise GatewayError("amount and deadline must be positive")
+        tx, receipt = self._send_operator(
+            purpose="issue_byoa_task",
+            context={"contest_id": cid},
+            build=lambda sender: self._task_sink.functions.issueTask(
+                bytes.fromhex(cid[2:]), amount, deadline, digest
+            ),
+            gas=GAS_MARK_DELIVERED,
+        )
+        task_id = _task_id_from_receipt(self._task_sink, receipt)
+        return task_id, tx
+
+    def report_byoa_utility_breach(self, contest_id: str) -> str:
+        cid = normalize_contest_id(contest_id)
+        tx, _receipt = self._send_operator(
+            purpose="report_byoa_utility_breach",
+            context={"contest_id": cid},
+            build=lambda sender: self._arena.functions.reportByoaUtilityBreach(
+                bytes.fromhex(cid[2:])
+            ),
+            gas=GAS_FAULT,
+        )
+        return tx
+
+    def expire_task(self, contest_id: str, task_id: str) -> str:
+        if self._task_sink is None:
+            raise GatewayError("TaskSink is not deployed in this registry")
+        cid = normalize_contest_id(contest_id)
+        digest = _bytes32(task_id, "task_id")
+        tx, _receipt = self._send_operator(
+            purpose="expire_byoa_task",
+            context={"contest_id": cid},
+            build=lambda sender: self._task_sink.functions.expireTask(
+                bytes.fromhex(cid[2:]), digest
+            ),
+            gas=GAS_MARK_DELIVERED,
+        )
+        return tx
+
+    def expired_task_count(self, contest_id: str) -> int:
+        if self._task_sink is None:
+            return 0
+        cid = normalize_contest_id(contest_id)
+        return _require_amount(
+            self._call(
+                lambda: self._task_sink.functions.expiredTaskCount(
+                    bytes.fromhex(cid[2:])
+                ).call(),
+                "expiredTaskCount",
+            ),
+            "expiredTaskCount",
+        )
+
+    def wallet_tools(
+        self, wallet_address: str, private_key: str, *, receipt_timeout: float = 60.0
+    ) -> Any:
+        """Build the fixed tool surface for the in-CVM wallet sidecar."""
+
+        from .agent_tools import WalletTools
+
+        return WalletTools(
+            self._w3,
+            self._rtm,
+            wallet_address,
+            private_key,
+            receipt_timeout=receipt_timeout,
+        )
 
     def create_mining_contest(self, wallet: str, defense_hash: str) -> tuple[str, str]:
         wallet = _require_address(wallet, "wallet")

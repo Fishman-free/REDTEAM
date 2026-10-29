@@ -9,6 +9,7 @@ COPY contracts/ ./
 RUN npx hardhat compile
 
 COPY deploy/wait-for-rpc.mjs /app/wait-for-rpc.mjs
+COPY deploy/check-registry.mjs /app/check-registry.mjs
 COPY deploy/deploy-contracts.sh /app/deploy-contracts.sh
 RUN chmod +x /app/deploy-contracts.sh
 

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   BookOpen,
+  Cpu,
   Crosshair,
   Database,
   Droplets,
@@ -46,6 +47,7 @@ const GROUPS: NavGroup[] = [
       { to: "/", en: "Overview", zh: "总览", icon: <LayoutDashboard size={16} /> },
       { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={16} /> },
       { to: "/defend", en: "Defend", zh: "守方", icon: <Shield size={16} /> },
+      { to: "/byoa", en: "BYOA", zh: "自带 agent", icon: <Cpu size={16} /> },
       { to: "/mine", en: "Mine", zh: "挖矿", icon: <Pickaxe size={16} /> },
     ],
   },
@@ -69,6 +71,7 @@ const MOBILE_PRIMARY: NavItem[] = [
   { to: "/", en: "Home", zh: "总览", icon: <LayoutDashboard size={18} /> },
   { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={18} /> },
   { to: "/defend", en: "Defend", zh: "守方", icon: <Shield size={18} /> },
+  { to: "/byoa", en: "BYOA", zh: "自带 agent", icon: <Cpu size={18} /> },
   { to: "/mine", en: "Mine", zh: "挖矿", icon: <Pickaxe size={18} /> },
 ];
 
@@ -84,6 +87,7 @@ function pageTitle(pathname: string): { en: string; zh: string } {
   if (pathname.startsWith("/arena/")) return { en: "Contest", zh: "战场详情" };
   if (pathname === "/arena") return { en: "Arena", zh: "竞技场" };
   if (pathname === "/defend") return { en: "Defend", zh: "守方计划" };
+  if (pathname === "/byoa") return { en: "BYOA", zh: "守方自带 agent" };
   if (pathname.startsWith("/mine/")) return { en: "Mining", zh: "挖矿战场" };
   if (pathname === "/mine") return { en: "Mine", zh: "挖矿中心" };
   if (pathname === "/leaderboard") return { en: "Ranks", zh: "排行榜" };

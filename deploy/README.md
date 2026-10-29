@@ -46,6 +46,8 @@ browser ──> web:3000 (SPA + /api + /rpc BFF)
 ```
 
 - 浏览器永远拿不到 `PLATFORM_API_TOKEN`；BFF 在服务端注入。
+- BYOA 模板在 `deploy/byoa/`（compose、出网允许列表、示例 bundle、runbook）；模拟器档位
+  不代表硬件 TEE 保密。
 - `/api/mining/contests` 与 `/api/data/:id/publish` 需要 `X-Admin-Key`。
 - `mock-model:18081` 与 API 共享网络命名空间，只监听 `127.0.0.1`，不对外暴露。
 - API 只启动 **1 个 worker**：runner session、索引器、vault 与 faucet nonce 都是单进程状态。
@@ -107,7 +109,13 @@ bash deploy/down.sh -v
 bash deploy/up.sh
 ```
 
-如果只重置链而保留旧的 addresses.json，API 会连到错误的合约；所以必须同时删除 `rtm-registry`（`down -v` 会做）。
+如果只重置链而保留旧的 registry，`contracts` 容器的 `check-registry.mjs` 会发现 chainId 或合约代码不符，并拒绝启动（API 随之不会启动）；必须同时删除 `rtm-registry`（`down -v` 会做）。
+
+### 地址从哪里来
+
+- 运行中唯一来源：`rtm-registry` 卷的 `/registry/addresses.json`，经 `GET /api/meta` 提供给 dApp。dApp 不再内置任何后备地址，API 不可达时链上读写会暂停。
+- `contracts/deploy/addresses.json` 是 gitignored 的本机副本，`up.sh` 结束时会通过 `bash deploy/sync-registry.sh` 自动刷新（`rpc` 改写为宿主机端口），也可以手动执行这条命令。
+- 查看运行中的地址：`curl -s http://127.0.0.1:3200/api/meta`；registry 是扁平 JSON（没有 `.addresses` 这一层）。
 
 ### 常见问题
 

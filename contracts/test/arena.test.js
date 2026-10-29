@@ -788,7 +788,7 @@ describe('Arena + Treasury', function () {
       await arena.connect(attackerA).attack(id, d1);
       await expect(arena.connect(operator).markDelivered(id, attackerA.address, d1))
         .to.emit(arena, 'MarkDelivered')
-        .withArgs(id, attackerA.address, d1, 1n);
+        .withArgs(id, attackerA.address, d1, 1n, ethers.ZeroHash);
       expect(await arena.deliveredMsg(id, attackerA.address, d1)).to.equal(true);
       expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(1n);
       await expect(arena.connect(operator).markDelivered(id, attackerA.address, d1))
@@ -804,7 +804,7 @@ describe('Arena + Treasury', function () {
 
       await expect(arena.connect(operator).markDelivered(id, attackerA.address, d2))
         .to.emit(arena, 'MarkDelivered')
-        .withArgs(id, attackerA.address, d2, 2n);
+        .withArgs(id, attackerA.address, d2, 2n, ethers.ZeroHash);
       expect(await arena.deliveredMsg(id, attackerA.address, d2)).to.equal(true);
       expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(2n);
     });

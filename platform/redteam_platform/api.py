@@ -55,6 +55,17 @@ from .faucet_signer import FaucetSigner, FaucetSignerError
 from .indexer import ChainEventSource, EventIndexer, IndexerError, normalize_contest_id
 from .indexer_runner import IndexerRunner
 from .runner import AgentSession, RunnerStopped
+from .signatures import config_hash, recover_defender_registration
+from .byoa.egress import EgressError, load_declaration
+from .byoa.models import ContentKind
+from .byoa.policy import PolicyError, WalletPolicy
+from .byoa.service import (
+    BundleRequest,
+    ByoaService,
+    ByoaServiceError,
+    ContestRequest,
+)
+from .byoa.wallet_mcp import create_wallet_mcp_app
 from .config import Settings, load_settings
 
 MINING_REWARD = 10**18
@@ -139,6 +150,12 @@ class RegisterDefender(BaseModel):
     api_key: str = Field(min_length=8, max_length=512)
     defense_prompt: str = Field(min_length=100, max_length=16000)
     mandate: str = Field(min_length=1, max_length=4000)
+    # EIP-712 DefenderRegistration: configHash, nonce, deadline, signature.
+    # Without these anyone could register somebody else's address and then
+    # spend that wallet's Arena allowance through a prompt-injected agent.
+    nonce: int = Field(ge=0, le=2**64 - 1)
+    deadline: int = Field(ge=0, le=2**64 - 1)
+    signature: str = Field(min_length=1, max_length=4096)
 
 
 class CreateContestRequest(BaseModel):
@@ -188,6 +205,83 @@ class MiningJoinRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     contest_id: str = Field(min_length=66, max_length=66)
     accept_data: bool
+
+
+class ByoaPolicyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    per_tx_limit: str = Field(min_length=1, max_length=64)
+    total_limit: str = Field(min_length=1, max_length=64)
+    not_after: int = Field(ge=0)
+    confirm_threshold: str | None = Field(default=None, max_length=64)
+    payee_allowlist: list[str] | None = None
+
+
+class ByoaBundleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    defender: str = Field(min_length=1, max_length=64)
+    image_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    transport_kind: str = Field(pattern=r"^(hosted-mcp|a2a|webhook|mcp-pull)$")
+    transport_endpoint: str = Field(min_length=1, max_length=2048)
+    transport_secret: str | None = Field(default=None, max_length=512)
+    egress: dict[str, Any]
+    policy: ByoaPolicyRequest
+    max_task_amount: str = Field(min_length=1, max_length=64)
+    defender_data_consent: bool
+    compose_files: dict[str, str]
+    attestation_tier: str = Field(default="simulated", pattern=r"^(simulated|hardware)$")
+    nonce: int = Field(ge=0, le=2**64 - 1)
+    deadline: int = Field(ge=0, le=2**64 - 1)
+    signature: str = Field(min_length=1, max_length=4096)
+
+
+class ByoaContestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    bundle_id: str = Field(pattern=r"^0x[0-9a-fA-F]{64}$")
+    stake: str = Field(min_length=1, max_length=64)
+    duration_h: int = Field(ge=6, le=168)
+    stake_bps: int = Field(ge=200, le=2000)
+    defender_signature: str = Field(min_length=1, max_length=4096)
+    miss_threshold: int = Field(default=0, ge=0, le=64)
+    penalty_bps: int = Field(default=1000, ge=0, le=5000)
+    nonce: int | None = Field(default=None, ge=0, le=2**64 - 1)
+    deadline: int | None = Field(default=None, ge=0, le=2**64 - 1)
+
+
+class ByoaTaskRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=4000)
+    amount: str = Field(min_length=1, max_length=64)
+    deadline: int = Field(ge=0)
+
+
+class ByoaGenerateTasksRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    count: int = Field(ge=1, le=32)
+    seed: str | None = Field(default=None, max_length=128)
+
+
+class ByoaPullReplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    seq: int = Field(ge=0)
+    text: str = Field(min_length=0, max_length=50_000)
+    tool_calls: list[dict[str, Any]] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class ByoaTurnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    content: str | None = Field(default=None, min_length=1, max_length=1000)
+    kind: str = Field(default="dialogue", pattern=r"^(dialogue|invoice|payment_required|tool_result)$")
+    attacker_consent: bool | None = None
+    metadata: dict[str, Any] | None = None
+    # Sealed (E2E) attack fields.  When present, the plaintext content above is
+    # ignored and the API verifies the paid ciphertext instead.
+    tx_hash: str | None = Field(default=None, pattern=_TX_RE)
+    attacker: str | None = Field(default=None, min_length=1, max_length=64)
+    ciphertext: dict[str, Any] | None = None
+    attacker_pubkey: str | None = Field(default=None, min_length=1, max_length=66)
+    key_signature: str | None = Field(default=None, min_length=1, max_length=4096)
+    key_deadline: int | None = Field(default=None, ge=0, le=2**64 - 1)
 
 
 # -- service -------------------------------------------------------------
@@ -321,6 +415,23 @@ class PlatformService:
         with self._lock:
             if defender in self._defenders:
                 raise ApiError(409, "defender is already registered")
+        if payload.deadline < int(self.deps.clock()):
+            raise ApiError(422, "defender registration signature has expired")
+        commitment = config_hash(provider, payload.defense_prompt, payload.mandate)
+        try:
+            signer = recover_defender_registration(
+                payload.signature,
+                chain_id=int(self.gateway.chain_id),
+                arena=self.gateway.arena_address,
+                defender=defender,
+                config_hash_hex=commitment,
+                nonce=payload.nonce,
+                deadline=payload.deadline,
+            )
+        except (ValueError, TypeError):
+            raise ApiError(422, "defender signature is invalid") from None
+        if signer.lower() != defender.lower():
+            raise ApiError(403, "defender signature does not match defender")
         version = self._version(payload.defense_prompt, payload.mandate)
         try:
             client = self.deps.model_factory(provider, payload.api_key)
@@ -913,6 +1024,7 @@ def create_app(
     meta: dict[str, Any] | None = None,
     status_provider: Callable[[], dict[str, Any]] | None = None,
     lifespan: Callable[[FastAPI], Any] | None = None,
+    byoa: ByoaService | None = None,
 ) -> FastAPI:
     if not isinstance(token, str) or not 24 <= len(token) <= 256:
         raise ValueError("API token must contain 24-256 characters")
@@ -932,6 +1044,15 @@ def create_app(
     @app.exception_handler(ApiError)
     async def handle_api_error(request, exc: ApiError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+    @app.exception_handler(ByoaServiceError)
+    async def handle_byoa_error(request, exc: ByoaServiceError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+    if byoa is not None:
+        # The sidecar endpoint is CVM-internal in production.  In the local
+        # simulator it is mounted here and protected by a per-session token.
+        app.mount("/byoa/wallet", create_wallet_mcp_app(byoa.wallet_registry))
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -1044,7 +1165,172 @@ def create_app(
     def mining_join(payload: MiningJoinRequest) -> dict[str, Any]:
         return service.mining_join_intent(payload)
 
+    if byoa is not None:
+
+        @app.post("/byoa/bundles", status_code=201, dependencies=[Depends(require_auth)])
+        def register_byoa_bundle(payload: ByoaBundleRequest) -> dict[str, Any]:
+            return byoa.register_bundle(_bundle_request(payload))
+
+        @app.post("/byoa/contests", status_code=201, dependencies=[Depends(require_auth)])
+        def create_byoa_contest(payload: ByoaContestRequest) -> dict[str, Any]:
+            return byoa.create_contest(
+                ContestRequest(
+                    bundle_id=payload.bundle_id,
+                    stake=_parse_rtm(payload.stake),
+                    duration_h=payload.duration_h,
+                    stake_bps=payload.stake_bps,
+                    defender_signature=payload.defender_signature,
+                    miss_threshold=payload.miss_threshold,
+                    penalty_bps=payload.penalty_bps,
+                    nonce=payload.nonce,
+                    deadline=payload.deadline,
+                )
+            )
+
+        @app.post(
+            "/byoa/contests/{contest_id}/tasks",
+            status_code=201,
+            dependencies=[Depends(require_auth)],
+        )
+        def issue_byoa_task(contest_id: str, payload: ByoaTaskRequest) -> dict[str, Any]:
+            return byoa.issue_task(
+                _contest_id(contest_id),
+                text=payload.text,
+                amount=_parse_rtm(payload.amount),
+                deadline=payload.deadline,
+            )
+
+        @app.post(
+            "/byoa/contests/{contest_id}/tasks/generate",
+            status_code=201,
+            dependencies=[Depends(require_auth)],
+        )
+        def generate_byoa_tasks(
+            contest_id: str, payload: ByoaGenerateTasksRequest
+        ) -> list[dict[str, Any]]:
+            return byoa.generate_tasks(
+                _contest_id(contest_id),
+                count=payload.count,
+                seed_hex=payload.seed,
+            )
+
+        @app.post("/byoa/contests/{contest_id}/turns", dependencies=[Depends(require_auth)])
+        def byoa_turn(contest_id: str, payload: ByoaTurnRequest) -> dict[str, Any]:
+            try:
+                kind = ContentKind(payload.kind)
+            except ValueError:
+                raise ApiError(422, "invalid BYOA content kind") from None
+            if payload.ciphertext is not None:
+                required = (
+                    payload.tx_hash,
+                    payload.attacker,
+                    payload.attacker_pubkey,
+                    payload.key_signature,
+                    payload.key_deadline,
+                )
+                if any(item is None for item in required):
+                    raise ApiError(422, "sealed turns require tx_hash, attacker, attacker_pubkey, key_signature and key_deadline")
+                return byoa.sealed_turn(
+                    _contest_id(contest_id),
+                    tx_hash=payload.tx_hash,
+                    attacker=payload.attacker,
+                    ciphertext=payload.ciphertext,
+                    attacker_pubkey=payload.attacker_pubkey,
+                    key_signature=payload.key_signature,
+                    key_deadline=payload.key_deadline,
+                    kind=kind,
+                    metadata=payload.metadata or {},
+                )
+            # BYOA turns are end-to-end encrypted only.  The service keeps a
+            # plaintext method for unit tests and owner-task plumbing, but the
+            # public relay must never accept plaintext attack content.
+            raise ApiError(
+                422,
+                "BYOA turns must carry an E2E ciphertext envelope; "
+                "plaintext turns are not accepted",
+            )
+
+        @app.post("/byoa/contests/{contest_id}/finalize", dependencies=[Depends(require_auth)])
+        def finalize_byoa(contest_id: str) -> dict[str, Any]:
+            return byoa.finalize(_contest_id(contest_id))
+
+        @app.get("/byoa/contests/{contest_id}", dependencies=[Depends(require_auth)])
+        def byoa_state(contest_id: str) -> dict[str, Any]:
+            return byoa.state(_contest_id(contest_id))
+
+        # mcp-pull is authenticated by a per-contest random token, not the
+        # platform API token: the defender container never receives the latter.
+        @app.get("/byoa/contests/{contest_id}/pull/next_message")
+        def byoa_pull_next(
+            contest_id: str,
+            x_byoa_pull_token: str = Header(default="", alias="X-BYOA-Pull-Token"),
+        ) -> dict[str, Any]:
+            return byoa.pull_next(_contest_id(contest_id), x_byoa_pull_token)
+
+        @app.post("/byoa/contests/{contest_id}/pull/reply")
+        def byoa_pull_reply(
+            contest_id: str,
+            payload: ByoaPullReplyRequest,
+            x_byoa_pull_token: str = Header(default="", alias="X-BYOA-Pull-Token"),
+        ) -> dict[str, Any]:
+            return byoa.pull_reply(
+                _contest_id(contest_id),
+                x_byoa_pull_token,
+                seq=payload.seq,
+                text=payload.text,
+                tool_calls=payload.tool_calls,
+                metadata=payload.metadata,
+            )
+
     return app
+
+
+def _bundle_request(payload: ByoaBundleRequest) -> BundleRequest:
+    try:
+        egress = load_declaration(payload.egress)
+    except EgressError as exc:
+        raise ByoaServiceError(422, str(exc)) from None
+    try:
+        per_tx = _parse_rtm(payload.policy.per_tx_limit)
+        total = _parse_rtm(payload.policy.total_limit)
+        confirm = (
+            _parse_rtm(payload.policy.confirm_threshold)
+            if payload.policy.confirm_threshold
+            else None
+        )
+        policy = WalletPolicy(
+            per_tx_limit=per_tx,
+            total_limit=total,
+            not_after=payload.policy.not_after,
+            payee_allowlist=(
+                frozenset(payload.policy.payee_allowlist)
+                if payload.policy.payee_allowlist is not None
+                else None
+            ),
+            confirm_threshold=confirm,
+        )
+    except (ApiError, PolicyError) as exc:
+        raise ByoaServiceError(422, str(exc)) from None
+    if len(payload.compose_files) > 64:
+        raise ByoaServiceError(422, "compose_files is too large")
+    if sum(len(value.encode("utf-8")) for value in payload.compose_files.values()) > 1_000_000:
+        raise ByoaServiceError(422, "compose_files exceeds 1 MB")
+    return BundleRequest(
+        defender=payload.defender,
+        image_digest=payload.image_digest,
+        transport_kind=payload.transport_kind,
+        transport_endpoint=payload.transport_endpoint,
+        transport_secret=payload.transport_secret,
+        egress=egress,
+        policy=policy,
+        max_task_amount=_parse_rtm(payload.max_task_amount),
+        defender_data_consent=payload.defender_data_consent,
+        compose_files=payload.compose_files,
+        attestation_tier=payload.attestation_tier,
+        nonce=payload.nonce,
+        deadline=payload.deadline,
+        signature=payload.signature,
+    )
 
 
 def _rtm_to_wei(value: Any, default: str = "0") -> str:
@@ -1069,6 +1355,8 @@ def build_app(
     ensure_directory(settings.data_dir)
     addresses = load_addresses(settings.addresses_path)
     chain = ChainClient(settings)
+    # Refuse to serve a registry that does not describe the chain we talk to.
+    chain.verify_startup()
     custody = Custody(settings.vault_path)
     audited = AuditedCustody(custody, settings.data_dir / "custody-audit.jsonl")
 
@@ -1190,14 +1478,17 @@ def build_app(
     mining_fee_wei = str(int(Decimal(mining_reward_wei) * mining_fee_bps / 10_000))
     faucet_drip_wei = _rtm_to_wei(addresses.get("faucetDrip", "200"), "200000000000000000000")
 
+    public_addresses = {
+        key: addresses[key]
+        for key in ("treasury", "arena", "rtm", "faucet", "dataMarket")
+    }
+    if addresses.get("taskSink"):
+        public_addresses["taskSink"] = addresses["taskSink"]
     public_meta: dict[str, Any] = {
         "network": addresses["network"],
         "chainId": settings.chain_id,
         "rpc": os.environ.get("PLATFORM_PUBLIC_RPC", "").strip() or settings.chain_rpc,
-        "addresses": {
-            key: addresses[key]
-            for key in ("treasury", "arena", "rtm", "faucet", "dataMarket")
-        },
+        "addresses": public_addresses,
         "fees": {
             "attackFeeBps": 50,
             "miningFeeBps": mining_fee_bps,
@@ -1220,6 +1511,14 @@ def build_app(
             "mining": bool(settings.platform_model_provider),
             "dataMarket": True,
             "defenderRegistration": bool(settings.model_allowlist),
+            "byoa": bool(addresses.get("taskSink")),
+        },
+        "byoa": {
+            "attestationTiers": ["simulated"],
+            "transports": ["hosted-mcp", "a2a", "webhook", "mcp-pull"],
+            "walletMcpUrl": os.environ.get(
+                "PLATFORM_BYOA_WALLET_URL", "http://127.0.0.1:8080/byoa/wallet"
+            ),
         },
         "indexer": {"startBlock": start_block},
     }
@@ -1285,12 +1584,21 @@ def build_app(
         )
     )
     holder["service"] = service
+    byoa_service = ByoaService(
+        gateway,
+        audited,
+        wallet_mcp_url=os.environ.get(
+            "PLATFORM_BYOA_WALLET_URL", "http://127.0.0.1:8080/byoa/wallet"
+        ),
+        indexer=indexer,
+    )
     return create_app(
         service,
         settings.api_token,
         meta=public_meta,
         status_provider=indexer_status,
         lifespan=lifespan,
+        byoa=byoa_service,
     )
 
 

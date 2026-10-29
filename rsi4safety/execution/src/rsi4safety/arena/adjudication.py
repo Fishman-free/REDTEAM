@@ -91,8 +91,9 @@ class AdjudicationMixin:
                     name = f"ledger-{condition}-{index}.sqlite"
                     shutil.copyfile(execution.db_path, staging / name)
                     files[name] = "sha256:" + file_sha256(staging / name)
-        (staging / "http_trace.jsonl").write_text("".join(json.dumps(t, ensure_ascii=False) + "\n" for t in traces))
-        (staging / "container_log.txt").write_text("\n".join(logs))
+        (staging / "http_trace.jsonl").write_text(
+            "".join(json.dumps(t, ensure_ascii=False) + "\n" for t in traces), encoding="utf-8")
+        (staging / "container_log.txt").write_text("\n".join(logs), encoding="utf-8")
         if executions and (staging / f"ledger-attack-{len(executions)-1}.sqlite").exists():
             shutil.copyfile(staging / f"ledger-attack-{len(executions)-1}.sqlite", staging / "ledger.sqlite")
             files["ledger.sqlite"] = "sha256:" + file_sha256(staging / "ledger.sqlite")
@@ -214,7 +215,7 @@ class AdjudicationMixin:
         record["regression_key"] = digest(json.loads(json.dumps({"fixture": record["fixture"],
                                                                "actions": record["actions"]}).replace(task_id, "{task_id}")))
         if not any(r.get("regression_key") == record["regression_key"] for r in self._regressions()):
-            with (self.config.state_dir / "regressions.jsonl").open("a") as handle:
+            with (self.config.state_dir / "regressions.jsonl").open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
             self._append_claim_request(round_index, finding, manifest)
         self.experiences.record_finding(task=record["fixture"], actions=record["actions"],

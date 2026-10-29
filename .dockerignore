@@ -15,4 +15,6 @@ infra/besu-testnet/data
 infra/besu-testnet/keydir
 infra/besu-testnet/networkFiles
 infra/besu-testnet/qbftConfig.json
+# Host-local registry copy (deploy/sync-registry.sh); the stack uses rtm-registry.
+contracts/deploy/addresses.json
 *.pptx

@@ -52,3 +52,7 @@ platform/data/
 .anvil/
 # docker stack secrets
 deploy/.env.stack
+# Per-machine copy of the running registry (deploy/sync-registry.sh). The
+# stack serves the authoritative addresses via /api/meta.
+contracts/deploy/addresses.json
+contracts/deploy/addresses.json.tmp

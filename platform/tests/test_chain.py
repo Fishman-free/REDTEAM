@@ -8,6 +8,7 @@ from redteam_platform.chain import (
     CONTRACT_ADDRESS_FIELDS,
     ChainClient,
     ChainError,
+    ChainUnavailable,
     load_addresses,
     load_contracts,
 )
@@ -180,5 +181,83 @@ def test_verify_chain_wraps_rpc_errors(tmp_path):
 
     client.w3 = SimpleNamespace(eth=BrokenEth())
 
-    with pytest.raises(ChainError, match="failed to query chain id"):
+    with pytest.raises(ChainUnavailable, match="failed to query chain id"):
         client.verify_chain()
+
+
+class FakeEth:
+    def __init__(self, *, chain_id=CHAIN_ID, code=b"\x60\x80", empty=(), fail_times=0):
+        self._chain_id = chain_id
+        self._code = code
+        self._empty = {Web3.to_checksum_address(a) for a in empty}
+        self._fail_times = fail_times
+
+    @property
+    def chain_id(self):
+        if self._fail_times:
+            self._fail_times -= 1
+            raise ConnectionError("rpc booting")
+        return self._chain_id
+
+    def get_code(self, address):
+        return b"" if address in self._empty else self._code
+
+
+def test_verify_deployment_accepts_registry_with_code(tmp_path):
+    client = ChainClient(make_settings(tmp_path))
+    client.w3 = SimpleNamespace(eth=FakeEth())
+
+    client.verify_deployment()
+
+
+def test_verify_deployment_rejects_addresses_without_code(tmp_path):
+    other = "0x" + "ab" * 20
+    addresses = write_addresses(tmp_path / "addresses.json", arena=other)
+    client = ChainClient(make_settings(tmp_path, addresses=addresses))
+    client.w3 = SimpleNamespace(eth=FakeEth(empty=(other,)))
+
+    with pytest.raises(ChainError, match="no contract code at arena=") as excinfo:
+        client.verify_deployment()
+    assert not isinstance(excinfo.value, ChainUnavailable)
+    assert "treasury=" not in str(excinfo.value)
+
+
+def test_verify_deployment_wraps_rpc_errors(tmp_path):
+    client = ChainClient(make_settings(tmp_path))
+
+    class BrokenEth:
+        def get_code(self, address):
+            raise ConnectionError("rpc down")
+
+    client.w3 = SimpleNamespace(eth=BrokenEth())
+
+    with pytest.raises(ChainUnavailable, match="failed to query code for"):
+        client.verify_deployment()
+
+
+def test_verify_startup_retries_only_while_rpc_is_unreachable(tmp_path):
+    client = ChainClient(make_settings(tmp_path))
+    client.w3 = SimpleNamespace(eth=FakeEth(fail_times=2))
+    sleeps = []
+
+    client.verify_startup(wait_seconds=60, poll_seconds=1, sleep=sleeps.append)
+
+    assert sleeps == [1, 1]
+
+
+def test_verify_startup_fails_fast_on_registry_mismatch(tmp_path):
+    client = ChainClient(make_settings(tmp_path))
+    client.w3 = SimpleNamespace(eth=FakeEth(code=b""))
+    sleeps = []
+
+    with pytest.raises(ChainError, match="no contract code"):
+        client.verify_startup(wait_seconds=60, poll_seconds=1, sleep=sleeps.append)
+    assert sleeps == []
+
+
+def test_verify_startup_gives_up_after_deadline(tmp_path):
+    client = ChainClient(make_settings(tmp_path))
+    client.w3 = SimpleNamespace(eth=FakeEth(fail_times=10_000))
+
+    with pytest.raises(ChainUnavailable):
+        client.verify_startup(wait_seconds=0, poll_seconds=1, sleep=lambda _: None)

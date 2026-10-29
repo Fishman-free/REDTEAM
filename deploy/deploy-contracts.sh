@@ -6,6 +6,8 @@ mkdir -p /registry /artifacts
 
 if [ -f /registry/addresses.json ]; then
   echo "[contracts] registry already exists; skipping deployment"
+  node /app/wait-for-rpc.mjs http://besu:8545
+  node /app/check-registry.mjs /registry/addresses.json http://besu:8545
 else
   node /app/wait-for-rpc.mjs http://besu:8545
   export BESU_TESTNET_RPC=http://besu:8545

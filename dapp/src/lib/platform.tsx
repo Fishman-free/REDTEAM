@@ -15,14 +15,22 @@ import {
   type Leaderboards,
   type PlatformMeta,
 } from "./api";
-import { ADDRESSES, arenaAbi, dataMarketAbi, faucetAbi, rtmAbi } from "./contracts";
+import { arenaAbi, dataMarketAbi, faucetAbi, rtmAbi } from "./contracts";
 import { walletRpcUrl } from "./chain";
+import { getLang } from "./i18n";
 
-export const FALLBACK_META: PlatformMeta = {
+export type ContractAddresses = PlatformMeta["addresses"];
+export type PlatformDefaults = Omit<PlatformMeta, "addresses">;
+
+/**
+ * Display defaults while GET /meta is loading or the API is offline.
+ * Deliberately has no contract addresses: every deployment gets fresh ones, so
+ * a hardcoded copy can only ever point reads and writes at stale contracts.
+ */
+export const FALLBACK_META: PlatformDefaults = {
   network: "besu-testnet",
   chainId: 48850,
   rpc: walletRpcUrl(),
-  addresses: { ...ADDRESSES },
   fees: {
     attackFeeBps: 50,
     miningFeeBps: 50,
@@ -43,7 +51,9 @@ export const FALLBACK_META: PlatformMeta = {
 };
 
 interface PlatformContextValue {
-  meta: PlatformMeta;
+  meta: PlatformDefaults;
+  /** Contract addresses from GET /meta only; null until the API answers. */
+  addresses: ContractAddresses | null;
   metaSource: "api" | "fallback";
   metaLoading: boolean;
   status: IndexerStatus | undefined;
@@ -70,12 +80,13 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: false,
   });
 
-  const meta = metaQuery.data ?? FALLBACK_META;
+  const meta: PlatformDefaults = metaQuery.data ?? FALLBACK_META;
   const online = Boolean(metaQuery.data) || Boolean(statusQuery.data);
 
   const value = useMemo<PlatformContextValue>(
     () => ({
       meta,
+      addresses: metaQuery.data?.addresses ?? null,
       metaSource: metaQuery.data ? "api" : "fallback",
       metaLoading: metaQuery.isLoading,
       status: statusQuery.data,
@@ -95,9 +106,22 @@ export function usePlatform(): PlatformContextValue {
   return context;
 }
 
-export function useContractAddresses() {
-  const { meta } = usePlatform();
-  return meta.addresses;
+export function useContractAddresses(): ContractAddresses | null {
+  return usePlatform().addresses;
+}
+
+/** For write handlers: refuse to build a transaction without API addresses. */
+export function requireAddresses(
+  addresses: ContractAddresses | null,
+): Record<keyof ContractAddresses, Address> {
+  if (!addresses) {
+    throw new Error(
+      getLang() === "en"
+        ? "Contract addresses come only from the platform API, which is not reachable. Retry once it is back online."
+        : "合约地址只从平台 API 获取，当前 API 未连通；请等 API 恢复后重试。",
+    );
+  }
+  return addresses as Record<keyof ContractAddresses, Address>;
 }
 
 export function useContestsQuery() {
@@ -140,9 +164,9 @@ export function useLeaderboardsQuery() {
 }
 
 export function useRtmBalance(address: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.rtm as Address,
+    address: addresses?.rtm as Address | undefined,
     abi: rtmAbi,
     functionName: "balanceOf",
     args: address ? [address as Address] : undefined,
@@ -155,9 +179,9 @@ export function useRtmBalance(address: string | undefined) {
 }
 
 export function useAllowance(owner: string | undefined, spender: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.rtm as Address,
+    address: addresses?.rtm as Address | undefined,
     abi: rtmAbi,
     functionName: "allowance",
     args: owner && spender ? [owner as Address, spender as Address] : undefined,
@@ -170,9 +194,9 @@ export function useAllowance(owner: string | undefined, spender: string | undefi
 }
 
 export function useFaucetDrip() {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.faucet as Address,
+    address: addresses?.faucet as Address | undefined,
     abi: faucetAbi,
     functionName: "dripAmount",
     query: { staleTime: 60_000 },
@@ -180,9 +204,9 @@ export function useFaucetDrip() {
 }
 
 export function useFaucetNonce(address: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.faucet as Address,
+    address: addresses?.faucet as Address | undefined,
     abi: faucetAbi,
     functionName: "nonces",
     args: address ? [address as Address] : undefined,
@@ -191,15 +215,15 @@ export function useFaucetNonce(address: string | undefined) {
 }
 
 export function useDataMarketPrices() {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   const priceBps = useReadContract({
-    address: meta.addresses.dataMarket as Address,
+    address: addresses?.dataMarket as Address | undefined,
     abi: dataMarketAbi,
     functionName: "dataPriceBps",
     query: { staleTime: 60_000 },
   });
   const attackerPrice = useReadContract({
-    address: meta.addresses.dataMarket as Address,
+    address: addresses?.dataMarket as Address | undefined,
     abi: dataMarketAbi,
     functionName: "attackerDataPrice",
     query: { staleTime: 60_000 },
@@ -208,9 +232,9 @@ export function useDataMarketPrices() {
 }
 
 export function useDatasetRoot(contestId: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.dataMarket as Address,
+    address: addresses?.dataMarket as Address | undefined,
     abi: dataMarketAbi,
     functionName: "datasetRoot",
     args: contestId ? [contestId as `0x${string}`] : undefined,
@@ -219,9 +243,9 @@ export function useDatasetRoot(contestId: string | undefined) {
 }
 
 export function useIsAttacker(contestId: string | undefined, address: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.arena as Address,
+    address: addresses?.arena as Address | undefined,
     abi: arenaAbi,
     functionName: "isRegisteredAttacker",
     args:
@@ -233,9 +257,9 @@ export function useIsAttacker(contestId: string | undefined, address: string | u
 }
 
 export function useDataConsent(contestId: string | undefined, address: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.arena as Address,
+    address: addresses?.arena as Address | undefined,
     abi: arenaAbi,
     functionName: "dataConsent",
     args:
@@ -247,9 +271,9 @@ export function useDataConsent(contestId: string | undefined, address: string | 
 }
 
 export function useRemainingStake(contestId: string | undefined, address: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.arena as Address,
+    address: addresses?.arena as Address | undefined,
     abi: arenaAbi,
     functionName: "remainingStake",
     args:
@@ -261,9 +285,9 @@ export function useRemainingStake(contestId: string | undefined, address: string
 }
 
 export function useBoughtOwn(contestId: string | undefined, address: string | undefined) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.dataMarket as Address,
+    address: addresses?.dataMarket as Address | undefined,
     abi: dataMarketAbi,
     functionName: "boughtOwn",
     args:
@@ -279,9 +303,9 @@ export function useBoughtAttacker(
   attacker: string | undefined,
   buyer: string | undefined,
 ) {
-  const { meta } = usePlatform();
+  const addresses = useContractAddresses();
   return useReadContract({
-    address: meta.addresses.dataMarket as Address,
+    address: addresses?.dataMarket as Address | undefined,
     abi: dataMarketAbi,
     functionName: "boughtAttacker",
     args:

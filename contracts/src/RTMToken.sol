@@ -10,12 +10,20 @@ interface IRTMArena {
     function isRegisteredAttacker(bytes32 contestId, address who) external view returns (bool);
 }
 
+/// @notice BYOA 委托任务存根：靶钱包向 TaskSink 的精确金额转账在此消费任务。
+interface ITaskSink {
+    function consume(bytes32 contestId, address from, uint256 value)
+        external
+        returns (bool);
+}
+
 /// @title RTMToken —— 靶钱包转账策略 + Arena 独占铸币
 /// @notice "REDTEAM" (RTM)。无预铸、无减半、无总量上限；主网唯一常规增发是
 ///         每次挖矿赛成功攻破时 Arena 固定补铸 1 RTM 回 Treasury（补偿预打款），
 ///         测试网另有 Arena.mintForTest 注水。
-/// @dev "标记"语义：活跃靶钱包（守方智能体的钱包 W）的转出只有两个合法去向——
-///      该场注册攻方（触发 Arena.onBreach 原子结算）或 Arena 的
+/// @dev "标记"语义：活跃靶钱包（守方智能体的钱包 W）的转出只有三个合法去向——
+///      该场注册攻方（触发 Arena.onBreach 原子结算）、BYOA 场次的 TaskSink
+///      （金额与某个开放任务精确匹配时原子完成），或 Arena 的
 ///      `controllerTransfer` 控制器划转。controllerTransfer 仅接受曾注册为靶的
 ///      受控钱包。其余任何转出（含守方小号、任意第三方、
 ///      其他比赛的靶钱包，以及 Arena 地址本身）一律 revert TargetTransferRestricted；
@@ -33,10 +41,14 @@ contract RTMToken is ERC20, Ownable {
     /// @notice Arena 合约（即 minter，单独存储便于类型化调用）。
     IRTMArena public immutable arena;
 
+    /// @notice BYOA 任务存根；未部署 TaskSink 的旧部署保持为 0。
+    address public taskSink;
+
     event TargetRegistered(address indexed wallet, bytes32 indexed contestId);
     event TargetUnregistered(address indexed wallet, bytes32 indexed contestId);
     event Breach(bytes32 indexed contestId, address indexed winner, uint256 amount);
     event MiningMinted(address indexed to, uint256 amount);
+    event TaskSinkUpdated(address indexed sink);
 
     error NotMinter();
     error ZeroAddress();
@@ -48,6 +60,8 @@ contract RTMToken is ERC20, Ownable {
     error ZeroAmount();
     error TargetTransferRestricted(address from, address to);
     error NotArena();
+    error InvalidTaskSink(address sink);
+    error TaskSinkAlreadySet();
 
     /// @param initialOwner Owner retained for inherited administration; it cannot mint.
     /// @param arena_ Arena address permanently authorised to mint/register/settle; must have code.
@@ -89,6 +103,18 @@ contract RTMToken is ERC20, Ownable {
         return targetContest[wallet] != bytes32(0);
     }
 
+    /// @notice 绑定 TaskSink：仅 Arena，且只能设置一次。
+    /// @dev 旧部署未设置时，靶钱包转出行为与之前完全一致。
+    function setTaskSink(address sink) external {
+        if (msg.sender != minter) revert NotArena();
+        if (taskSink != address(0)) revert TaskSinkAlreadySet();
+        if (sink == address(0) || sink.code.length == 0) {
+            revert InvalidTaskSink(sink);
+        }
+        taskSink = sink;
+        emit TaskSinkUpdated(sink);
+    }
+
     /// @notice 铸币：仅 Arena。用于挖矿攻破固定补铸与测试网注水，无年份预算。
     function mint(address to, uint256 amount) external {
         if (msg.sender != minter) revert NotMinter();
@@ -126,6 +152,15 @@ contract RTMToken is ERC20, Ownable {
             if (value == 0) revert TargetTransferRestricted(from, to);
             // Arena 地址永远不是合法收款方：即使被误登记为该场攻方也拒绝。
             if (to == minter) revert TargetTransferRestricted(from, to);
+            // BYOA 委托任务：只有金额与开放任务精确匹配时才允许进入 TaskSink。
+            address sink = taskSink;
+            if (sink != address(0) && to == sink) {
+                if (!ITaskSink(sink).consume(contestId, from, value)) {
+                    revert TargetTransferRestricted(from, to);
+                }
+                super._update(from, to, value);
+                return;
+            }
             if (arena.isRegisteredAttacker(contestId, to)) {
                 delete targetContest[from];
                 emit TargetUnregistered(from, contestId);

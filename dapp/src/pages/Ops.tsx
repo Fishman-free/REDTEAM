@@ -42,7 +42,7 @@ export default function Ops() {
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   const [busy, setBusy] = useState<"mining" | "publish" | null>(null);
   const [error, setError] = useState("");
-  const { meta, status, online, refetchStatus, refetchMeta } = usePlatform();
+  const { meta, addresses, status, online, refetchStatus, refetchMeta } = usePlatform();
   const contestsQuery = useContestsQuery();
   const { toast } = useToast();
   const { t } = useI18n();
@@ -321,12 +321,21 @@ export default function Ops() {
           bracket
         >
           <div className="contract-list">
-            {Object.entries(meta.addresses).map(([name, address]) => (
-              <div key={name}>
-                <span className="mono">{name}</span>
-                <AddressChip value={address} />
-              </div>
-            ))}
+            {addresses ? (
+              Object.entries(addresses).map(([name, address]) => (
+                <div key={name}>
+                  <span className="mono">{name}</span>
+                  <AddressChip value={address} />
+                </div>
+              ))
+            ) : (
+              <p className="position__hint">
+                {t(
+                  "Not loaded: the API is unreachable, and there is deliberately no bundled fallback.",
+                  "未加载：API 不可达，且前端刻意不内置后备地址。",
+                )}
+              </p>
+            )}
           </div>
           <p className="position__hint">
             {t("Addresses come from ", "地址来自 ")}

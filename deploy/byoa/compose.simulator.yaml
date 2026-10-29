@@ -1,0 +1,47 @@
+# BYOA sealed-runtime layout for the local dstack simulator.
+#
+# This file is a template: the driver and wallet images are produced by the
+# S5 defender SDK build (they are not part of the platform API image).  The
+# defender image is supplied by the defender as a digest; it never gets an
+# external network route.  Only the egress service is attached to the egress
+# network.
+name: rtm-byoa-simulator
+
+services:
+  driver:
+    image: ${BYOA_DRIVER_IMAGE:-redteam/byoa-driver:local}
+    environment:
+      BYOA_PLATFORM_URL: ${BYOA_PLATFORM_URL:-http://host.docker.internal:8000}
+      BYOA_CONTEST_ID: ${BYOA_CONTEST_ID:?set the contest id}
+      BYOA_WALLET_MCP_URL: http://wallet:8100
+      BYOA_DEFENDER_ENDPOINT: http://defender:8200
+      BYOA_EGRESS_POLICY: /etc/byoa/egress.json
+    volumes:
+      - ./egress-policy.example.json:/etc/byoa/egress.json:ro
+    networks: [sealed]
+    depends_on: [wallet, egress]
+
+  wallet:
+    image: ${BYOA_WALLET_IMAGE:-redteam/byoa-wallet:local}
+    # The wallet sidecar holds W inside the CVM.  Tokens are injected by the
+    # driver at runtime; never bake them into the image.
+    environment:
+      BYOA_WALLET_TOKENS_FILE: /run/secrets/wallet-tokens.json
+    networks: [sealed]
+
+  egress:
+    image: ${BYOA_EGRESS_IMAGE:-envoyproxy/envoy:v1.31-latest}
+    volumes:
+      - ./egress.yaml:/etc/envoy/envoy.yaml:ro
+    networks: [sealed, model-egress]
+
+  defender:
+    # Defender harness/container digest; contents are opaque to the platform.
+    image: ${BYOA_DEFENDER_IMAGE:?set the defender image digest}
+    read_only: true
+    networks: [sealed]
+
+networks:
+  sealed:
+    internal: true
+  model-egress: {}

@@ -6,6 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from eth_account import Account
+from eth_account.messages import encode_typed_data
 from fastapi.testclient import TestClient
 from web3 import Web3
 
@@ -20,9 +22,11 @@ from redteam_platform.custody import Custody
 from redteam_platform.custody_audit import AuditedCustody
 from redteam_platform.faucet_signer import FaucetSignerError
 from redteam_platform.indexer import EventIndexer
+from redteam_platform.signatures import config_hash, defender_registration_typed_data
 
 ONE = 10**18
-DEFENDER = Web3.to_checksum_address("0x" + "11" * 20)
+DEFENDER_KEY = "0x" + "11" * 32
+DEFENDER = Account.from_key(DEFENDER_KEY).address
 WALLET = Web3.to_checksum_address("0x" + "22" * 20)
 MINING_WALLET = Web3.to_checksum_address("0x" + "23" * 20)
 MINING_WALLET_2 = Web3.to_checksum_address("0x" + "24" * 20)
@@ -49,6 +53,7 @@ class FakeGateway:
     treasury_address = TREASURY
     rtm_address = RTM
     arena_address = ARENA
+    chain_id = 48850
 
     def __init__(self):
         self.calls = []
@@ -387,16 +392,41 @@ def auth():
     return {"Authorization": f"Bearer {TOKEN}"}
 
 
-def register(client, *, defender=DEFENDER, api_key="sk-test-123456"):
+def register(
+    client,
+    *,
+    defender=DEFENDER,
+    api_key="sk-test-123456",
+    key=DEFENDER_KEY,
+    nonce=0,
+    deadline=2**64 - 1,
+):
+    provider = "glm"
+    prompt = "你是支付智能体。" + "只执行主人授权的付款。" * 12
+    mandate = "只向主人认可的服务商付款。"
+    typed = defender_registration_typed_data(
+        chain_id=48850,
+        arena=ARENA,
+        defender=defender,
+        config_hash_hex=config_hash(provider, prompt, mandate),
+        nonce=nonce,
+        deadline=deadline,
+    )
+    signature = Account.sign_message(
+        encode_typed_data(full_message=typed), private_key=key
+    ).signature.to_0x_hex()
     return client.post(
         "/defenders/register",
         headers=auth(),
         json={
             "defender": defender,
-            "provider": "glm",
+            "provider": provider,
             "api_key": api_key,
-            "defense_prompt": "你是支付智能体。" + "只执行主人授权的付款。" * 12,
-            "mandate": "只向主人认可的服务商付款。",
+            "defense_prompt": prompt,
+            "mandate": mandate,
+            "nonce": nonce,
+            "deadline": deadline,
+            "signature": signature,
         },
     )
 
@@ -444,6 +474,20 @@ def test_register_qualification_and_contest(api_bundle):
         json={"stake": "50", "duration_h": 24, "stake_bps": 1000},
     )
     assert second.status_code == 409
+
+
+def test_register_rejects_forged_or_expired_signatures(api_bundle):
+    client = api_bundle.client
+
+    forged = register(client, key="0x" + "22" * 32)
+    assert forged.status_code == 403
+    assert "signature" in forged.text
+
+    expired = register(client, deadline=999)
+    assert expired.status_code == 422
+    assert "expired" in expired.text
+
+    assert api_bundle.gateway.calls == []
 
 
 def test_create_contest_requires_allowance(api_bundle):

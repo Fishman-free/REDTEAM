@@ -50,11 +50,21 @@ _PROCESS_WAIT_TIMEOUT_SECONDS = 5
 _DB_CLEANUP_TIMEOUT_SECONDS = 5
 
 
+def _uses_windows_venv_launcher() -> bool:
+    """A Windows venv python.exe is a redirector that spawns the base interpreter."""
+    return sys.prefix != sys.base_prefix
+
+
 def _terminate_process_tree(process: subprocess.Popen, *, force: bool) -> None:
     """Terminate the owned process group, including Windows venv children."""
-    if os.name == "nt":
-        # Always target the full tree: the Python launcher may have spawned a
-        # venv child that still owns SQLite handles after the launcher exits.
+    if os.name == "nt" and not _uses_windows_venv_launcher():
+        # No launcher and the SUT apps spawn no children: the SUT is a single
+        # process. TerminateProcess is ~4 ms versus ~600 ms for taskkill.exe,
+        # which dominated Windows CI time across ~850 SUT runs.
+        process.kill()
+    elif os.name == "nt":
+        # Target the full tree: the venv launcher has spawned a child that
+        # still owns SQLite handles after the launcher exits.
         command = ["taskkill", "/PID", str(process.pid), "/T", "/F"]
         try:
             result = subprocess.run(command, capture_output=True,
@@ -84,6 +94,10 @@ class _Http:
     def __init__(self, base_url: str) -> None:
         self.base_url = base_url
         self.trace: list[dict] = []
+        # Never follow SUT-controlled redirects or inherit a host HTTP proxy.
+        # Built once: on Windows each build_opener() loads the system certificate
+        # store (~100 ms), which dominated SUT runs in CI.
+        self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
     def call(self, method: str, path: str, body: dict | None = None, *, timeout_seconds: float = 30) -> tuple[int, object]:
         if not isinstance(path, str) or not path.startswith("/") or path.startswith("//"):
@@ -95,9 +109,7 @@ class _Http:
         )
         started = time.time()
         try:
-            # Never follow SUT-controlled redirects or inherit a host HTTP proxy.
-            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
-            with opener.open(request, timeout=timeout_seconds) as response:
+            with self._opener.open(request, timeout=timeout_seconds) as response:
                 status = response.status
                 raw = response.read(2_000_001).decode("utf-8", errors="replace")
         except urllib.error.HTTPError as exc:
@@ -126,7 +138,10 @@ class _Http:
         last: Exception | None = None
         while time.monotonic() < deadline:
             try:
-                status, body = self.call("GET", "/health", timeout_seconds=min(2, max(0.001, deadline - time.monotonic())))
+                # Short per-probe timeout: on Windows a connect to a loopback port
+                # that is not listening yet blocks for the full timeout instead of
+                # failing fast with ECONNREFUSED. The overall deadline is unchanged.
+                status, body = self.call("GET", "/health", timeout_seconds=min(0.5, max(0.001, deadline - time.monotonic())))
                 if status == 200:
                     if expected_nonce is None:
                         return
@@ -139,7 +154,7 @@ class _Http:
                     continue
             except Exception as exc:  # noqa: BLE001
                 last = exc
-            time.sleep(0.3)
+            time.sleep(0.1)
         raise RuntimeError(f"SUT not healthy: {last}")
 
 

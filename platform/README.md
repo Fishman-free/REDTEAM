@@ -17,6 +17,13 @@ REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端�
 - `redteam_platform.rsi_export`：挖矿攻破 → RSI findings（仅 `rsi_only` 数据，不进 DataMarket）；
 - `redteam_platform.chain_gateway`：API 使用的链读写（operator/owner/W 分权、审计 key）；
 - `redteam_platform.api`：FastAPI 入口（注册/资格/比赛/消息/榜单/Faucet/数据/挖矿/下载）。
+- `redteam_platform.byoa`：BYOA 密封运行时（L3 钱包策略、四种 DefenderPort、出网白名单、
+  E2E 信封、任务结算、证明档位）；`byoa.sdk` 提供守方参考 agent 与四传输端点。
+- BYOA API：`POST /byoa/bundles`、`POST /byoa/contests`、`POST /byoa/contests/{id}/tasks[/generate]`、
+  `POST /byoa/contests/{id}/turns`、`POST /byoa/contests/{id}/finalize`、`GET /byoa/contests/{id}`；
+  钱包 MCP 在本地挂在 `/byoa/wallet/mcp`，按会话 bearer token 鉴权。
+- `PLATFORM_BYOA_WALLET_URL`：注入给守方容器的钱包 MCP URL（默认
+  `http://127.0.0.1:8000/byoa/wallet`）。模拟器档位不提供硬件保密，UI 必须显示 `simulated`。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -84,12 +91,16 @@ vault 文件不会自动创建；首次 `Custody.store()` 会以临时文件 + f
 
 ## 合约地址与 ABI
 
-- 唯一有效地址：`contracts/deploy/addresses.json`（R4）。旧地址已作废。
+- 地址来自 `PLATFORM_ADDRESSES_PATH`：Docker 栈中为 `/registry/addresses.json`（运行中的
+  唯一来源，经 `/api/meta` 对外）；宿主机默认路径 `contracts/deploy/addresses.json` 是
+  `deploy/sync-registry.sh` 写出的 gitignored 本机副本。
+- `build_app` 启动时调用 `ChainClient.verify_startup()`：先核对 RPC chainId，再确认 5 个
+  合约地址都有代码；任一不符就拒绝启动（RPC 暂时不可达时最多等待 60 秒）。
 - ABI 读取自 `contracts/artifacts/src/<Name>.sol/<Name>.json`，合约映射为
   `RTMToken`、`Arena`、`Faucet`、`DataMarket`、`Treasury`。
 - 缺少 ABI 时会提示先在 `contracts/` 运行 `npx hardhat compile`。
 - 本模块不读取私钥、不发交易；`ChainClient` 构造只做本地文件 I/O，
-  `verify_chain()` 才访问 RPC。
+  `verify_chain()` / `verify_deployment()` 才访问 RPC。
 - Besu QBFT 区块的 `extraData` 为 128 字节；`ChainClient` 的 web3 注入了
   `ExtraDataToPOAMiddleware`，否则 `get_block` 会被 web3 拒绝。web3 8 的回执是
   `AttributeDict`（Mapping，不是 `dict`）；所有回执状态判断使用 `Mapping`。
@@ -452,7 +463,7 @@ defender/buyer/attacker 身份仍由链上事件与服务层校验。
 | `GET /health` | 无鉴权，仅进程存活 |
 | `GET /meta` | 鉴权；公开链/费用/限额/provider/功能开关，供 dApp 运行时读取 |
 | `GET /status` | 鉴权；API + 自动索引器状态（last/latest block、lag、事件数） |
-| `POST /defenders/register` | `{defender, provider, api_key, defense_prompt, mandate}`；BYOK/W 入审计托管、W 预置 1 wei、资格测试；失败回滚托管条目 |
+| `POST /defenders/register` | `{defender, provider, api_key, defense_prompt, mandate, nonce, deadline, signature}`；`signature` 是守方对 `DefenderRegistration(defender,configHash,nonce,deadline)` 的 EIP-712 签名，防止冒用他人地址；BYOK/W 入审计托管、W 预置 1 wei、资格测试；失败回滚托管条目 |
 | `POST /contests` | `{stake, duration_h, stake_bps}`（可选 `?defender=`；只有一个 defender 时自动选用）；守方先 approve，operator `createContest`；返回 contest_id/tx |
 | `POST /contests/{id}/join-intent` | `{max_stake, data_consent}`；返回 `join(id,maxStake,dataConsent)` 参数与 approve 提示 |
 | `POST /contests/{id}/messages` | `{tx_hash, content}`；要求 indexer 已看到 `AttackPaid`、身份/同意匹配、未处理过该 tx；`markDelivered` → `attacker_turn` → 回复 |

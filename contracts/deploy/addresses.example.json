@@ -1,0 +1,23 @@
+{
+  "_comment": "Shape reference only. Never send transactions to these placeholders. The running stack reads /registry/addresses.json (served by /api/meta); deploy/sync-registry.sh writes a gitignored host copy to contracts/deploy/addresses.json.",
+  "network": "besu-testnet",
+  "chainId": 48850,
+  "rpc": "http://127.0.0.1:8546",
+  "deployBlock": 0,
+  "deployer": "0x0000000000000000000000000000000000000000",
+  "platform": "0x0000000000000000000000000000000000000000",
+  "operator": "0x0000000000000000000000000000000000000000",
+  "ticketSigner": "0x0000000000000000000000000000000000000000",
+  "treasury": "0x0000000000000000000000000000000000000001",
+  "arena": "0x0000000000000000000000000000000000000002",
+  "rtm": "0x0000000000000000000000000000000000000003",
+  "faucet": "0x0000000000000000000000000000000000000004",
+  "dataMarket": "0x0000000000000000000000000000000000000005",
+  "taskSink": "0x0000000000000000000000000000000000000006",
+  "faucetDrip": "200",
+  "faucetFunding": "1000000",
+  "treasuryMiningFund": "3",
+  "refundAllowance": "0",
+  "miningReward": "1",
+  "miningFeeBps": 50
+}

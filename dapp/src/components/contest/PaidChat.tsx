@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
-import { keccak256, toHex, type Address } from "viem";
+import { keccak256, toHex } from "viem";
 import { useAccount, useChainId } from "wagmi";
 import {
   api,
@@ -26,6 +26,7 @@ import { useLocalStorage, useNow } from "../../lib/hooks";
 import {
   useAllowance,
   useDataConsent,
+  requireAddresses,
   usePlatform,
   useRtmBalance,
 } from "../../lib/platform";
@@ -96,12 +97,12 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useArenaWriteContract();
-  const { meta } = usePlatform();
+  const { meta, addresses } = usePlatform();
   const { trackTransaction } = useActivity();
   const { toast } = useToast();
   const { t } = useI18n();
   const balance = useRtmBalance(address);
-  const allowance = useAllowance(address, meta.addresses.arena);
+  const allowance = useAllowance(address, addresses?.arena);
   const consent = useDataConsent(contest.id, address);
   const now = useNow(15_000);
   const live = isContestLive(contest, now);
@@ -276,10 +277,10 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
         const approvalAmount =
           balance.data !== undefined && balance.data < desired ? fee : desired;
         const approvalHash = await writeContractAsync({
-          address: meta.addresses.rtm as Address,
+          address: requireAddresses(addresses).rtm,
           abi: rtmAbi,
           functionName: "approve",
-          args: [meta.addresses.arena as Address, approvalAmount],
+          args: [requireAddresses(addresses).arena, approvalAmount],
         });
         await trackTransaction(approvalHash, t("Approve message fees", "授权消息费"), "approve");
       }
@@ -289,7 +290,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
         toHex(`${address}:${contest.id}:${Date.now()}:${newId()}:${text}`),
       );
       const attackHash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: "attack",
         args: [contest.id as `0x${string}`, msgHash],

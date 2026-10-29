@@ -40,6 +40,7 @@ import {
   useContestQuery,
   useDataMarketPrices,
   useDatasetRoot,
+  requireAddresses,
   usePlatform,
   useRtmBalance,
 } from "../lib/platform";
@@ -87,7 +88,7 @@ export default function MarketDetail() {
   const detail = query.data;
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { meta } = usePlatform();
+  const { addresses } = usePlatform();
   const { writeContractAsync } = useArenaWriteContract();
   const { trackTransaction } = useActivity();
   const { toast } = useToast();
@@ -95,7 +96,7 @@ export default function MarketDetail() {
   const root = useDatasetRoot(contestId);
   const prices = useDataMarketPrices();
   const boughtOwn = useBoughtOwn(contestId, address);
-  const allowance = useAllowance(address, meta.addresses.dataMarket);
+  const allowance = useAllowance(address, addresses?.dataMarket);
   const balance = useRtmBalance(address);
   const [records, setRecords] = useLocalStorage<PurchaseRecord[]>(
     `rtm.market.purchases.v1:${chainId}:${contestId?.toLowerCase() ?? "none"}:${address?.toLowerCase() ?? "guest"}`,
@@ -260,15 +261,15 @@ export default function MarketDetail() {
     try {
       if ((allowance.data ?? 0n) < price) {
         const approvalHash = await writeContractAsync({
-          address: meta.addresses.rtm as Address,
+          address: requireAddresses(addresses).rtm,
           abi: rtmAbi,
           functionName: "approve",
-          args: [meta.addresses.dataMarket as Address, price],
+          args: [requireAddresses(addresses).dataMarket, price],
         });
         await trackTransaction(approvalHash, t("Approve data payment", "授权数据费用"), "approve");
       }
       const hash = await writeContractAsync({
-        address: meta.addresses.dataMarket as Address,
+        address: requireAddresses(addresses).dataMarket,
         abi: dataMarketAbi,
         functionName: kind === "own" ? "buyOwn" : "buyFromAttacker",
         args:

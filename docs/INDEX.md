@@ -14,8 +14,9 @@
 | [区块链攻击悬赏与持续评估总构想](references/research/RSI攻击悬赏与持续评估机制_研究构想.md) | 原始研究目标，保留 |
 | [RTM 悬赏预算与合约设计](references/research/RTM_BOUNTY_DESIGN.md) | 旧减半/BountyVault 设计已归档；RTM 已重构为攻守博弈与红队挖矿，测试网运行中，主网兑换计划 B 受法律门控 |
 | [攻守博弈与红队挖矿规格](superpowers/specs/2026-10-27-rtm-redteam-game-design.md) | 2026-10-27 当前机制：普通层零和攻防、挖矿固定 1 RTM、RSI、数据同意 |
-| [实施计划](superpowers/plans/2026-10-27-rtm-redteam-game-plan-a.md)、[工作交接](superpowers/HANDOFF-2026-10-27.md) | 任务 0–19；R1–R4 合约/部署与任务 10–17 平台/dApp/e2e；当前测试网状态 |
-| [平台后端](../platform/README.md)、[dApp](../dapp/README.md)、[R4 地址登记](../contracts/deploy/addresses.json) | runner/indexer/Faucet/数据服务/FastAPI；7 页 dApp；当前唯一有效测试网地址 |
+| [BYOA 守方自带 agent 规格](superpowers/specs/2026-10-29-byoa-defender-design.md) | 2026-10-29 设计 + 实现（S1–S6，模拟器档位）：TEE 封闭运行时、三方保密、四种接入、委托任务 + 效用义务；硬件档未验收 |
+| [实施计划](superpowers/plans/2026-10-27-rtm-redteam-game-plan-a.md)、[工作交接](superpowers/HANDOFF-2026-10-29.md) | 任务 0–19 已收束；当前栈、签名代发水龙头、双 RPC、i18n/文档、测试与 CI 状态 |
+| [平台后端](../platform/README.md)、[dApp](../dapp/README.md)、[地址登记结构](../contracts/deploy/addresses.example.json) | runner/indexer/Faucet/数据服务/FastAPI；7 页 dApp；运行中地址只认 `/api/meta`（`rtm-registry` 卷），仓库不再提交地址文件 |
 | [外部攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md)、[旧 Arena 会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound（已归档）](../archieve/contracts-2026-10/BountyRound.sol) | 独立 HTTP/commit–reveal 原型；当前 PayAssist 无公共提交到链上判奖端到端接线 |
 | [证据与奖励协议 v1](EVIDENCE_REWARD_PROTOCOL.md)、[RTM 桥（已归档）](../archieve/contracts-2026-10/rtm-reward-bridge.js) | 旧 Arena claim 与本地 BountyVault 桥；不是当前 PayAssist 奖励实现 |
 | [历史研究论文 Markdown](paper/payment-agent-security-rsi.md)、[历史论文 PDF](paper/payment-agent-security-rsi.pdf) | 历史确定性研究稿；20%→100%受未见族分母缩小影响，逐点成功项始终2，不能证明跨族泛化；不含当前 live.v3 结果，PDF未更新 |

@@ -57,6 +57,9 @@ fi
 log "Building and starting the stack..."
 "${COMPOSE[@]}" --env-file .env.stack -f docker-compose.yml up -d --build
 
+# Keep the gitignored host copy in step with the volume the stack reads.
+bash ./sync-registry.sh || log "warning: could not sync contracts/deploy/addresses.json; run deploy/sync-registry.sh once the api is up"
+
 log ""
 log "Stack started."
 log "  dApp:      http://localhost:$(grep '^WEB_PORT=' .env.stack | cut -d= -f2-)"

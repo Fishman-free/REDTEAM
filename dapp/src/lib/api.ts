@@ -77,6 +77,7 @@ export interface PlatformMeta {
     rtm: string;
     faucet: string;
     dataMarket: string;
+    taskSink?: string;
   };
   fees: {
     attackFeeBps: number;
@@ -100,6 +101,12 @@ export interface PlatformMeta {
     mining: boolean;
     dataMarket: boolean;
     defenderRegistration: boolean;
+    byoa?: boolean;
+  };
+  byoa?: {
+    attestationTiers: string[];
+    transports: string[];
+    walletMcpUrl: string;
   };
   indexer: {
     startBlock: number;
@@ -129,6 +136,7 @@ export interface Contest {
   stake: string;
   end: string;
   is_mining: boolean;
+  is_byoa?: boolean;
   stake_bps: number;
   defense_hash: string;
   start_ts: number;
@@ -161,6 +169,87 @@ export interface LeaderboardEntry {
   difficulty: number;
   current_streak: number;
   longest_streak: number;
+}
+
+export interface ByoaBundleResult {
+  bundle_id: string;
+  defender: string;
+  commitment: string;
+  attestation_tier: "simulated" | "hardware";
+  runtime_measurement: string;
+  tee_pubkey: string;
+  tee_signer: string;
+  wallet: string;
+  byoa_nonce: number;
+  defender_data_consent: boolean;
+  policy_fingerprint: string;
+  manifest: Record<string, unknown>;
+  egress: { models: string[]; oracles: Record<string, unknown>[] };
+}
+
+export interface ByoaContestResult {
+  contest_id: string;
+  tx_hash: string;
+  wallet: string;
+  defender: string;
+  tee_signer: string;
+  config_commitment: string;
+  runtime_measurement: string;
+  attestation_tier: string;
+  end: number;
+  task_sink: string;
+  pull_token?: string | null;
+}
+
+export interface ByoaTurnResult {
+  contest_id: string;
+  seq: number;
+  sealed: boolean;
+  reply_envelope?: Record<string, unknown>;
+  reply_hash?: string;
+  reply_signature?: string;
+  tee_signer?: string;
+  reply?: string;
+  completed_tasks: string[];
+  transfers: { to: string | null; amount: string; tx: string | null }[];
+}
+
+export interface ByoaState {
+  contest_id: string;
+  defender: string;
+  wallet: string;
+  tee_signer: string;
+  tee_pubkey: string;
+  config_commitment: string;
+  runtime_measurement: string;
+  attestation_tier: string;
+  policy_fingerprint: string;
+  defender_data_consent: boolean;
+  manifest: Record<string, unknown>;
+  egress: { models: string[]; oracles: Record<string, unknown>[] };
+  transcript: {
+    seq: number;
+    at: number;
+    channel: string;
+    kind: string;
+    contentHash: string;
+    replyHash: string;
+    content: string | null;
+    reply: string | null;
+    toolCalls: unknown[];
+  }[];
+  utility: {
+    issued: number;
+    completed: number;
+    expired: number;
+    open: number;
+    miss_threshold: number;
+    breached: boolean;
+    completion_ratio: number;
+  };
+  wallet_audit: Record<string, unknown>[];
+  encryption: string;
+  end: number;
 }
 
 export interface DefenderEntry {
@@ -313,12 +402,65 @@ export const api = {
     api_key: string;
     defense_prompt: string;
     mandate: string;
+    nonce: number;
+    deadline: number;
+    signature: string;
   }) {
     return request<RegisterResult>(
       "/defenders/register",
       { method: "POST", body: JSON.stringify(payload) },
       { timeoutMs: 180_000 },
     );
+  },
+
+  registerByoaBundle(payload: Record<string, unknown>) {
+    return request<ByoaBundleResult>(
+      "/byoa/bundles",
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 120_000 },
+    );
+  },
+
+  createByoaContest(payload: Record<string, unknown>) {
+    return request<ByoaContestResult>(
+      "/byoa/contests",
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 120_000 },
+    );
+  },
+
+  byoaState(contestId: string) {
+    return request<ByoaState>(`/byoa/contests/${contestId}`, {}, { timeoutMs: 20_000 });
+  },
+
+  generateByoaTasks(contestId: string, payload: { count: number; seed?: string }) {
+    return request<Record<string, unknown>[]>(
+      `/byoa/contests/${contestId}/tasks/generate`,
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 120_000 },
+    );
+  },
+
+  byoaTurn(contestId: string, payload: Record<string, unknown>) {
+    return request<ByoaTurnResult>(
+      `/byoa/contests/${contestId}/turns`,
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 180_000 },
+    );
+  },
+
+  byoaFinalize(contestId: string) {
+    return request<{
+      issued: number;
+      completed: number;
+      expired: number;
+      open: number;
+      miss_threshold: number;
+      breached: boolean;
+      completion_ratio: number;
+      penalty_tx: string | null;
+      errors: string[];
+    }>(`/byoa/contests/${contestId}/finalize`, { method: "POST", body: "{}" }, { timeoutMs: 120_000 });
   },
 
   createContest(
