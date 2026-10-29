@@ -830,6 +830,38 @@ class PlatformService:
             "terms": MINING_TERMS,
         }
 
+    def retire_mining_contest(self, contest_id: str) -> dict[str, Any]:
+        """Operator action: close a mining contest that was never breached.
+
+        Mining contests have no fixed end time, so a defense that cannot be
+        broken would stay ``live`` forever: it keeps one of the three
+        concurrency slots, keeps its ``defenseHash`` busy and keeps paying for
+        an arena nobody can win.  ``Arena.retireMining`` is the chain-side
+        counterpart - it returns W's remaining balance to the treasury, retires
+        the hash permanently and frees the slot.
+
+        The local runner session is stopped as well; otherwise a joined miner
+        could keep paying for messages against a contest that no longer exists
+        on chain, and every turn would fail at ``markDelivered``.
+        """
+        cid = _contest_id(contest_id)
+        info = self._contest_info(cid)
+        if not info.get("is_mining"):
+            raise ApiError(409, "this is not a mining contest")
+        if info.get("state") != STATE_LIVE:
+            raise ApiError(409, "contest is not live")
+        try:
+            tx = self.gateway.retire_mining(cid)
+        except Exception:
+            raise ApiError(502, "retireMining failed") from None
+        self.stop_session(cid, "retired")
+        return {
+            "contest_id": cid,
+            "status": "retired",
+            "tx_hash": tx,
+            "defense_hash": info.get("defense_hash"),
+        }
+
     # -- messages -------------------------------------------------------
 
     def post_message(self, contest_id: str, payload: MessageRequest) -> dict[str, Any]:
@@ -1400,6 +1432,12 @@ def create_app(
     @app.post("/mining/join-intent", dependencies=[Depends(require_auth)])
     def mining_join(payload: MiningJoinRequest) -> dict[str, Any]:
         return service.mining_join_intent(payload)
+
+    @app.post(
+        "/mining/contests/{contest_id}/retire", dependencies=[Depends(require_auth)]
+    )
+    def retire_mining(contest_id: str) -> dict[str, Any]:
+        return service.retire_mining_contest(contest_id)
 
     if byoa is not None:
 

@@ -857,6 +857,54 @@ def test_mining_creation_precondition_and_recovery(api_bundle):
     assert create_failed.json()["detail"]["recovery"] == "returned"
 
 
+def test_retire_mining_contest_closes_session_and_hash(api_bundle):
+    client = api_bundle.client
+    created = client.post("/mining/contests", headers=auth(), json={"version": "v0_demo"})
+    assert created.status_code == 201
+    session = api_bundle.runners.sessions[-1]
+
+    retired = client.post(f"/mining/contests/{MINING_CID}/retire", headers=auth())
+
+    assert retired.status_code == 200, retired.text
+    body = retired.json()
+    assert body["contest_id"] == MINING_CID
+    assert body["status"] == "retired"
+    assert body["tx_hash"] == "0xretire"
+    assert body["defense_hash"] == "0x" + "55" * 32
+    assert ("retire_mining", MINING_CID) in api_bundle.gateway.calls
+    # The runner session must stop too, otherwise a joined miner keeps paying
+    # for messages against a contest that no longer exists on chain.
+    assert session.stopped == "retired"
+
+
+def test_retire_mining_rejects_standard_and_ended_contests(api_bundle):
+    client = api_bundle.client
+
+    standard = client.post(f"/mining/contests/{CONTEST}/retire", headers=auth())
+    assert standard.status_code == 409
+    assert standard.json()["detail"] == "this is not a mining contest"
+
+    api_bundle.gateway.contests[MINING_CID]["state"] = 2
+    ended = client.post(f"/mining/contests/{MINING_CID}/retire", headers=auth())
+    assert ended.status_code == 409
+    assert ended.json()["detail"] == "contest is not live"
+
+    unauthorized = client.post(f"/mining/contests/{MINING_CID}/retire")
+    assert unauthorized.status_code == 401
+
+
+def test_retire_mining_reports_chain_failure(api_bundle):
+    api_bundle.gateway.fault_error = True
+
+    failed = api_bundle.client.post(
+        f"/mining/contests/{MINING_CID}/retire", headers=auth()
+    )
+
+    assert failed.status_code == 502
+    assert failed.json()["detail"] == "retireMining failed"
+    assert not any(call[0] == "retire_mining" for call in api_bundle.gateway.calls)
+
+
 def test_registration_failure_cleans_custody(tmp_path):
     indexer = EventIndexer(tmp_path / "index.sqlite3", network="test")
     emit_normal(indexer)

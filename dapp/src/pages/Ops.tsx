@@ -47,6 +47,8 @@ export default function Ops() {
   const [miningResult, setMiningResult] = useState<MiningContestResult | null>(null);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   const [busy, setBusy] = useState<"mining" | "publish" | null>(null);
+  const [armedRetire, setArmedRetire] = useState("");
+  const [retiringId, setRetiringId] = useState<string | null>(null);
   const [rsiCasesList, setRsiCasesList] = useState<RsiCase[]>([]);
   const [rsiCandidatesList, setRsiCandidatesList] = useState<RsiCandidate[]>([]);
   const [selectedCase, setSelectedCase] = useState("");
@@ -66,6 +68,14 @@ export default function Ops() {
       (contestsQuery.data ?? [])
         .filter((contest) => !contest.is_mining && contest.state !== "live")
         .sort((a, b) => (b.ended_ts ?? b.start_ts) - (a.ended_ts ?? a.start_ts)),
+    [contestsQuery.data],
+  );
+
+  const activeMining = useMemo(
+    () =>
+      (contestsQuery.data ?? []).filter(
+        (contest) => contest.is_mining && contest.state === "live",
+      ),
     [contestsQuery.data],
   );
 
@@ -117,6 +127,29 @@ export default function Ops() {
       setError(errorText(reason));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function retireMining(contestId: string) {
+    setError("");
+    setRetiringId(contestId);
+    try {
+      const result = await api.retireMiningContest(contestId, adminKey);
+      toast({
+        title: t("Mining contest retired", "挖矿赛已退役"),
+        description: t(
+          `W balance returned to Treasury; ${result.defense_hash.slice(0, 10)}… stays retired.`,
+          `W 余额已退回 Treasury；${result.defense_hash.slice(0, 10)}… 永久退役。`,
+        ),
+        tone: "success",
+      });
+      setArmedRetire("");
+      await contestsQuery.refetch();
+      void refetchStatus();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setRetiringId(null);
     }
   }
 
@@ -496,6 +529,63 @@ export default function Ops() {
               </div>
             </div>
           )}
+
+          <div className="ops-result">
+            <p className="mono">
+              {t("ACTIVE MINING", "进行中挖矿赛")} {activeMining.length} /{" "}
+              {meta.limits.maxActiveMining}
+            </p>
+            {activeMining.length === 0 ? (
+              <p className="muted small">
+                {t(
+                  "No live mining contest. A defense nobody can break stays live forever, so retire it to free the slot and the defenseHash.",
+                  "没有进行中的挖矿赛。打不穿的守方不会自己结束，需要退役才能释放名额与 defenseHash。",
+                )}
+              </p>
+            ) : (
+              activeMining.map((contest) => (
+                <div className="ops-contests__row" key={contest.id}>
+                  <span className="mono">{contest.id.slice(0, 12)}…</span>
+                  <span className="small muted">
+                    {t(`${contest.paid_count} msgs`, `${contest.paid_count} 条消息`)}
+                  </span>
+                  {armedRetire === contest.id ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setArmedRetire("")}
+                      >
+                        {t("Cancel", "取消")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        loading={retiringId === contest.id}
+                        onClick={() => void retireMining(contest.id)}
+                      >
+                        {t("Confirm retire", "确认退役")}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      iconLeft={<Lock size={12} />}
+                      onClick={() => setArmedRetire(contest.id)}
+                    >
+                      {t("Retire", "退役")}
+                    </Button>
+                  )}
+                </div>
+              ))
+            )}
+            <p className="muted small">
+              {t(
+                "Retiring returns W's remaining balance to the Treasury, retires the defenseHash permanently and stops the hosted agent.",
+                "退役会把 W 剩余余额退回 Treasury、永久作废该 defenseHash，并停止托管 agent。",
+              )}
+            </p>
+          </div>
         </Panel>
 
         <Panel

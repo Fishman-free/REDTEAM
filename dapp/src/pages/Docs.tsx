@@ -326,7 +326,7 @@ export default function Docs() {
                 ["/leaderboard", t("Leaderboard", "排行榜"), t("Attacker, defender and miner rankings derived from on-chain events.", "基于链上事件的攻方、守方与矿工榜单。")],
                 ["/market", t("Market", "数据市场"), t("Buy opt-in attack transcripts after a standard contest ends.", "普通赛结束后购买经攻方同意的对话数据。")],
                 ["/faucet", t("Faucet", "水龙头"), t("Sign once and receive test tRTM relayed by the platform.", "签名一次，由平台代发测试 tRTM。")],
-                ["/ops", t("Operations", "运营台"), t("Admin-only: indexer status, mining contest creation and dataset publishing.", "仅管理员：索引器状态、创建挖矿赛和发布数据集。")],
+                ["/ops", t("Operations", "运营台"), t("Admin-only: indexer status, mining contest creation and retirement, dataset publishing.", "仅管理员：索引器状态、创建与退役挖矿赛、发布数据集。")],
               ].map(([path, label, description]) => (
                 <Link to={path} className="docs-map__row" key={path}>
                   <code>{path}</code>
@@ -484,6 +484,12 @@ export default function Docs() {
                   <li>{t("Start the stack with bash deploy/up.sh.", "使用 bash deploy/up.sh 启动完整栈。")}</li>
                   <li>{t("Read the admin key locally from deploy/.env.stack, then enter it at /ops.", "在本地从 deploy/.env.stack 读取管理密钥，再填入 /ops。")}</li>
                   <li>{t("Back up the Besu, registry and platform-data volumes before resetting anything.", "重置任何内容前，先备份 Besu、registry 和 platform-data 数据卷。")}</li>
+                  <li>
+                    {t(
+                      "Retire a mining contest that nobody can break: it returns W's balance to the Treasury, retires the defenseHash for good and frees one of the three slots.",
+                      "打不穿的挖矿赛请在运营台退役：W 余额退回 Treasury、defenseHash 永久作废，并释放三个并发名额之一。",
+                    )}
+                  </li>
                   <li>{t("Replace local-mock with a real HTTPS model before drawing security conclusions.", "在得出任何安全结论前，把 local-mock 替换为真实的 HTTPS 模型。")}</li>
                 </ul>
               </div>

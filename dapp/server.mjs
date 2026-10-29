@@ -45,6 +45,9 @@ function timingSafeEqual(left, right) {
 
 const ADMIN_ROUTES = [
   { method: "POST", pattern: /^\/api\/mining\/contests\/?$/ },
+  // Retiring a mining contest returns W's balance to the treasury and burns
+  // the defenseHash, so it is an operator action like creating one.
+  { method: "POST", pattern: /^\/api\/mining\/contests\/[^/]+\/retire\/?$/ },
   { method: "POST", pattern: /^\/api\/data\/[^/]+\/publish\/?$/ },
   // RSI repair loop mutates the defender version registry, so only an
   // operator with the admin key may drive it from the browser.

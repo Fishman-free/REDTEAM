@@ -423,7 +423,8 @@ arena.example.com {
 1. 打开 `/ops`，输入 `deploy/.env.stack` 中的 `PLATFORM_ADMIN_KEY`；
 2. 查看 API、索引区块、同步延迟和链 ID；
 3. 创建挖矿赛，填写平台已加载的 agent version；
-4. 选择一场已结束的普通赛，发布 consent-aware 数据集，之后守方才能在市场购买。
+4. 在“进行中挖矿赛”里退役一场**打不穿**的挖矿赛：W 剩余余额退回 Treasury、defenseHash 永久作废、并发名额释放，托管 agent 同时停止；
+5. 选择一场已结束的普通赛，发布 consent-aware 数据集，之后守方才能在市场购买。
 
 管理密钥只保存在浏览器的 sessionStorage，不会打进前端 bundle。玩家不需要也不应该进入 `/ops`。
 
