@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,25 @@ from .base_prompt import compose_base_prompt
 
 VERSIONS_DIR = Path(__file__).resolve().parent / "versions"
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
+def overlay_versions_dir() -> Path | None:
+    """Writable version registry, e.g. RSI repairs promoted at runtime.
+
+    The deployed API image is read-only, so promoted versions are written to a
+    mounted data volume and resolved *before* the bundled versions.  Setting
+    ``REDTEAM_VERSIONS_DIR`` to an empty string disables the overlay.
+    """
+
+    raw = os.environ.get("REDTEAM_VERSIONS_DIR", "").strip()
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
+def _version_dirs() -> list[Path]:
+    overlay = overlay_versions_dir()
+    return [overlay, VERSIONS_DIR] if overlay is not None else [VERSIONS_DIR]
 
 
 @dataclass(frozen=True)
@@ -53,17 +73,28 @@ class AgentVersion:
 
 
 def list_versions() -> list[str]:
-    if not VERSIONS_DIR.is_dir():
-        return []
-    return sorted(path.parent.name for path in VERSIONS_DIR.glob("*/agent.json"))
+    names: set[str] = set()
+    for directory in _version_dirs():
+        if not directory.is_dir():
+            continue
+        names.update(path.parent.name for path in directory.glob("*/agent.json"))
+    return sorted(names)
+
+
+def _find_version_file(name: str) -> Path | None:
+    for directory in _version_dirs():
+        path = directory / name / "agent.json"
+        if path.is_file():
+            return path
+    return None
 
 
 def load_version(name: str) -> AgentVersion:
     """按名称加载版本；名字受限，防止目录穿越。"""
     if not isinstance(name, str) or not _NAME_RE.fullmatch(name):
         raise ValueError("version name must match [a-z0-9][a-z0-9_-]{0,63}")
-    path = VERSIONS_DIR / name / "agent.json"
-    if not path.is_file():
+    path = _find_version_file(name)
+    if path is None:
         raise ValueError(f"unknown agent version: {name}")
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or set(raw) - {"name", "description", "defense"}:

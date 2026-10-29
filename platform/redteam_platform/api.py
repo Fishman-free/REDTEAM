@@ -1858,6 +1858,7 @@ def build_app(
         export_dir=rsi_dir,
         candidate_root=rsi_dir / "candidates",
         versions_dir=os.environ.get("PLATFORM_RSI_VERSIONS_DIR", "").strip()
+        or os.environ.get("REDTEAM_VERSIONS_DIR", "").strip()
         or VERSIONS_DIR,
         exporter=RsiExporter(
             indexer,

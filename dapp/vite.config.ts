@@ -41,6 +41,27 @@ const bridgeHeaders = platformToken
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // 把变化频率低的依赖拆成独立 chunk：钱包栈（wagmi/viem）与 React
+        // 运行时不再和业务页面一起失效，首屏也能并行下载。
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](@wagmi|wagmi|viem|@noble|@scure|abitype)[\\/]/.test(id)) {
+            return "wallet";
+          }
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|@remix-run)[\\/]/.test(id)) {
+            return "react";
+          }
+          if (/[\\/]node_modules[\\/](@tanstack|lucide-react)[\\/]/.test(id)) {
+            return "ui";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

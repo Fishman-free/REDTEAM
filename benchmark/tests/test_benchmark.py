@@ -139,3 +139,26 @@ def test_exhausted_step_budget_surfaces_protocol_error():
     result, _ = run(version, responses, max_steps=3)
     assert result["error"]["kind"] == "agent_protocol"
     assert "budget exhausted" in result["error"]["message"]
+
+
+def test_overlay_version_dir_takes_precedence(tmp_path, monkeypatch):
+    """运行时可写的版本目录（RSI 修复产物）优先于仓库内版本。"""
+    payload = {
+        "name": "v0_demo",
+        "description": "overlay override",
+        "defense": {"system_prompt": "覆盖版本：" + "y" * 120, "runtime": {}, "memory": []},
+    }
+    directory = tmp_path / "v0_demo"
+    directory.mkdir()
+    (directory / "agent.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    bundled = load_version("v0_demo")
+    monkeypatch.setenv("REDTEAM_VERSIONS_DIR", str(tmp_path))
+
+    overridden = load_version("v0_demo")
+    assert overridden.digest != bundled.digest
+    assert overridden.description == "overlay override"
+    assert "v0_demo" in list_versions()
+
+    monkeypatch.delenv("REDTEAM_VERSIONS_DIR")
+    assert load_version("v0_demo").digest == bundled.digest

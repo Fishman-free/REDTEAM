@@ -91,6 +91,9 @@ services:
       PLATFORM_VAULT: /data/vault.json
       PLATFORM_DATA_DIR: /data
       PLATFORM_INDEXER_ENABLED: "true"
+      # Promoted RSI repairs are written here and resolved before the bundled
+      # versions, so a new defender version survives container rebuilds.
+      REDTEAM_VERSIONS_DIR: /data/versions
       MODEL_ALLOWLIST_JSON: '{"local-mock":{"base_url":"http://127.0.0.1:18081/v1","model":"mock-defender"}}'
       PLATFORM_MODEL_PROVIDER: local-mock
       PLATFORM_BYOA_WALLET_URL: ${PLATFORM_BYOA_WALLET_URL:-http://127.0.0.1:8080/byoa/wallet}

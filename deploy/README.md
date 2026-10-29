@@ -49,8 +49,15 @@ browser ──> web:3000 (SPA + /api + /rpc BFF)
 - BYOA 模板在 `deploy/byoa/`（compose、出网允许列表、示例 bundle、runbook）；模拟器档位
   不代表硬件 TEE 保密。
 - `/api/mining/contests` 与 `/api/data/:id/publish` 需要 `X-Admin-Key`。
+  运营台的 RSI 修复闭环（`/api/rsi/export`、`/api/rsi/candidates`、
+  `/verify`、`/promote`）同样需要该密钥。
 - `mock-model:18081` 与 API 共享网络命名空间，只监听 `127.0.0.1`，不对外暴露。
 - API 只启动 **1 个 worker**：runner session、索引器、vault 与 faucet nonce 都是单进程状态。
+  重启后，`/data/platform-state.sqlite3` 会恢复守方注册、已处理付费交易与会话元数据；
+  下一次付费消息会按需重建 agent 会话。会话内容是否保留取决于加入时的数据同意：
+  同意（或挖矿赛）会完整恢复，opt-out 的攻方线程只恢复轮次预算、不恢复对话。
+- RSI 修复产出的新版本写在 `REDTEAM_VERSIONS_DIR=/data/versions`，优先于镜像内
+  `benchmark/versions` 加载，因此容器重建后仍然可以继续用新版开赛。
 
 ## 演示模型（重要）
 
