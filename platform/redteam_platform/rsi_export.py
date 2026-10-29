@@ -132,13 +132,29 @@ class RsiExporter:
         output_root: str | Path,
         *,
         clock: Callable[[], float] = time.time,
+        mandate_lookup: Callable[[str], str | None] | None = None,
     ) -> None:
         self.indexer = indexer
         self.transcript_root = Path(transcript_root).expanduser()
         self.output_root = Path(output_root).expanduser()
         if not callable(clock):
             raise RsiExportError("clock must be callable")
+        if mandate_lookup is not None and not callable(mandate_lookup):
+            raise RsiExportError("mandate_lookup must be callable")
         self._clock = clock
+        # 复盘必须知道当时的任务授权书，否则回放无法复现宿主侧白名单。
+        self._mandate_lookup = mandate_lookup
+
+    def _mandate(self, contest_id: str) -> str | None:
+        if self._mandate_lookup is None:
+            return None
+        try:
+            value = self._mandate_lookup(contest_id)
+        except Exception:
+            return None
+        if not isinstance(value, str) or not 1 <= len(value) <= 4000:
+            return None
+        return value
 
     def export_breach(
         self, contest_id: str, *, attack_goal: str | None = None
@@ -277,6 +293,7 @@ class RsiExporter:
                     },
                 },
             },
+            "mandate": self._mandate(cid),
             "exported_at": int(self._clock()),
         }
 

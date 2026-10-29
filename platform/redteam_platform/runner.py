@@ -44,6 +44,7 @@ from benchmark.interface import AgentVersion
 from web3 import Web3
 
 from .agent_tools import tool_definitions
+from .payments import enforcement_enabled, parse_authorization
 from .byok import ModelError
 from .transcripts import TranscriptStore
 
@@ -218,6 +219,10 @@ class AgentSession:
         self._system_prompt = version.system_prompt(
             mandate=mandate, wallet_address=self.wallet_address
         )
+        # 授权来源是任务授权书，不是对话文本；没有结构化授权条款时不启用拦截
+        # （普通守方的自由文本 mandate 保持原行为）。
+        self._policy = parse_authorization(mandate)
+        self._enforce_payments = enforcement_enabled(version.defense.get("runtime", {}))
         self._system_message = {"role": "system", "content": self._system_prompt}
         self._threads: dict[str, list[dict]] = {}
         self._thread_locks: dict[str, threading.Lock] = {}
@@ -413,7 +418,8 @@ class AgentSession:
                 ),
             },
         ]
-        reply, error, tool_calls = self._run_loop(conversation)
+        # 资格测试由宿主发起，不是模型决策，不能被守方的白名单拦住。
+        reply, error, tool_calls = self._run_loop(conversation, enforce_policy=False)
         ok = any(
             _successful_transfer(item, target, QUALIFICATION_AMOUNT)
             for item in tool_calls
@@ -524,7 +530,19 @@ class AgentSession:
         with self._lock:
             return self._stopped is not None
 
-    def _run_loop(self, thread: list[dict]) -> tuple[str, dict | None, list[dict]]:
+    def _payment_denial(self, name: str, args: object) -> str | None:
+        """返回拒绝原因；``None`` 表示放行。原因只用于证据，不给模型看。"""
+
+        if name != "transfer_rtm" or not self._enforce_payments or self._policy is None:
+            return None
+        if not isinstance(args, dict):
+            return "malformed_arguments"
+        allowed, reason = self._policy.allows(args.get("to"), args.get("amount"))
+        return None if allowed else reason
+
+    def _run_loop(
+        self, thread: list[dict], *, enforce_policy: bool = True
+    ) -> tuple[str, dict | None, list[dict]]:
         deadline = time.monotonic() + self.turn_timeout
         tools = tool_definitions()
         reply = ""
@@ -562,8 +580,19 @@ class AgentSession:
                     if time.monotonic() > deadline:
                         raise AgentProtocolError("turn deadline exhausted")
                     try:
-                        receipt = self.tools.call(name, args)
+                        denial = (
+                            self._payment_denial(name, args) if enforce_policy else None
+                        )
+                        if denial is None:
+                            receipt = self.tools.call(name, args)
+                        else:
+                            # 对模型抹平：与链上回滚看起来完全一样，攻击者无法
+                            # 通过反复试探定位白名单边界。
+                            receipt = {
+                                "result": {"status": "failed", "reason": "transfer failed"}
+                            }
                     except (ValueError, KeyError, TypeError):
+                        denial = None
                         # Keep the conversation consistent: the assistant
                         # tool_call must always be followed by a tool message.
                         receipt = {
@@ -573,13 +602,16 @@ class AgentSession:
                         raise AgentProtocolError(
                             "tool executor must return a result object"
                         )
-                    tool_trace.append(
-                        {
-                            "tool": name,
-                            "args": copy.deepcopy(args),
-                            "receipt": copy.deepcopy(receipt),
-                        }
-                    )
+                    trace_entry = {
+                        "tool": name,
+                        "args": copy.deepcopy(args),
+                        "receipt": copy.deepcopy(receipt),
+                    }
+                    if denial is not None:
+                        # 拦截证据只进证据链，不进模型上下文。
+                        trace_entry["policy_denied"] = True
+                        trace_entry["policy_reason"] = denial
+                    tool_trace.append(trace_entry)
                     thread.append(
                         {
                             "role": "tool",

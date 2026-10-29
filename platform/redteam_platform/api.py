@@ -54,6 +54,7 @@ from .faucet_relay import FaucetClaimStore, FaucetRelayError, recover_claim_sign
 from .faucet_signer import FaucetSigner, FaucetSignerError
 from .indexer import ChainEventSource, EventIndexer, IndexerError, normalize_contest_id
 from .indexer_runner import IndexerRunner
+from .payments import build_mandate
 from .rsi_pipeline import RepairVerifier, RsiPipelineError, RsiService
 from .rsi_export import RsiExporter
 from .runner import AgentSession, RunnerStopped
@@ -449,6 +450,15 @@ class PlatformService:
             self.state_warnings.append(f"session {meta.get('contest_id')} not persisted")
             return
         self._session_meta[meta["contest_id"]] = {**meta, "state": state}
+
+    def session_mandate(self, contest_id: str) -> str | None:
+        """该场比赛使用的任务授权书；RSI 复盘与宿主闸门都依赖它。"""
+
+        meta = self._session_meta.get(contest_id)
+        if meta is None:
+            return None
+        mandate = meta.get("mandate")
+        return mandate if isinstance(mandate, str) else None
 
     def _persist_session_state(self, contest_id: str, session: Any) -> None:
         if self._state is None:
@@ -1165,6 +1175,10 @@ class PlatformService:
                 {"detail": "createMiningContest failed", "recovery": recovery},
             ) from None
 
+        # 挖矿赛给守方一个“合法业务对象”：合成供应商地址 + 单笔上限。
+        # 这样宿主侧白名单不会退化成“全拒付”，正常付款能力仍可被验证。
+        merchant = Account.create().address
+        mandate = build_mandate(merchant, self.deps.mining_reward)
         try:
             session = self.deps.runner_factory(
                 version=version,
@@ -1173,7 +1187,7 @@ class PlatformService:
                 wallet_entry=wallet_entry,
                 contest_id=contest_id,
                 is_mining=True,
-                mandate=MINING_MANDATE,
+                mandate=mandate,
             )
         except Exception:
             raise ApiError(
@@ -1196,7 +1210,7 @@ class PlatformService:
                 "wallet_entry": wallet_entry,
                 "api_key_entry": "",
                 "provider": "platform",
-                "mandate": MINING_MANDATE,
+                "mandate": mandate,
                 "is_mining": True,
                 "created_at": self.deps.clock(),
             },
@@ -1205,6 +1219,7 @@ class PlatformService:
         return {
             "contest_id": contest_id,
             "wallet": wallet,
+            "merchant": merchant,
             "defense_hash": defense_hash,
             "tx_hash": tx_hash,
             "version": version.name,
@@ -1868,6 +1883,7 @@ def build_app(
             indexer,
             settings.data_dir / "transcripts",
             rsi_dir,
+            mandate_lookup=lambda cid: holder["service"].session_mandate(cid),
         ),
         verifier=RepairVerifier(client_factory=replay_factory),
     )
