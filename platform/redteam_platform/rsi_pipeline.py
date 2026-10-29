@@ -1055,8 +1055,8 @@ class RsiService:
             "limits": {
                 "runtime_flags_unchanged": True,
                 "note": (
-                    "runtime flags are not enforced by the arena runner; a repair "
-                    "that only flips them would be a no-op"
+                    "runtime flags may only be tightened (never weakened); the "
+                    "replay must prove an enabled flag actually fires"
                 ),
             },
         }
