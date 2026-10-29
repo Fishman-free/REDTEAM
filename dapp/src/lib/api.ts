@@ -248,6 +248,13 @@ export interface FaucetTicket {
   signature: string;
 }
 
+export interface FaucetRelayClaim {
+  to: string;
+  amount_wei: string;
+  tx_hash: string;
+  claimed_at: number;
+}
+
 export interface DeliveryGrant {
   token: string;
   expires_at: number;
@@ -364,6 +371,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ to, captcha_token: captchaToken || null }),
     });
+  },
+
+  faucetClaim(payload: {
+    to: string;
+    issued_at: number;
+    nonce: string;
+    signature: string;
+  }) {
+    return request<FaucetRelayClaim>(
+      "/faucet/claim",
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 40_000 },
+    );
   },
 
   publishDataSet(contestId: string, adminKey?: string) {

@@ -30,6 +30,7 @@ GAS_MARK_DELIVERED = 200_000
 GAS_FAULT = 250_000
 GAS_TREASURY_WITHDRAW = 200_000
 GAS_TRANSFER = 120_000
+GAS_MINT_TEST = 120_000
 DEFAULT_RECEIPT_TIMEOUT = 90.0
 
 _CONTEST_FIELDS = (
@@ -63,6 +64,7 @@ class ChainGatewayPort(Protocol):
     def active_defense_hash(self, defense_hash: str) -> str: ...
     def contest_info(self, contest_id: str) -> dict[str, Any]: ...
     def fund_wallet(self, wallet: str, amount: int) -> str: ...
+    def mint_test_tokens(self, to: str, amount: int) -> str: ...
     def create_contest(
         self, defender: str, wallet: str, stake: int, duration: int, stake_bps: int
     ) -> tuple[str, str]: ...
@@ -342,6 +344,20 @@ class Web3ChainGateway:
             context={"wallet_address": wallet},
             build=lambda sender: self._rtm.functions.transfer(wallet, amount),
             gas=GAS_TRANSFER,
+        )
+        return tx
+
+    def mint_test_tokens(self, to: str, amount: int) -> str:
+        """Testnet-only faucet mint executed on the platform's configured chain."""
+        to = _require_address(to, "to")
+        amount = _require_amount(amount, "amount")
+        if amount == 0:
+            raise GatewayError("amount must be positive")
+        tx, _receipt = self._send_operator(
+            purpose="faucet_relay",
+            context={"wallet_address": to},
+            build=lambda sender: self._arena.functions.mintForTest(to, amount),
+            gas=GAS_MINT_TEST,
         )
         return tx
 

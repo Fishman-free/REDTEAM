@@ -56,7 +56,7 @@ export function RpcBanner() {
         </button>
         <Link to="/docs#troubleshooting" className="btn btn--secondary btn--sm">
           <BookOpen size={13} />
-          {t("Fix RPC", "修复 RPC")}
+          {t("Network help", "网络说明")}
         </Link>
       </div>
     </div>

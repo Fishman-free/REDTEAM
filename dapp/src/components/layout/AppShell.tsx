@@ -258,6 +258,7 @@ export function AppShell() {
   const { t, lang } = useI18n();
   const title = pageTitle(location.pathname);
   const localizedTitle = lang === "en" ? title.en : title.zh;
+  const networkFreePage = location.pathname === "/faucet" || location.pathname === "/docs";
   useDocumentTitle(`${localizedTitle} · RTM Arena`);
 
   useEffect(() => {
@@ -298,11 +299,11 @@ export function AppShell() {
               <Activity size={17} />
               {pendingCount > 0 && <span className="icon-btn__badge">{pendingCount}</span>}
             </button>
-            <ConnectButton size="sm" />
+            <ConnectButton size="sm" label={t("Connect", "连接")} />
           </div>
         </header>
-        <NetworkBanner />
-        <RpcBanner />
+        {!networkFreePage && <NetworkBanner />}
+        {!networkFreePage && <RpcBanner />}
         <OfflineBanner />
         <main className="main" id="main">
           <div className="page" key={location.pathname}>

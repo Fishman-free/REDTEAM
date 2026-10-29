@@ -97,7 +97,7 @@ export default function Arena() {
         }
         description={t(
           "Pick a live standard contest, stake to join, then pay per message. Break the defender agent and the contract settles the balance by its rules.",
-          "选择一场进行中的普通赛，质押加入，然后为每条消息付费。攻破守方智能体后，W 余额会按合约规则结算。",
+          "选择一场进行中的普通赛，质押加入，然后为每条消息付费。攻破守方 agent 后，W 余额会按合约规则结算。",
         )}
         actions={
           <Link to="/faucet" className="btn btn--ghost btn--sm">
@@ -154,7 +154,7 @@ export default function Arena() {
             <p>
               {t(
                 "Message fee = S × 0.5%. The agent runs only after the payment is indexed.",
-                "消息费 = S × 0.5%，付款被索引后才运行智能体。",
+                "消息费 = S × 0.5%，付款被索引后才运行 agent。",
               )}
             </p>
           </div>

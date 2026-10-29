@@ -32,6 +32,10 @@ services:
       - besu-data:/shared
     ports:
       - "127.0.0.1:${BESU_RPC_PORT:-8546}:8545"
+      # Compatibility alias: older wallet profiles point at 8546. Keep both
+      # endpoints on the current chain so a stale wallet RPC cannot silently
+      # reach a different local Besu stack.
+      - "127.0.0.1:${BESU_ALIAS_RPC_PORT:-9546}:8545"
     restart: unless-stopped
 
   contracts:

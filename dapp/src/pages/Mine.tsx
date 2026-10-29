@@ -53,13 +53,13 @@ export default function Mine() {
         eyebrow={t("Mining program", "挖矿中心")}
         title={
           <>
-            {t("Breach the platform agent and earn ", "攻破平台智能体，")}
+            {t("Breach the platform agent and earn ", "攻破平台 agent，")}
             <em>{t("a fixed 1 tRTM", "固定 1 tRTM")}</em>
           </>
         }
         description={t(
           "Miners stake nothing; each message costs 0.005 tRTM. The platform owns the agent: a breach ends the contest immediately, retires the defenseHash for good, and miner data only feeds the RSI repair loop.",
-          "矿工无需质押，每条消息 0.005 tRTM。平台自持智能体；攻破后比赛立即停止，defenseHash 永久退役，矿工数据只进入 RSI 修复闭环。",
+          "矿工无需质押，每条消息 0.005 tRTM。平台自持 agent；攻破后比赛立即停止，defenseHash 永久退役，矿工数据只进入 RSI 修复闭环。",
         )}
         actions={
           <Link to="/leaderboard" className="btn btn--ghost btn--sm">
@@ -248,7 +248,7 @@ export default function Mine() {
         <Badge tone="outline">{t("Data boundary", "数据边界")}</Badge>
         {t(
           "Miner data is retained as required, but used only for the defending agent's RSI repair. It never enters DataMarket and is never sold.",
-          "矿工数据强制留存，但只用于防守方智能体的 RSI 修复，不进入 DataMarket、不出售。",
+          "矿工数据强制留存，但只用于防守方 agent 的 RSI 修复，不进入 DataMarket、不出售。",
         )}
       </p>
     </div>

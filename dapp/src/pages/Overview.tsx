@@ -201,16 +201,16 @@ export default function Overview() {
             </Badge>
           </div>
           <h1 className="hero__title">
-            {t("Break the", "攻破")}
+            <span className="hero__break">Break the</span>
             <br />
-            <em>{t("agent.", "智能体。")}</em>
+            <em>agent.</em>
           </h1>
           <p className="hero__lede">
-            {t("Put autonomous agents to the test against ", "让自主智能体在")}
+            {t("Put autonomous agents to the test against ", "让自主 agent 在")}
             <strong>{t("real on-chain funds", "真实链上资金")}</strong>
             {t(
               " and real adversaries. Defenders bring their own BYOK agents, attackers pay per message, and the contracts settle every contest.",
-              "与真实对手之间接受检验。守方自带 BYOK 智能体，攻方付费对话，结算由合约完成。",
+              "与真实对手之间接受检验。守方自带 BYOK agent，攻方付费对话，结算由合约完成。",
             )}
           </p>
           <div className="hero__actions">
@@ -232,7 +232,7 @@ export default function Overview() {
             <span className="hero__meta-dot" />
             <span>{meta.network.toUpperCase()}</span>
             <span className="hero__meta-dot" />
-            <span>{t("ZERO-GAS TESTNET", "零 GAS 测试网")}</span>
+            <span>{t("ZERO-GAS TESTNET", "零 gas 测试网")}</span>
           </div>
         </div>
 
@@ -417,7 +417,7 @@ export default function Overview() {
             en="DEFENDER"
             description={t(
               "Bring your own BYOK agent and authorization, pass qualification, then stake to open a contest.",
-              "自带 BYOK 智能体与授权书，通过资格测试后质押开赛。",
+              "自带 BYOK agent 与授权书，通过资格测试后质押开赛。",
             )}
             points={[
               t("One registration creates one standard contest", "一次注册创建一场普通赛"),
@@ -435,7 +435,7 @@ export default function Overview() {
             en="ATTACKER"
             description={t(
               "Stake to enter the field, pay for every message, and lure the agent into moving real funds.",
-              "质押加入战场，为每条消息付费，诱导智能体转出真实资金。",
+              "质押加入战场，为每条消息付费，诱导 agent 转出真实资金。",
             )}
             points={[
               t("The winner takes the W balance and the pool", "赢家拿走 W 余额与奖池"),
@@ -453,7 +453,7 @@ export default function Overview() {
             en="MINER"
             description={t(
               "Challenge platform-owned agents with no stake and earn a fixed 1 tRTM per breach.",
-              "无质押挑战平台自持智能体，每次攻破固定 1 tRTM。",
+              "无质押挑战平台自持 agent，每次攻破固定 1 tRTM。",
             )}
             points={[
               t("0.005 tRTM per message", "每条消息 0.005 tRTM"),
@@ -604,7 +604,7 @@ export default function Overview() {
                 <p>
                   {t(
                     "Each message is paid on-chain before the platform runs the agent.",
-                    "每条消息先上链付费，再由平台运行智能体。",
+                    "每条消息先上链付费，再由平台运行 agent。",
                   )}
                 </p>
               </div>

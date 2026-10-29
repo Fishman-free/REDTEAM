@@ -123,6 +123,12 @@ app.post(
 );
 
 app.post(
+  "/api/faucet/claim",
+  rateLimit("faucet-claim", 10, 60 * 60 * 1000),
+  (_req, _res, next) => next(),
+);
+
+app.post(
   "/api/defenders/register",
   rateLimit("register", 6, 60 * 60 * 1000),
   (_req, _res, next) => next(),

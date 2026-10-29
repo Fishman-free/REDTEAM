@@ -572,7 +572,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
                   <p>
                     {t(
                       "After joining, each message approves the fee before going on-chain; the platform runs the defender agent only after the indexer confirms it.",
-                      "加入后，每条消息先授权费用，再上链；索引器确认后平台才会运行守方智能体。",
+                      "加入后，每条消息先授权费用，再上链；索引器确认后平台才会运行守方 agent。",
                     )}
                   </p>
                 </div>
@@ -939,7 +939,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
                   <li>
                     {t(
                       "Fee per message = 0.5% of the defender stake; the agent runs only after payment.",
-                      "每条消息费 = 守方质押 × 0.5%，付款后才能运行智能体。",
+                      "每条消息费 = 守方质押 × 0.5%，付款后才能运行 agent。",
                     )}
                   </li>
                   <li>

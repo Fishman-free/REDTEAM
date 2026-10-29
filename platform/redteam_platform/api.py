@@ -50,6 +50,7 @@ from .chain_gateway import GatewayError, Web3ChainGateway
 from .custody import Custody
 from .custody_audit import AuditedCustody
 from .data_service import ChainDataMarketWriter, DataService, DataServiceError
+from .faucet_relay import FaucetClaimStore, FaucetRelayError, recover_claim_signer
 from .faucet_signer import FaucetSigner, FaucetSignerError
 from .indexer import ChainEventSource, EventIndexer, IndexerError, normalize_contest_id
 from .indexer_runner import IndexerRunner
@@ -165,6 +166,14 @@ class FaucetTicketRequest(BaseModel):
     captcha_token: str | None = Field(default=None, max_length=4096)
 
 
+class FaucetClaimRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    to: str = Field(min_length=1, max_length=64)
+    issued_at: int = Field(ge=0)
+    nonce: str = Field(pattern=r"^0x[0-9a-fA-F]{64}$")
+    signature: str = Field(min_length=1, max_length=4096)
+
+
 class DeliverRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tx_hash: str = Field(pattern=_TX_RE)
@@ -206,6 +215,8 @@ class ApiDeps:
     runner_factory: Callable[..., Any]
     wallet_factory: Callable[[], tuple[str, str]]
     faucet_signer: Any | None = None
+    faucet_claim_store: Any | None = None
+    faucet_drip: int = 0
     data_service: Any | None = None
     version_loader: Callable[[str], AgentVersion] | None = None
     platform_client_factory: Callable[[], Any] | None = None
@@ -230,6 +241,8 @@ class PlatformService:
         self.indexer = deps.indexer
         self.custody = deps.custody
         self.faucet_signer = deps.faucet_signer
+        self.faucet_claim_store = deps.faucet_claim_store
+        self.faucet_drip = int(deps.faucet_drip)
         self.data_service = deps.data_service
         self._defenders: dict[str, DefenderRecord] = {}
         self._sessions: dict[str, Any] = {}
@@ -662,6 +675,46 @@ class PlatformService:
             raise ApiError(status, message) from None
         return ticket.as_dict() if hasattr(ticket, "as_dict") else dict(ticket)
 
+    def faucet_claim(self, payload: FaucetClaimRequest) -> dict[str, Any]:
+        """Relay a signed faucet claim on the platform's correct chain.
+
+        The player's wallet only signs a short message; no wallet RPC is used
+        for the credit, so stale local networks cannot misroute the claim.
+        """
+        if self.faucet_claim_store is None:
+            raise ApiError(503, "faucet relay is not configured")
+        if self.faucet_drip <= 0:
+            raise ApiError(503, "faucet amount is not configured")
+        to = _address(payload.to, "to")
+        try:
+            self.faucet_claim_store.validate_issued_at(payload.issued_at)
+            signer = recover_claim_signer(
+                to, payload.issued_at, payload.nonce, payload.signature
+            )
+        except FaucetRelayError as exc:
+            raise ApiError(400, str(exc)) from None
+        if Web3.to_checksum_address(signer) != to:
+            raise ApiError(403, "faucet signature does not match address")
+        try:
+            with self._lock:
+                self.faucet_claim_store.reserve(to, payload.nonce)
+                try:
+                    tx_hash = self.gateway.mint_test_tokens(to, self.faucet_drip)
+                except Exception:
+                    self.faucet_claim_store.release_nonce(payload.nonce)
+                    raise ApiError(502, "faucet relay failed") from None
+                self.faucet_claim_store.record_claim(to, tx_hash)
+        except FaucetRelayError as exc:
+            message = str(exc)
+            status = 409 if ("cooldown" in message or "already used" in message) else 400
+            raise ApiError(status, message) from None
+        return {
+            "to": to,
+            "amount_wei": str(self.faucet_drip),
+            "tx_hash": tx_hash,
+            "claimed_at": int(self.deps.clock()),
+        }
+
     # -- data market ----------------------------------------------------
 
     def publish_data(self, contest_id: str) -> dict[str, Any]:
@@ -960,6 +1013,10 @@ def create_app(
     def faucet_ticket(payload: FaucetTicketRequest) -> dict[str, Any]:
         return service.faucet_ticket(payload)
 
+    @app.post("/faucet/claim", dependencies=[Depends(require_auth)])
+    def faucet_claim(payload: FaucetClaimRequest) -> dict[str, Any]:
+        return service.faucet_claim(payload)
+
     @app.post("/data/{contest_id}/publish", dependencies=[Depends(require_auth)])
     def publish(contest_id: str) -> dict[str, Any]:
         return service.publish_data(contest_id)
@@ -1053,6 +1110,7 @@ def build_app(
         captcha_verifier=captcha_verifier,
         expected_signer=addresses.get("ticketSigner"),
     )
+    faucet_claim_store = FaucetClaimStore(settings.data_dir / "faucet-relay.sqlite3")
 
     writer = ChainDataMarketWriter(
         chain.w3,
@@ -1219,6 +1277,8 @@ def build_app(
             runner_factory=runner_factory,
             wallet_factory=wallet_factory,
             faucet_signer=faucet_signer,
+            faucet_claim_store=faucet_claim_store,
+            faucet_drip=int(faucet_drip_wei),
             data_service=data_service,
             version_loader=load_version,
             platform_client_factory=platform_client_factory,

@@ -66,9 +66,9 @@ bash deploy/up.sh
 
 ## 关键交互
 
-- **钱包/网络**：注入式钱包；自动检测错误网络并支持 `wallet_addEthereumChain`；
-  每次写入前比较钱包 RPC 与本站 RPC 的区块哈希，避免把交易发到另一个同 Chain ID
-  的本地链；顶部账户菜单展示 tRTM / Gas 余额、复制地址、切链和断开。
+- **钱包/网络**：注入式钱包；水龙头完全不依赖钱包网络。游戏写入前比较钱包 RPC
+  与本站 RPC 的区块哈希，避免把交易发到另一个同 Chain ID 的本地链；顶部账户菜单
+  展示 tRTM / gas 余额、复制地址、切链和断开。
 - **入门序列**：总览页四步检查（连接钱包 → 切测试网 → 领 tRTM → 选角色）。
 - **竞技场**：状态筛选、搜索、排序、倒计时；战场详情包含加入/质押、数据同意确认、
   付费对话、到期 `expire`、攻方 `withdrawStake`、守方 `collectPenalties`。
@@ -83,6 +83,9 @@ bash deploy/up.sh
   下载；购买记录保存在本浏览器。
 - **交易活动**：全局 Activity 抽屉与 toast，检查 receipt status；超时后区分“仍在等待打包”
   和“交易根本没到本站这条链”，并支持手动重新检查。
+- **水龙头**：用户只签一条 EIP-191 消息；平台校验签名后在正确链上代发 tRTM
+  （`POST /faucet/claim`）。不依赖钱包 RPC、不需要 gas、不需要切链。服务端持久化
+  24 小时冷却与 one-time nonce。
 - **使用文档**：`/docs` 包含设计理念、快速开始、四种角色、默认规则、数据边界、
   钱包 RPC 排障与运营者说明，术语旁的可点击问号提供即时解释。
 
@@ -104,8 +107,8 @@ bash deploy/up.sh
 
 - 浏览器不包含平台 bearer token；开发与生产都由服务端代理注入。
 - `/ops` 是独立路由，公开导航不展示；生产必须设置 `PLATFORM_ADMIN_KEY`。
-- API 单 worker：runner session、索引器、vault、faucet nonce 都是进程内状态，
-  不要横向扩容。
+- API 单 worker：runner session、索引器、vault 都是进程内状态；水龙头冷却与 nonce
+  存在 SQLite 中。不要横向扩容。
 - 当前仍是测试网演示：单验证者零 gas Besu、共享 API token、无每用户会话；
   公网/主网部署前需要补 per-user auth、限流、captcha 与多验证者链。
 - 测试网资产无价值；所有对话只用于防御性安全研究。

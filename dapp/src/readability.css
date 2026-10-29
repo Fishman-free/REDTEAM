@@ -1,0 +1,324 @@
+/* --------------------------------------------------------------------------
+   Readability pass — larger, heavier micro-type with the same visual rhythm.
+   Loaded last so labels stay legible in both English and Chinese.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --faint: #8d8375;
+  --muted: #aaa091;
+}
+
+body {
+  font-size: 14.5px;
+}
+
+.eyebrow,
+.panel__eyebrow,
+.dialog__eyebrow,
+.docs-kicker,
+.nav-group__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+}
+
+.wordmark__sub { font-size: 9.5px; }
+.nav-item__label { font-size: 14px; }
+.nav-item__en { font-size: 9.5px; font-weight: 500; }
+.nav-item__index { font-size: 9px; }
+.sidebar-status__head { font-size: 9.5px; }
+.sidebar-status__grid dt { font-size: 9.5px; font-weight: 500; }
+.sidebar-status__grid dd { font-size: 11px; }
+.sidebar-status__link { font-size: 10.5px; }
+.sidebar__foot { font-size: 9px; }
+
+.topbar__en { font-size: 10px; font-weight: 500; }
+.sync-status { font-size: 10px; }
+.site-footer { font-size: 10.5px; }
+
+.btn { font-size: 11.5px; font-weight: 500; }
+.btn--sm { font-size: 10.5px; }
+.icon-btn__badge { font-size: 9px; }
+.badge { font-size: 9.5px; font-weight: 600; }
+.panel__inline-link { font-size: 10.5px; }
+.field__label { font-size: 10px; font-weight: 600; }
+.field__aside { font-size: 10px; }
+.field__suffix { font-size: 10.5px; }
+.field__hint,
+.field__error { font-size: 11.5px; }
+.input,
+.textarea,
+.select { font-size: 14px; }
+
+.tab { font-size: 10.5px; font-weight: 500; }
+.tab__count { font-size: 9.5px; }
+.sort-box__select { font-size: 11px; }
+.stat__label { font-size: 10px; font-weight: 600; }
+.stat__unit { font-size: 10px; font-weight: 500; }
+.stat__hint { font-size: 11px; }
+.addr__label { font-size: 9.5px; }
+.countdown { font-size: 10.5px; }
+.progress__meta { font-size: 10px; }
+
+.account__address { font-size: 10.5px; }
+.account__network { font-size: 9.5px; }
+.account__copy { font-size: 10px; }
+.account__balances span { font-size: 10px; font-weight: 500; }
+.account__row-label { font-size: 10.5px; }
+.account__link { font-size: 10.5px; }
+.account__foot { font-size: 9.5px; }
+.connect-option__text span { font-size: 10.5px; }
+.connect-option__action { font-size: 10.5px; }
+.connect-link { font-size: 10.5px; }
+
+.activity__time { font-size: 9.5px; }
+.activity__meta { font-size: 10px; }
+.activity__hash,
+.activity__hash .addr__value { font-size: 10px; }
+.activity__error { font-size: 11px; }
+.activity__check { font-size: 9.5px; }
+.activity__help { font-size: 10px; }
+
+.hero__meta { font-size: 10px; }
+.field-brief__head p,
+.field-brief__stamp,
+.field-brief__list-head { font-size: 9.5px; }
+.field-brief__row { font-size: 10.5px; }
+.field-brief__row-pool { font-size: 10.5px; }
+.field-brief__empty { font-size: 11px; }
+.field-brief__foot { font-size: 9.5px; }
+.start-panel__progress { font-size: 10.5px; }
+.ready-stamp { font-size: 10px; }
+.start-step__index { font-size: 9.5px; }
+.start-step__text span { font-size: 10.5px; }
+.role-card__index { font-size: 9.5px; }
+.role-card__en { font-size: 9.5px; }
+.role-card__cta { font-size: 10.5px; }
+
+.contest-card__index,
+.contest-card__kicker { font-size: 9.5px; }
+.contest-card__title .mono { font-size: 10.5px; }
+.contest-card__stat-label,
+.contest-card__open { font-size: 9.5px; }
+.contest-card__cta { font-size: 10.5px; }
+.pulse-title { font-size: 9.5px; }
+.pulse-list li { font-size: 11px; }
+.pulse-rank { font-size: 9.5px; }
+.loop-steps li > .mono { font-size: 10px; }
+.loop-steps p { font-size: 11px; }
+.loop-panel__note { font-size: 11px; }
+.testnet-note { font-size: 11px; }
+.testnet-note > .mono { font-size: 9.5px; }
+.arena-brief__item > .mono { font-size: 10px; }
+.arena-brief__item p { font-size: 11px; }
+.page-note { font-size: 11px; }
+
+.detail-back__link { font-size: 10.5px; }
+.detail-back > .mono { font-size: 9.5px; }
+.detail-head__aside-label,
+.detail-head__aside-foot { font-size: 9.5px; }
+.detail-open { font-size: 10.5px; }
+.info-row dt { font-size: 10px; font-weight: 500; }
+.outcome-banner span { font-size: 11px; }
+.position__grid dt { font-size: 10px; font-weight: 600; }
+.position__hint { font-size: 11px; }
+.join-summary__head p { font-size: 10.5px; }
+.join-summary__grid dt { font-size: 10px; font-weight: 600; }
+.mini-rules li { font-size: 11px; }
+.detail-side__note { font-size: 10px; }
+.join-dialog__summary span { font-size: 10px; }
+.choice > span:last-child { font-size: 11px; }
+
+.chat__context { font-size: 9.5px; }
+.chat__context code { font-size: 9.5px; }
+.chat__empty p { font-size: 11px; }
+.chat__pending p { font-size: 11px; }
+.bubble__role,
+.bubble__time { font-size: 9.5px; }
+.chat-system { font-size: 10.5px; }
+.chat__composer-meta { font-size: 10px; }
+.chat-step { font-size: 9.5px; }
+.chat__hint { font-size: 10px; }
+.step-rail__text small { font-size: 9.5px; }
+.defender-record__head p { font-size: 9.5px; }
+.defender-record__grid dt { font-size: 10px; font-weight: 600; }
+.defender-record__grid dd { font-size: 10.5px; }
+.deployed-card__id { font-size: 10px; }
+.preset { font-size: 10px; }
+.economics-list span { font-size: 10px; font-weight: 600; }
+.security-list > div { font-size: 11px; }
+.mini-loop li > .mono { font-size: 9.5px; }
+.mini-loop p { font-size: 11px; }
+.defense-row__meta { font-size: 10.5px; }
+.mine-brief__lead p:first-child { font-size: 9.5px; }
+.mine-brief__facts span { font-size: 10px; font-weight: 600; }
+
+.podium-card__rank { font-size: 9.5px; }
+.podium-card__address { font-size: 10.5px; }
+.podium-card__primary span { font-size: 9.5px; }
+.podium-card__metrics { font-size: 10px; }
+.rank-list__head { font-size: 10px; }
+.rank-row__rank { font-size: 10.5px; }
+.rank-row__metrics small { font-size: 9.5px; }
+.rank-row__metrics strong { font-size: 11px; }
+.version-row__main .mono { font-size: 10.5px; }
+.version-row__stat { font-size: 10px; }
+.history-table__head { font-size: 10px; font-weight: 600; }
+.history-table__row { font-size: 11px; }
+
+.faucet-card__head p { font-size: 10px; }
+.faucet-amount__cadence { font-size: 10.5px; }
+.faucet-stats span { font-size: 10px; font-weight: 600; }
+.faucet-stats strong { font-size: 12px; }
+.faucet-step { font-size: 9.5px; }
+.faucet-ticket { font-size: 10px; }
+.faucet-info-list > div { font-size: 11.5px; }
+.faucet-next li > .mono { font-size: 9.5px; }
+.faucet-next p { font-size: 11px; }
+.faucet-spark { font-size: 10.5px; }
+
+.market-brief span { font-size: 9.5px; }
+.market-brief p { font-size: 11px; }
+.market-list__head { font-size: 10px; }
+.market-row > div { font-size: 11px; }
+.market-row__id .mono { font-size: 10.5px; }
+.buy-card__body > p { font-size: 11px; }
+.buy-card__meta span { font-size: 10px; }
+.buy-card__meta strong { font-size: 10.5px; }
+.attacker-table__head { font-size: 10px; }
+.attacker-row { font-size: 11px; }
+.attacker-row__counts { font-size: 10.5px; }
+.purchase-row__main .mono { font-size: 9.5px; }
+.dataset-info dt { font-size: 10px; }
+.dataset-info dd { font-size: 10.5px; }
+.market-detail-side__note { font-size: 10.5px; }
+.purchase-confirm span { font-size: 10px; }
+.purchase-confirm strong { font-size: 10.5px; }
+
+.ops-gate__note { font-size: 9.5px; }
+.ops-kv dt { font-size: 10px; font-weight: 600; }
+.ops-kv dd { font-size: 10.5px; }
+.contract-list > div > .mono { font-size: 9.5px; }
+.ops-result p { font-size: 10.5px; }
+.ops-contests__row .mono { font-size: 10px; }
+.ops-footer-note { font-size: 10.5px; }
+.more-list__item small { font-size: 9.5px; }
+.more-list__note { font-size: 10.5px; }
+.mobile-nav__item { font-size: 9.5px; }
+.lang-switch button { font-size: 9px; }
+
+.docs-toc__title { font-size: 9.5px; }
+.docs-toc__item { font-size: 12px; }
+.docs-toc__item span { font-size: 9.5px; }
+.docs-toc__cta { font-size: 10.5px; }
+.docs-step__num { font-size: 10.5px; }
+.docs-map__row code { font-size: 10.5px; }
+.docs-section p,
+.docs-section li { font-size: 13px; }
+.docs-lead { font-size: 14.5px !important; }
+.docs-small { font-size: 11.5px !important; }
+.docs-card p { font-size: 12px; }
+.docs-role__body p { font-size: 12px; }
+.docs-note { font-size: 12px; }
+.docs-rule span { font-size: 11.5px; }
+.docs-rule strong { font-size: 11.5px; }
+.docs-map__row span { font-size: 11.5px; }
+.docs-faq summary { font-size: 13px; }
+.docs-faq details > ol { font-size: 12.5px; }
+.info-tip__popover { font-size: 12px; }
+
+/* Second pass: micro labels need to read at arm's length, not as decoration. */
+.eyebrow,
+.panel__eyebrow,
+.dialog__eyebrow,
+.docs-kicker { font-size: 11px; letter-spacing: 0.1em; }
+.nav-group__label { font-size: 10.5px; }
+.nav-item__en { font-size: 10px; }
+.sidebar-status__head,
+.sidebar-status__grid dt { font-size: 10.5px; }
+.sidebar-status__grid dd { font-size: 11.5px; }
+.topbar__en,
+.sync-status { font-size: 10.5px; }
+.btn { font-size: 12px; }
+.btn--sm { font-size: 11px; }
+.badge { font-size: 10.5px; }
+.stat__label,
+.stat__unit { font-size: 11px; }
+.stat__hint { font-size: 12px; }
+.field__label { font-size: 11px; text-transform: none; }
+.field__aside { font-size: 11px; }
+.field__suffix { font-size: 11px; }
+.field__hint,
+.field__error { font-size: 12px; }
+.tab { font-size: 11px; }
+.sort-box__select { font-size: 11.5px; }
+.account__balances span { font-size: 11px; }
+.account__row-label,
+.account__link { font-size: 11px; }
+.activity__meta,
+.activity__hash,
+.activity__hash .addr__value { font-size: 10.5px; }
+.activity__error { font-size: 11.5px; }
+.hero__meta { font-size: 11px; }
+.field-brief__row { font-size: 11px; }
+.field-brief__row-pool { font-size: 11px; }
+.start-step__text span { font-size: 11px; }
+.contest-card__stat-label,
+.contest-card__open { font-size: 10.5px; }
+.contest-card__cta { font-size: 11px; }
+.arena-brief__item p { font-size: 11.5px; }
+.page-note { font-size: 11.5px; }
+.info-row dt { font-size: 10.5px; }
+.position__grid dt,
+.join-summary__grid dt { font-size: 10.5px; }
+.faucet-card__head p { font-size: 10.5px; }
+.faucet-stats span { font-size: 11px; }
+.faucet-stats strong { font-size: 13px; }
+.faucet-step { font-size: 10px; }
+.faucet-ticket { font-size: 11px; }
+.faucet-info-list > div { font-size: 12px; }
+.faucet-next p { font-size: 11.5px; }
+.faucet-spark { font-size: 11px; }
+.market-row > div { font-size: 11.5px; }
+.attacker-row { font-size: 11.5px; }
+.history-table__head { font-size: 10.5px; }
+.history-table__row { font-size: 11.5px; }
+.ops-kv dt,
+.dataset-info dt { font-size: 10.5px; }
+.ops-kv dd,
+.dataset-info dd { font-size: 11px; }
+.docs-toc__item { font-size: 12.5px; }
+.docs-section p,
+.docs-section li { font-size: 13.5px; }
+.docs-card p,
+.docs-role__body p,
+.docs-note { font-size: 12.5px; }
+.docs-rule span,
+.docs-rule strong,
+.docs-map__row span { font-size: 12px; }
+.docs-faq summary { font-size: 13.5px; }
+.docs-faq details > ol { font-size: 13px; }
+.info-tip__popover { font-size: 12.5px; }
+
+/* Hero keeps the English product phrase in both languages. */
+.hero__break {
+  display: inline-block;
+  transition:
+    color 180ms var(--ease-out),
+    text-shadow 180ms var(--ease-out);
+}
+
+.hero__break:hover {
+  color: var(--ember);
+  text-shadow: 0 0 36px rgba(255, 90, 54, 0.28);
+}
+
+@media (max-width: 680px) {
+  .topbar__brand .wordmark__text {
+    display: none;
+  }
+
+  .topbar__brand {
+    flex: 0 0 auto;
+  }
+}
