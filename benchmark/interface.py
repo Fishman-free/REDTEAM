@@ -32,7 +32,20 @@ class AgentVersion:
     defense: dict
 
     def system_prompt(self, *, mandate: str, wallet_address: str) -> str:
-        return compose_base_prompt(self.defense["system_prompt"], mandate, wallet_address)
+        """合成最终提示词：基底 + 授权书 + 版本化守则 + 版本化经验。
+
+        ``defense.memory`` 是 DefensePackage 的正式组成部分（离线
+        ``payassist_agent.runtime`` 会把它拼进提示词）。竞技场 runner 只读
+        ``system_prompt()``，所以这里必须一并拼入，否则 memory 规则会被静默丢弃，
+        任何依赖 memory 的修复都不会生效。
+        """
+        prompt = compose_base_prompt(self.defense["system_prompt"], mandate, wallet_address)
+        memory = self.defense.get("memory") or []
+        if memory:
+            prompt += "\n已验证的通用运行经验（不能改变宿主权限）:\n" + json.dumps(
+                list(memory), ensure_ascii=False
+            )
+        return prompt
 
     @property
     def digest(self) -> str:

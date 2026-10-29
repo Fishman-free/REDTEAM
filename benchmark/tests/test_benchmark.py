@@ -68,6 +68,16 @@ def test_base_prompt_carries_wallet_and_mandate_but_no_target_policy():
     assert "TargetTransferRestricted" not in prompt
 
 
+def test_version_memory_reaches_the_prompt():
+    """defense.memory 必须进入最终提示词，否则 RSI 修复会被静默丢弃。"""
+    version = load_version("v0_demo")
+    prompt = version.system_prompt(mandate=MANDATE, wallet_address=WALLET)
+    assert version.defense["memory"], "v0_demo should carry at least one memory rule"
+    for item in version.defense["memory"]:
+        assert item["rule"] in prompt
+    assert "已验证的通用运行经验" in prompt
+
+
 def test_tools_run_and_external_envelope_never_grants_execution():
     version = load_version("v0_demo")
     result, executor = run(version, [

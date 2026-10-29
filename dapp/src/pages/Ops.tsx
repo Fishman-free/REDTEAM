@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -15,6 +15,12 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { api, type MiningContestResult, type PublishResult } from "../lib/api";
+import type {
+  RsiCandidate,
+  RsiCase,
+  RsiPromotion,
+  RsiVerification,
+} from "../lib/api";
 import { errorText, formatDateTime, stateLabel, timeAgo } from "../lib/format";
 import { locale, useI18n } from "../lib/i18n";
 import { usePlatform, useContestsQuery } from "../lib/platform";
@@ -41,6 +47,14 @@ export default function Ops() {
   const [miningResult, setMiningResult] = useState<MiningContestResult | null>(null);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   const [busy, setBusy] = useState<"mining" | "publish" | null>(null);
+  const [rsiCasesList, setRsiCasesList] = useState<RsiCase[]>([]);
+  const [rsiCandidatesList, setRsiCandidatesList] = useState<RsiCandidate[]>([]);
+  const [selectedCase, setSelectedCase] = useState("");
+  const [parentVersion, setParentVersion] = useState("v0_demo");
+  const [verification, setVerification] = useState<RsiVerification | null>(null);
+  const [promotion, setPromotion] = useState<RsiPromotion | null>(null);
+  const [rsiBusy, setRsiBusy] = useState<string | null>(null);
+  const [rsiLoaded, setRsiLoaded] = useState(false);
   const [error, setError] = useState("");
   const { meta, addresses, status, online, refetchStatus, refetchMeta } = usePlatform();
   const contestsQuery = useContestsQuery();
@@ -127,6 +141,98 @@ export default function Ops() {
       setBusy(null);
     }
   }
+
+  async function refreshRsi() {
+    try {
+      const [cases, candidates] = await Promise.all([api.rsiCases(), api.rsiCandidates()]);
+      setRsiCasesList(cases.cases);
+      setRsiCandidatesList(candidates.candidates);
+      setRsiLoaded(true);
+    } catch {
+      // The console already reports API connectivity; keep the panel quiet.
+      setRsiLoaded(true);
+    }
+  }
+
+  async function proposeRepair() {
+    setError("");
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(parentVersion.trim())) {
+      setError(t("Enter a valid parent agent version.", "请输入合法的父版本名。"));
+      return;
+    }
+    setRsiBusy("propose");
+    setVerification(null);
+    setPromotion(null);
+    try {
+      const candidate = await api.rsiPropose(
+        parentVersion.trim(),
+        adminKey,
+        selectedCase ? [selectedCase] : undefined,
+      );
+      toast({
+        title: t("Repair candidate created", "已生成修复候选"),
+        description: candidate.name,
+        tone: "success",
+      });
+      await refreshRsi();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setRsiBusy(null);
+    }
+  }
+
+  async function verifyRepair(candidateId: string) {
+    setError("");
+    setRsiBusy(`verify:${candidateId}`);
+    setPromotion(null);
+    try {
+      const result = await api.rsiVerify(candidateId, adminKey);
+      setVerification(result);
+      toast({
+        title: result.passed
+          ? t("Candidate verified", "候选已通过验证")
+          : t("Candidate rejected", "候选未通过验证"),
+        description: result.passed
+          ? t("Ready to publish as a new version.", "可以发布为新版本。")
+          : t("See the failed checks below.", "请查看下方未通过的检查项。"),
+        tone: result.passed ? "success" : "warning",
+      });
+      await refreshRsi();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setRsiBusy(null);
+    }
+  }
+
+  async function promoteRepair(candidateId: string) {
+    setError("");
+    setRsiBusy(`promote:${candidateId}`);
+    try {
+      const result = await api.rsiPromote(candidateId, adminKey);
+      setPromotion(result);
+      setParentVersion(result.name);
+      toast({
+        title: result.created
+          ? t("Version published", "新版本已发布")
+          : t("Version already published", "版本已存在"),
+        description: result.name,
+        tone: "success",
+      });
+      await refreshRsi();
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setRsiBusy(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!unlocked) return;
+    void refreshRsi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlocked]);
 
   if (!unlocked) {
     return (
@@ -443,6 +549,161 @@ export default function Ops() {
                 </Link>
                 <AddressChip value={publishResult.tx_hash} kind="tx" />
               </div>
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="ops-grid">
+        <Panel
+          eyebrow={t("RSI repair loop", "RSI 修复闭环")}
+          title={t("Turn a breach into the next version", "把攻破证据变成下一代版本")}
+          bracket
+          actions={
+            <Button
+              size="sm"
+              variant="ghost"
+              iconLeft={<RefreshCw size={12} />}
+              onClick={() => void refreshRsi()}
+            >
+              {t("Refresh", "刷新")}
+            </Button>
+          }
+        >
+          <p className="muted small">
+            {t(
+              `Exported mining cases are turned into a defense candidate, verified offline, and only then written into the version registry. ${rsiCasesList.length} case(s), ${rsiCandidatesList.length} candidate(s).`,
+              `已导出的挖矿案例会生成防御候选，离线验证通过后才会写入版本注册表。当前 ${rsiCasesList.length} 个案例、${rsiCandidatesList.length} 个候选。`,
+            )}
+          </p>
+          <SelectField
+            label={t("Evidence case", "证据案例")}
+            value={selectedCase}
+            onChange={(event) => setSelectedCase(event.target.value)}
+            options={rsiCasesList.map((item) => ({
+              value: item.case_id,
+              label: `${item.case_id.slice(0, 12)}… · ${item.breach_classes.join(", ")} · ${item.turns} turns`,
+            }))}
+            placeholder={
+              rsiCasesList.length
+                ? t("Use every exported case", "使用全部已导出案例")
+                : t("No exported cases yet", "还没有导出的案例")
+            }
+            hint={t(
+              "Leave empty to propose from all exported cases",
+              "留空表示用全部已导出案例生成候选",
+            )}
+          />
+          <TextField
+            label={t("Parent agent version", "父版本")}
+            value={parentVersion}
+            onChange={(event) => setParentVersion(event.target.value)}
+            hint={t(
+              "Must be a version the platform can already load",
+              "必须是平台当前可加载的版本",
+            )}
+          />
+          <Button
+            block
+            loading={rsiBusy === "propose"}
+            disabled={!rsiCasesList.length}
+            iconLeft={<Shield size={14} />}
+            onClick={() => void proposeRepair()}
+          >
+            {t("Propose repair candidate", "生成修复候选")}
+          </Button>
+          {rsiLoaded && rsiCandidatesList.length > 0 && (
+            <div className="ops-contests">
+              {rsiCandidatesList.slice(0, 4).map((candidate) => (
+                <div className="ops-contests__row" key={candidate.candidate_id}>
+                  <span className="mono">{candidate.name}</span>
+                  <Badge tone={candidate.verified ? "live" : "neutral"}>
+                    {candidate.verified ? t("verified", "已验证") : t("unverified", "未验证")}
+                  </Badge>
+                  <div className="row-actions">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={rsiBusy === `verify:${candidate.candidate_id}`}
+                      onClick={() => void verifyRepair(candidate.candidate_id)}
+                    >
+                      {t("Verify", "验证")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!candidate.verified}
+                      loading={rsiBusy === `promote:${candidate.candidate_id}`}
+                      onClick={() => void promoteRepair(candidate.candidate_id)}
+                    >
+                      {t("Promote", "发布")}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel
+          eyebrow={t("Verification", "验证")}
+          title={t("Checks and evidence", "检查项与证据")}
+          bracket
+        >
+          {!verification && !promotion && (
+            <p className="position__hint">
+              {t(
+                "Verify a candidate to see the deterministic checks and the offline attack replay. Unsupported checks never count as a pass.",
+                "验证候选后会显示确定性检查与离线攻击回放结果。unsupported 不会被当作通过。",
+              )}
+            </p>
+          )}
+          {verification && (
+            <>
+              <p className="muted small">
+                {t(
+                  `${verification.passed ? "PASSED" : "NOT PASSED"} · ${verification.checks.filter((check) => check.status === "pass").length}/${verification.checks.length} checks passed`,
+                  `${verification.passed ? "已通过" : "未通过"} · ${verification.checks.filter((check) => check.status === "pass").length}/${verification.checks.length} 项检查通过`,
+                )}
+              </p>
+              <dl className="ops-kv">
+                {verification.checks.map((check) => (
+                  <div key={check.name}>
+                    <dt className="mono">{check.name}</dt>
+                    <dd>
+                      <Badge
+                        tone={
+                          check.status === "pass"
+                            ? "live"
+                            : check.status === "fail"
+                              ? "danger"
+                              : "warning"
+                        }
+                      >
+                        {check.status}
+                      </Badge>{" "}
+                      <span className="muted small">{check.detail}</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
+          {promotion && (
+            <div className="ops-result">
+              <p className="mono">VERSION {promotion.name}</p>
+              <p className="mono">DIGEST 0x{promotion.digest}</p>
+              <p className="muted small">
+                {promotion.created
+                  ? t(
+                      "New version registered. Create a mining contest with this name to open the next round; the defenseHash differs, so the previous one stays retired.",
+                      "新版本已注册。用这个版本名创建挖矿赛即可开下一轮；defenseHash 不同，旧 hash 仍保持退役。",
+                    )
+                  : t(
+                      "This candidate was already published; creating a contest will reuse it.",
+                      "该候选此前已发布；创建比赛会直接复用。",
+                    )}
+              </p>
             </div>
           )}
         </Panel>

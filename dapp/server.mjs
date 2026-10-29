@@ -46,6 +46,11 @@ function timingSafeEqual(left, right) {
 const ADMIN_ROUTES = [
   { method: "POST", pattern: /^\/api\/mining\/contests\/?$/ },
   { method: "POST", pattern: /^\/api\/data\/[^/]+\/publish\/?$/ },
+  // RSI repair loop mutates the defender version registry, so only an
+  // operator with the admin key may drive it from the browser.
+  { method: "POST", pattern: /^\/api\/rsi\/export\/?$/ },
+  { method: "POST", pattern: /^\/api\/rsi\/candidates\/?$/ },
+  { method: "POST", pattern: /^\/api\/rsi\/candidates\/[^/]+\/(verify|promote)\/?$/ },
 ];
 
 function isAdminRoute(req) {

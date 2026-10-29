@@ -40,7 +40,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from web3 import Web3
 
-from benchmark.interface import AgentVersion, load_version
+from benchmark.interface import VERSIONS_DIR, AgentVersion, load_version
 
 from ._jsonl import ensure_directory
 from .agent_tools import WalletTools
@@ -54,6 +54,8 @@ from .faucet_relay import FaucetClaimStore, FaucetRelayError, recover_claim_sign
 from .faucet_signer import FaucetSigner, FaucetSignerError
 from .indexer import ChainEventSource, EventIndexer, IndexerError, normalize_contest_id
 from .indexer_runner import IndexerRunner
+from .rsi_pipeline import RepairVerifier, RsiPipelineError, RsiService
+from .rsi_export import RsiExporter
 from .runner import AgentSession, RunnerStopped
 from .signatures import config_hash, recover_defender_registration
 from .byoa.egress import EgressError, load_declaration
@@ -258,6 +260,17 @@ class ByoaGenerateTasksRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     count: int = Field(ge=1, le=32)
     seed: str | None = Field(default=None, max_length=128)
+
+
+class RsiExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    contest_id: str = Field(min_length=66, max_length=66)
+
+
+class RsiProposeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    parent_version: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$")
+    case_ids: list[str] | None = Field(default=None, max_length=20)
 
 
 class ByoaPullReplyRequest(BaseModel):
@@ -1025,6 +1038,7 @@ def create_app(
     status_provider: Callable[[], dict[str, Any]] | None = None,
     lifespan: Callable[[FastAPI], Any] | None = None,
     byoa: ByoaService | None = None,
+    rsi: RsiService | None = None,
 ) -> FastAPI:
     if not isinstance(token, str) or not 24 <= len(token) <= 256:
         raise ValueError("API token must contain 24-256 characters")
@@ -1281,6 +1295,44 @@ def create_app(
                 tool_calls=payload.tool_calls,
                 metadata=payload.metadata,
             )
+
+    if rsi is not None:
+
+        @app.get("/rsi/cases", dependencies=[Depends(require_auth)])
+        def rsi_cases() -> dict[str, Any]:
+            return {"cases": rsi.cases()}
+
+        @app.post("/rsi/export", status_code=201, dependencies=[Depends(require_auth)])
+        def rsi_export(payload: RsiExportRequest) -> dict[str, Any]:
+            try:
+                return rsi.export_case(_contest_id(payload.contest_id))
+            except RsiPipelineError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+
+        @app.post("/rsi/candidates", status_code=201, dependencies=[Depends(require_auth)])
+        def rsi_propose(payload: RsiProposeRequest) -> dict[str, Any]:
+            try:
+                return rsi.propose(payload.parent_version, payload.case_ids)
+            except RsiPipelineError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+
+        @app.get("/rsi/candidates", dependencies=[Depends(require_auth)])
+        def rsi_candidates() -> dict[str, Any]:
+            return {"candidates": rsi.store.list()}
+
+        @app.post("/rsi/candidates/{candidate_id}/verify", dependencies=[Depends(require_auth)])
+        def rsi_verify(candidate_id: str) -> dict[str, Any]:
+            try:
+                return rsi.verify(candidate_id)
+            except RsiPipelineError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+
+        @app.post("/rsi/candidates/{candidate_id}/promote", dependencies=[Depends(require_auth)])
+        def rsi_promote(candidate_id: str) -> dict[str, Any]:
+            try:
+                return rsi.promote(candidate_id)
+            except RsiPipelineError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
 
     return app
 
@@ -1592,6 +1644,21 @@ def build_app(
         ),
         indexer=indexer,
     )
+
+    rsi_dir = settings.data_dir / "rsi"
+    replay_factory = platform_client_factory if settings.platform_model_provider else None
+    rsi_service = RsiService(
+        export_dir=rsi_dir,
+        candidate_root=rsi_dir / "candidates",
+        versions_dir=os.environ.get("PLATFORM_RSI_VERSIONS_DIR", "").strip()
+        or VERSIONS_DIR,
+        exporter=RsiExporter(
+            indexer,
+            settings.data_dir / "transcripts",
+            rsi_dir,
+        ),
+        verifier=RepairVerifier(client_factory=replay_factory),
+    )
     return create_app(
         service,
         settings.api_token,
@@ -1599,6 +1666,7 @@ def build_app(
         status_provider=indexer_status,
         lifespan=lifespan,
         byoa=byoa_service,
+        rsi=rsi_service,
     )
 
 

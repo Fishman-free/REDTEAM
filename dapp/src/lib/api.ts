@@ -383,6 +383,52 @@ export interface PublishResult {
   tx_hash: string;
 }
 
+export interface RsiCase {
+  case_id: string;
+  contest_id: string;
+  attacker: string;
+  breach_classes: string[];
+  turns: number;
+  path: string;
+  sha256: string;
+}
+
+export interface RsiCandidate {
+  candidate_id: string;
+  name: string;
+  parent: string;
+  digest: string;
+  case_ids: string[];
+  created_at: number;
+  verified: boolean;
+}
+
+export interface RsiCheck {
+  name: string;
+  status: "pass" | "fail" | "unsupported";
+  detail: string;
+}
+
+export interface RsiVerification {
+  candidate_id: string;
+  digest: string;
+  passed: boolean;
+  checks: RsiCheck[];
+  replays: Array<{
+    case_id: string;
+    status: string;
+    breached: boolean;
+    detail: string;
+  }>;
+  verified_at: number;
+}
+
+export interface RsiPromotion {
+  name: string;
+  digest: string;
+  created: boolean;
+}
+
 export const api = {
   meta() {
     return request<PlatformMeta>("/meta", {}, { timeoutMs: 10_000 });
@@ -549,6 +595,53 @@ export const api = {
       "/mining/contests",
       { method: "POST", body: JSON.stringify({ version }) },
       { timeoutMs: 120_000, adminKey },
+    );
+  },
+
+  rsiCases() {
+    return request<{ cases: RsiCase[] }>("/rsi/cases", {}, { timeoutMs: 15_000 });
+  },
+
+  rsiCandidates() {
+    return request<{ candidates: RsiCandidate[] }>("/rsi/candidates", {}, { timeoutMs: 15_000 });
+  },
+
+  rsiExport(contestId: string, adminKey?: string) {
+    return request<{ case_id: string; path: string; sha256: string }>(
+      "/rsi/export",
+      { method: "POST", body: JSON.stringify({ contest_id: contestId }) },
+      { timeoutMs: 45_000, adminKey },
+    );
+  },
+
+  rsiPropose(parentVersion: string, adminKey?: string, caseIds?: string[]) {
+    return request<RsiCandidate & { defense: unknown; evidence: unknown }>(
+      "/rsi/candidates",
+      {
+        method: "POST",
+        body: JSON.stringify(
+          caseIds && caseIds.length
+            ? { parent_version: parentVersion, case_ids: caseIds }
+            : { parent_version: parentVersion },
+        ),
+      },
+      { timeoutMs: 30_000, adminKey },
+    );
+  },
+
+  rsiVerify(candidateId: string, adminKey?: string) {
+    return request<RsiVerification>(
+      `/rsi/candidates/${encodeURIComponent(candidateId)}/verify`,
+      { method: "POST" },
+      { timeoutMs: 300_000, adminKey },
+    );
+  },
+
+  rsiPromote(candidateId: string, adminKey?: string) {
+    return request<RsiPromotion>(
+      `/rsi/candidates/${encodeURIComponent(candidateId)}/promote`,
+      { method: "POST" },
+      { timeoutMs: 30_000, adminKey },
     );
   },
 
