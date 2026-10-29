@@ -252,7 +252,7 @@ python -m unittest discover -s tests -p test_site_build.py -v
 - Windows 用户使用 Git Bash；
 - 首次启动需要联网下载镜像并构建，通常需要几分钟。
 
-在项目根目录执行：
+在项目根目录执行（把 `REDTEAM` 换成你实际克隆的目录名；不要照抄任何人的绝对路径）：
 
 ```bash
 git clone https://github.com/Fishman-free/REDTEAM.git
