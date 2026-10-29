@@ -5,3 +5,8 @@ index.html text eol=lf
 docs/site/*.html text eol=lf
 docs/site/*.css text eol=lf
 docs/site/*.js text eol=lf
+
+# Shell scripts run inside Linux build/runtime containers; keep LF on Windows checkouts.
+*.sh text eol=lf
+*.bash text eol=lf
+.gitattributes text eol=lf
