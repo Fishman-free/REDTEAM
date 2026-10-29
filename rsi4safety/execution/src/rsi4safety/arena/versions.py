@@ -228,7 +228,7 @@ class VersionStore:
 
     def get(self, version_id: str) -> AgentPackage:
         self._check_id(version_id)
-        payload = json.loads((self.manifests / f"{version_id}.json").read_text())
+        payload = json.loads((self.manifests / f"{version_id}.json").read_text(encoding="utf-8"))
         seal = payload.pop("manifest_digest", None)
         if seal != _digest(payload) or payload.get("version_id") != version_id:
             raise ValueError("package manifest integrity check failed")
@@ -246,12 +246,12 @@ class VersionStore:
         pointer = self.root / "ACTIVE"
         if not pointer.exists():
             return None
-        value = json.loads(pointer.read_text())
+        value = json.loads(pointer.read_text(encoding="utf-8"))
         package = self.get(value["version_id"])
         if value.get("package_digest") != package.package_digest:
             raise ValueError("ACTIVE content digest mismatch")
         receipt_path = self.root / "activations" / f"{value['activation_id']}.json"
-        receipt = json.loads(receipt_path.read_text())
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
         if (_digest(receipt) != value["activation_id"] or receipt.get("version_id") != package.version_id
                 or receipt.get("package_digest") != package.package_digest):
             raise ValueError("ACTIVE activation receipt mismatch")
@@ -457,7 +457,7 @@ class VersionStore:
             package = self.get(version_id)
             validated = False
             for path in (self.root / "activations").glob("*.json"):
-                record = json.loads(path.read_text())
+                record = json.loads(path.read_text(encoding="utf-8"))
                 if path.stem != _digest(record):
                     raise ValueError("activation receipt integrity check failed")
                 if (record.get("version_id") == version_id

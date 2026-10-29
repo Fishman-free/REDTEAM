@@ -1,7 +1,7 @@
 # 测试网部署 runbook（R4 新 ABI）
 
 `deploy-testnet.js` 在 Besu QBFT 测试网（chainId **48850 / 0xbed2**，零 gas）一次性部署
-Treasury、Arena、RTMToken、Faucet、DataMarket 五个合约，完成新挖矿 ABI 的 wiring、
+Treasury、Arena、RTMToken、Faucet、DataMarket 五个核心合约，以及 BYOA 的 TaskSink，完成新挖矿 ABI 的 wiring、
 注资与固定 **1 RTM** 挖矿结算烟测，把地址写入同目录的 `addresses.json`，并在写文件前
 断言全部关键状态。
 
@@ -12,7 +12,12 @@ Treasury、Arena、RTMToken、Faucet、DataMarket 五个合约，完成新挖矿
 > Faucet `0x042Bc6dfbc08ECe0Db7901b1d2D65a1F9ede35b3`、
 > DataMarket `0x9446F32556dE6E053F6E22205d7300f0ED1d28Fb`。
 > 它们绑定旧 ABI（`accrue`/`miningRate`/`approveSale`），不得再用于新挖矿/数据市场接口。
-> 以 R4 重新生成的 `contracts/deploy/addresses.json` 为准。
+
+> **地址的唯一来源（2026-10-29 起）**：运行中的栈只读 `rtm-registry` 卷里的
+> `/registry/addresses.json`，并通过 `GET /api/meta` 对外提供。仓库里的
+> `contracts/deploy/addresses.json` **不再提交**（已 gitignore）：每台机器的 `deploy/up.sh`
+> 都会用新生成的 key 部署，地址天然各不相同。它只是 `deploy/sync-registry.sh` 写出的
+> 本机副本，供本地工具和测试读取。字段结构参见 `addresses.example.json`（占位地址，不可发交易）。
 
 > **R4 审查修复（2026-10-28）**：本轮只加固部署脚本/runbook 并补充登记字段，
 > **未重新部署**。链上地址、`totalSupply=1,000,004`、Treasury 3 RTM、
@@ -48,9 +53,9 @@ BESU_TESTNET_KEY="$(tr -d '\r\n' < ../infra/besu-testnet/keydir/key)" \
 npx hardhat run deploy/deploy-testnet.js --network besu-testnet
 ```
 
-- 本仓库自带 `contracts/deploy/addresses.json`，因此**首次/再次部署都必须显式设置
-  `DEPLOY_ALLOW_REDEPLOY=1`（或先删除该文件）**；仅全新、没有该文件的检出首次部署
-  才可省略。脚本在该文件存在且未显式允许时会直接拒绝，不会覆盖旧登记。
+- 如果本机已有 `contracts/deploy/addresses.json`（例如运行过 `deploy/sync-registry.sh`），
+  再次部署必须显式设置 `DEPLOY_ALLOW_REDEPLOY=1`（或先删除该文件）。脚本在该文件存在
+  且未显式允许时会直接拒绝，不会覆盖旧登记。
 - Hardhat 的 `accounts` 接受带或不带 `0x` 前缀的私钥；`keydir/key` 本身已带 `0x`，
   直接 `tr -d '\r\n'` 注入即可。**不要 echo/tee 私钥，不要把 key 写进任何文件。**
 - 零 gas 网络，部署账户余额为 0 也能成功（`gasPrice: 0`）。
@@ -105,8 +110,12 @@ ownership 在全部注资/烟测完成后才转移，避免提前转移导致 de
 two-step ownership（`Ownable2Step`）或由多签确认接收。当前五合约为单步 `Ownable`，
 一旦转错不可回滚。
 
-## 新 ABI 口径（R2/R3/R4）
+## 新 ABI 口径（R2/R3/R4/BYOA）
 
+- TaskSink：`issueTask`（operator 或该场 TEE signer）、`expireTask`（任何人）、
+  `consume`（仅 RTMToken 在 `_update` 靶分支调用）；Arena `setTaskSink` 只能设置一次。
+- Arena：`createByoaContest(ByoaParams,bytes defenderSig,bytes teeSig)`、
+  `markDelivered(cid,attacker,msgHash,replyHash)`、`byoaContestInfo(cid)`。
 - Arena：`createMiningContest(address wallet, bytes32 defenseHash)`、
   `joinMining(bytes32 id, bool acceptData)`、`join(bytes32 id, uint256 maxStake, bool dataConsent)`、
   `retireMining(bytes32 id)`、`dataConsent(bytes32 id, address who)`。
@@ -194,7 +203,7 @@ W 的剩余余额 `rest=0`，没有实际执行 `controllerTransfer` 扫尾；�
 全部断言通过后才写入（覆盖前先通过重部署保护）。字段：
 
 `network`、`chainId`、`rpc`、`deployer`、`platform`、`operator`、`ticketSigner`、
-`treasury`、`arena`、`rtm`、`faucet`、`dataMarket`、`faucetDrip`、`faucetFunding`、
+`treasury`、`arena`、`rtm`、`faucet`、`dataMarket`、`taskSink`、`faucetDrip`、`faucetFunding`、
 `treasuryMiningFund`、`refundAllowance`、`miningReward`、`miningFeeBps`、
 `totalSupply`、`smokeMining`、`smokeDefenseHash`、`smokeContestId`、`smokeTxHash`、
 `deployedAt`（ISO 8601）。
@@ -224,7 +233,10 @@ R4 默认值示例：
 - 后端/dApp/indexer 读取地址时不得把这三项误当业务数据；任务 13/17 需排除该
   烟测赛与部署注水 mint。
 - 金额为十进制 RTM 字符串；`miningFeeBps` 为数字。
-- 该文件用于后端/dApp 对齐地址，**不包含任何私钥**，随仓库提交。
+- 该文件**不包含任何私钥**，但也**不随仓库提交**：Docker 栈中由 `deploy-contracts.sh`
+  复制到 `rtm-registry` 卷，API 与 dApp 都只认这一份（dApp 经 `/api/meta`）。
+  registry 已存在时，`deploy/check-registry.mjs` 会核对 chainId 和核心 5 个地址（以及存在时的 `taskSink`）上的合约代码，
+  不一致就拒绝启动，不会自动重部署。
 
 ## 重部署保护
 

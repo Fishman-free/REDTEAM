@@ -569,7 +569,7 @@ describe('Arena 罚款曲线与 pause 时钟', function () {
     // 这里断言现状（暂停中允许记录送达），不修改合约。
     await expect(arena.connect(operator).markDelivered(id, attackerA.address, deliveredHash))
       .to.emit(arena, 'MarkDelivered')
-      .withArgs(id, attackerA.address, deliveredHash, 1n);
+      .withArgs(id, attackerA.address, deliveredHash, 1n, ethers.ZeroHash);
     expect((await arena.attackers(id, attackerA.address)).delivered).to.equal(1n);
 
     await arena.connect(operator).unpause(id);

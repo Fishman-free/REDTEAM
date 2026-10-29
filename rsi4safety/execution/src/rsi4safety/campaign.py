@@ -109,10 +109,10 @@ class ExperimentRunner:
         runtime = {
             "model": self.config.model, "base_url": self.config.base_url,
             "prompt_version": PROMPT_VERSION,
-            "code_hash": stable_hash({p.name: p.read_text() for p in Path(__file__).parent.glob("*.py")}),
+            "code_hash": stable_hash({p.name: p.read_text(encoding="utf-8") for p in Path(__file__).parent.glob("*.py")}),
         }
         fingerprint_path = self.state_dir / "runtime.json"
-        if fingerprint_path.exists() and json.loads(fingerprint_path.read_text()) != runtime:
+        if fingerprint_path.exists() and json.loads(fingerprint_path.read_text(encoding="utf-8")) != runtime:
             raise ValueError("runtime/model changed; use a new state directory for a comparable experiment")
         fingerprint_path.write_text(json.dumps(runtime, indent=2), encoding="utf-8")
         self.report["runtime"] = runtime

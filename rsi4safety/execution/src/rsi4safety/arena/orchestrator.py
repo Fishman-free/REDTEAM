@@ -89,7 +89,7 @@ class ArenaOrchestrator(ExecutionCacheMixin, AdjudicationMixin, PromotionMixin):
     def _checkpoint_before_round(self, index: int) -> None:
         path = self.config.state_dir / "round-checkpoint.json"
         if path.exists():
-            saved = json.loads(path.read_text())
+            saved = json.loads(path.read_text(encoding="utf-8"))
             self.versions.rollback(saved["version"], reason="recover interrupted round")
             self.versions.materialize_source(saved["version"], self.config.sut_dir)
             self._sut_version = saved["version"]

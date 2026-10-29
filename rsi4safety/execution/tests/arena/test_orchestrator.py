@@ -145,12 +145,12 @@ class ArenaProtocolTests(unittest.TestCase):
         self.assertEqual(first["status"], "stopped")
         self.assertEqual(len(first["rounds"]), 1)
         chain_path = config.audit_dir / "chain.jsonl"
-        self.assertNotIn('"resume"', chain_path.read_text())
+        self.assertNotIn('"resume"', chain_path.read_text(encoding="utf-8"))
         # Rerun with the same config resumes at round 2 instead of repeating round 1.
         second = ArenaOrchestrator(config, runtime=StubAgentRuntime()).run()
         self.assertEqual(second["status"], "completed", second.get("stop_reason"))
         self.assertEqual(len(second["rounds"]), 2)
-        chain = chain_path.read_text()
+        chain = chain_path.read_text(encoding="utf-8")
         self.assertIn('"resume"', chain)
         # Repeated executions come from the cache, not from new SUT runs.
         self.assertIn('"execution_cache_hit"', chain)
@@ -159,7 +159,7 @@ class ArenaProtocolTests(unittest.TestCase):
         # A fully completed campaign rerun is a no-op, not a repeat.
         third = ArenaOrchestrator(config, runtime=StubAgentRuntime()).run()
         self.assertEqual(len(third["rounds"]), 2)
-        self.assertIn('"resume_noop"', chain_path.read_text())
+        self.assertIn('"resume_noop"', chain_path.read_text(encoding="utf-8"))
 
     def test_programmatic_judging_is_default_and_reproducibility_gated(self) -> None:
         config = _config(self.tmp, "it-judge")

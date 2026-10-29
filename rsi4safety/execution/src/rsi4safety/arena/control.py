@@ -72,7 +72,7 @@ def extract_source(archive: Path, target: Path) -> None:
 
 def verify_evidence(directory: Path) -> tuple[bool, str]:
     try:
-        manifest = json.loads((directory / "manifest.json").read_text())
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         expected = "ev-" + digest({k: v for k, v in manifest.items() if k != "evidence_id"})[:12]
         if manifest["evidence_id"] != expected or directory.name != expected:
             return False, "evidence manifest identity mismatch"

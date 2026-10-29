@@ -14,8 +14,8 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import type { Address } from "viem";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount, useChainId, useSignTypedData } from "wagmi";
+import { keccak256, stringToBytes, type Address } from "viem";
 import { api, type DefenderEntry } from "../lib/api";
 import { arenaAbi, rtmAbi } from "../lib/contracts";
 import {
@@ -33,6 +33,7 @@ import {
   useAllowance,
   useContestsQuery,
   useLeaderboardsQuery,
+  requireAddresses,
   usePlatform,
   useRtmBalance,
 } from "../lib/platform";
@@ -207,7 +208,8 @@ function DefenseRow({
 export default function Defend() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { meta } = usePlatform();
+  const { meta, addresses } = usePlatform();
+  const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useArenaWriteContract();
   const { trackTransaction } = useActivity();
   const { toast } = useToast();
@@ -215,7 +217,7 @@ export default function Defend() {
   const contestsQuery = useContestsQuery();
   const boardsQuery = useLeaderboardsQuery();
   const balance = useRtmBalance(address);
-  const allowance = useAllowance(address, meta.addresses.arena);
+  const allowance = useAllowance(address, addresses?.arena);
   const [registration, setRegistration] = useLocalStorage<DefenderRegistration | null>(
     defenderStorageKey(address),
     null,
@@ -298,14 +300,59 @@ export default function Defend() {
       setRegisterError(t("Select or enter a provider.", "请选择或填写 provider。"));
       return;
     }
+    const arena = addresses?.arena;
+    if (!arena) {
+      setRegisterError(
+        t(
+          "Contract addresses are unavailable; wait for the platform API.",
+          "合约地址不可用，请等待平台 API 恢复。",
+        ),
+      );
+      return;
+    }
     setRegistering(true);
     try {
+      const providerName = provider.trim();
+      const defensePrompt = prompt.trim();
+      const mandateText = mandate.trim();
+      // Matches redteam_platform.signatures.config_hash: provider\0prompt\0mandate.
+      const configHash = keccak256(
+        stringToBytes(`${providerName}\u0000${defensePrompt}\u0000${mandateText}`),
+      );
+      const nonce = Date.now();
+      const deadline = Math.floor(Date.now() / 1000) + 900;
+      const signature = await signTypedDataAsync({
+        domain: {
+          name: "RTM Arena",
+          version: "1",
+          chainId,
+          verifyingContract: arena as Address,
+        },
+        types: {
+          DefenderRegistration: [
+            { name: "defender", type: "address" },
+            { name: "configHash", type: "bytes32" },
+            { name: "nonce", type: "uint64" },
+            { name: "deadline", type: "uint64" },
+          ],
+        },
+        primaryType: "DefenderRegistration",
+        message: {
+          defender: address,
+          configHash,
+          nonce: BigInt(nonce),
+          deadline: BigInt(deadline),
+        },
+      });
       const result = await api.registerDefender({
         defender: address,
-        provider: provider.trim(),
+        provider: providerName,
         api_key: apiKey.trim(),
-        defense_prompt: prompt.trim(),
-        mandate: mandate.trim(),
+        defense_prompt: defensePrompt,
+        mandate: mandateText,
+        nonce,
+        deadline,
+        signature,
       });
       setRegistration({
         wallet: result.wallet,
@@ -371,10 +418,10 @@ export default function Defend() {
     try {
       if ((allowance.data ?? 0n) < stakeWei) {
         const approvalHash = await writeContractAsync({
-          address: meta.addresses.rtm as Address,
+          address: requireAddresses(addresses).rtm,
           abi: rtmAbi,
           functionName: "approve",
-          args: [meta.addresses.arena as Address, stakeWei],
+          args: [requireAddresses(addresses).arena, stakeWei],
         });
         await trackTransaction(approvalHash, t("Approve defender stake", "授权守方质押"), "approve");
       }
@@ -407,7 +454,7 @@ export default function Defend() {
     setActionBusy(`${contestId}:${action}`);
     try {
       const hash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: action === "settle" ? "expire" : "collectPenalties",
         args: [contestId as `0x${string}`],

@@ -89,7 +89,11 @@ def _env_path(env: Mapping[str, str], name: str, default: Path) -> Path:
 
 def _read_addresses(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        raise ConfigError(f"addresses file not found: {path}")
+        raise ConfigError(
+            f"addresses file not found: {path}; it is a gitignored copy of the "
+            "running registry: run `bash deploy/up.sh` (or `bash deploy/sync-registry.sh`) "
+            f"or set {ENV_ADDRESSES_PATH}"
+        )
     try:
         with path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)

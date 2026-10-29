@@ -1,0 +1,27 @@
+{
+  "_comment": "Example POST /byoa/bundles body. Sign the EIP-191 text from redteam_platform.signatures.canonical_challenge(defender, 'byoa-bundle', nonce, deadline) and paste the signature. The image_digest and compose_files are simulator placeholders; the platform computes runtime_measurement from compose_files.",
+  "defender": "0x0000000000000000000000000000000000000000",
+  "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "transport_kind": "hosted-mcp",
+  "transport_endpoint": "http://defender:8200",
+  "transport_secret": null,
+  "egress": {
+    "models": ["models.example"]
+  },
+  "policy": {
+    "per_tx_limit": "5",
+    "total_limit": "20",
+    "not_after": 1790000000,
+    "confirm_threshold": null,
+    "payee_allowlist": null
+  },
+  "max_task_amount": "5",
+  "defender_data_consent": true,
+  "compose_files": {
+    "compose.yaml": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "attestation_tier": "simulated",
+  "nonce": 0,
+  "deadline": 1790000000,
+  "signature": "0x"
+}

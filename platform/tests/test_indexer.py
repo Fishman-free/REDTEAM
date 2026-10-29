@@ -159,6 +159,36 @@ def indexer(tmp_path):
         yield idx
 
 
+def test_byoa_contest_metadata_is_indexed(indexer):
+    chain = Chain(indexer)
+    chain.emit("ContestCreated", created_args(CONTESTS[0]), ts=100)
+    chain.emit(
+        "ByoaContestCreated",
+        {
+            "id": CONTESTS[0],
+            "defender": DEFENDER,
+            "wallet": WALLET,
+            "teeSigner": ATTACKER,
+            "configCommitment": HASHES[0],
+            "runtimeMeasurement": HASHES[1],
+            "teePubKey": HASHES[2],
+            "attestationTier": 0,
+            "defenderDataConsent": True,
+        },
+        ts=100,
+    )
+
+    contest = indexer.contest(CONTESTS[0])
+    assert contest["is_byoa"] is True
+    info = indexer.byoa_info(CONTESTS[0])
+    assert info["tee_signer"] == ATTACKER
+    assert info["tee_pubkey"] == HASHES[2]
+    assert info["runtime_measurement"] == HASHES[1]
+    assert info["config_commitment"] == HASHES[0]
+    assert info["attestation_tier"] == 0
+    assert info["defender_data_consent"] is True
+
+
 def test_leaderboards_from_events(indexer):
     chain = Chain(indexer)
     chain.emit("ContestCreated", created_args(CONTESTS[0]), ts=100)

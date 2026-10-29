@@ -17,7 +17,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: rsi4safety
@@ -33,7 +33,8 @@ jobs:
         working-directory: contracts
         run: python -m pytest tests -q
       - name: RSI Python and Arena suites (including promotion, resume and rollback)
-        timeout-minutes: 20
+        # ~850 real SUT subprocess runs; Windows runners need headroom over 20 min.
+        timeout-minutes: 30
         run: python -m pytest execution/tests -q --durations=15 -o faulthandler_timeout=120
       - name: PayGate suite (isolated app import)
         working-directory: rsi4safety/payment_agents/paygate
@@ -78,7 +79,7 @@ jobs:
       - name: Contract and payment-agent suites
         run: npm test
       - name: New RTM game contract suite
-        run: npx hardhat test test/arena.test.js test/arena-penalty.test.js test/arena-fuzz.test.js test/faucet.test.js test/datamarket.test.js test/rtm-game.test.js
+        run: npx hardhat test test/arena.test.js test/arena-penalty.test.js test/arena-fuzz.test.js test/faucet.test.js test/datamarket.test.js test/rtm-game.test.js test/byoa.test.js
       - name: Nontransferable flower demo (local synthetic evidence only)
         run: npm run flower:demo
       - name: Single-turn payment demo (offline)

@@ -14,6 +14,7 @@ class SutCleanupTests(unittest.TestCase):
     def test_windows_kills_full_tree_even_on_initial_stop(self):
         process = Mock(pid=12345)
         with patch('rsi4safety.arena.sut_driver.os.name', 'nt'), \
+                patch('rsi4safety.arena.sut_driver._uses_windows_venv_launcher', return_value=True), \
                 patch('rsi4safety.arena.sut_driver.subprocess.run') as run:
             run.return_value.returncode = 0
             _terminate_process_tree(process, force=False)
@@ -24,6 +25,7 @@ class SutCleanupTests(unittest.TestCase):
         process = Mock(pid=12345)
         process.poll.return_value = None
         with patch('rsi4safety.arena.sut_driver.os.name', 'nt'), \
+                patch('rsi4safety.arena.sut_driver._uses_windows_venv_launcher', return_value=True), \
                 patch('rsi4safety.arena.sut_driver.subprocess.run') as run:
             run.return_value.returncode = 1
             run.return_value.stderr = b'Access is denied'
@@ -35,10 +37,20 @@ class SutCleanupTests(unittest.TestCase):
         process = Mock(pid=12345)
         process.poll.return_value = None
         with patch('rsi4safety.arena.sut_driver.os.name', 'nt'), \
+                patch('rsi4safety.arena.sut_driver._uses_windows_venv_launcher', return_value=True), \
                 patch('rsi4safety.arena.sut_driver.subprocess.run',
                       side_effect=subprocess.TimeoutExpired(['taskkill'], 5)):
             with self.assertRaisesRegex(RuntimeError, 'timed out after 5s'):
                 _terminate_process_tree(process, force=True)
+
+    def test_windows_without_launcher_kills_the_single_process_directly(self):
+        process = Mock(pid=12345)
+        with patch('rsi4safety.arena.sut_driver.os.name', 'nt'), \
+                patch('rsi4safety.arena.sut_driver._uses_windows_venv_launcher', return_value=False), \
+                patch('rsi4safety.arena.sut_driver.subprocess.run') as run:
+            _terminate_process_tree(process, force=False)
+        run.assert_not_called()
+        process.kill.assert_called_once_with()
 
     @unittest.skipUnless(os.name == 'nt', 'Windows venv process-tree regression')
     def test_config_exposes_bounded_sut_execution_timeout(self):

@@ -55,7 +55,12 @@ class FakeEvents:
     def __getattr__(self, name):
         return SimpleNamespace(
             process_receipt=lambda receipt, **kwargs: [
-                {"args": {"id": bytes.fromhex(CONTEST[2:])}}
+                {
+                    "args": {
+                        "id": bytes.fromhex(CONTEST[2:]),
+                        "taskId": bytes.fromhex(MSG_HASH[2:]),
+                    }
+                }
             ]
         )
 
@@ -64,6 +69,9 @@ class FakeContract:
     def __init__(self, eth):
         self.functions = FakeFunctions(eth)
         self.events = FakeEvents(eth)
+
+    def get_function_by_signature(self, signature):
+        return getattr(self.functions, signature.split("(", 1)[0])
 
 
 class FakeSigner:
@@ -113,6 +121,7 @@ def make_gateway(tmp_path, *, operator_key=None):
         "Arena": FakeContract(eth),
         "RTMToken": FakeContract(eth),
         "Treasury": FakeContract(eth),
+        "TaskSink": FakeContract(eth),
     }
     gateway = Web3ChainGateway(
         FakeW3(eth),
@@ -184,6 +193,67 @@ def test_mark_delivered_and_faults_build_expected_args(tmp_path):
     assert eth.builds[1][1] == (bytes.fromhex(CONTEST[2:]),)
 
 
+def test_byoa_creation_task_and_utility_breach_build_expected_args(tmp_path):
+    gateway, eth, _audited, _operator, _owner, _wallet = make_gateway(tmp_path)
+    params = {
+        "defender": DEFENDER,
+        "wallet": WALLET,
+        "teeSigner": DEFENDER,
+        "stake": 50 * ONE,
+        "duration": 24 * 3600,
+        "stakeBps": 1000,
+        "configCommitment": DEFENSE_HASH,
+        "runtimeMeasurement": DEFENSE_HASH,
+        "teePubKey": DEFENSE_HASH,
+        "attestationTier": 0,
+        "defenderDataConsent": True,
+        "utilityMissThreshold": 1,
+        "utilityPenaltyBps": 1000,
+        "nonce": 0,
+        "deadline": 2**64 - 1,
+    }
+
+    contest_id, tx = gateway.create_byoa_contest(
+        params, "0x" + "11" * 65, "0x" + "22" * 65
+    )
+    assert contest_id == CONTEST and tx == "0xtxhash"
+    name, args, _params = eth.builds[0]
+    assert name == "createByoaContest"
+    assert len(args) == 3
+    assert args[0] == (
+        DEFENDER,
+        WALLET,
+        DEFENDER,
+        50 * ONE,
+        24 * 3600,
+        1000,
+        bytes.fromhex(DEFENSE_HASH[2:]),
+        bytes.fromhex(DEFENSE_HASH[2:]),
+        bytes.fromhex(DEFENSE_HASH[2:]),
+        0,
+        True,
+        1,
+        1000,
+        0,
+        2**64 - 1,
+    )
+    assert args[1] == bytes([0x11]) * 65
+    assert args[2] == bytes([0x22]) * 65
+
+    task_id, _tx = gateway.issue_task(CONTEST, ONE, 2**64 - 2, DEFENSE_HASH)
+    assert task_id == MSG_HASH
+    assert eth.builds[1][0] == "issueTask"
+    assert eth.builds[1][1] == (
+        bytes.fromhex(CONTEST[2:]),
+        ONE,
+        2**64 - 2,
+        bytes.fromhex(DEFENSE_HASH[2:]),
+    )
+
+    assert gateway.report_byoa_utility_breach(CONTEST) == "0xtxhash"
+    assert eth.builds[2][0] == "reportByoaUtilityBreach"
+
+
 def test_treasury_withdraw_uses_owner_entry_and_audits(tmp_path):
     gateway, eth, audited, _operator, owner, _wallet = make_gateway(tmp_path)
 
@@ -245,6 +315,7 @@ def test_contest_info_and_reads(tmp_path):
         False,
         3,
         False,
+        False,
     )
     eth.values["activeMiningCount"] = 2
     eth.values["retiredDefenseHash"] = True
@@ -260,6 +331,7 @@ def test_contest_info_and_reads(tmp_path):
     assert info["stake_bps"] == 1000
     assert info["state"] == 0
     assert info["is_mining"] is False
+    assert info["is_byoa"] is False
     assert info["attacker_count"] == 3
     assert gateway.active_mining_count() == 2
     assert gateway.defense_hash_retired(DEFENSE_HASH) is True

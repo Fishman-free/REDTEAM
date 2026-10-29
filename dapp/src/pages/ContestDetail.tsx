@@ -46,6 +46,7 @@ import {
   useContestQuery,
   useDataConsent,
   useIsAttacker,
+  requireAddresses,
   usePlatform,
   useRemainingStake,
   useRtmBalance,
@@ -110,7 +111,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
   const detail = query.data;
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { meta } = usePlatform();
+  const { meta, addresses } = usePlatform();
   const { writeContractAsync } = useArenaWriteContract();
   const { trackTransaction } = useActivity();
   const { toast } = useToast();
@@ -119,7 +120,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
   const isAttacker = useIsAttacker(contestId, address);
   const remaining = useRemainingStake(contestId, address);
   const consent = useDataConsent(contestId, address);
-  const allowance = useAllowance(address, meta.addresses.arena);
+  const allowance = useAllowance(address, addresses?.arena);
   const balance = useRtmBalance(address);
   const [joinOpen, setJoinOpen] = useState(false);
   const [miningIntent, setMiningIntent] = useState<string | null>(null);
@@ -206,7 +207,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
       const approveAmount = BigInt(intent.approve.amount);
       if ((allowance.data ?? 0n) < approveAmount) {
         const approvalHash = await writeContractAsync({
-          address: meta.addresses.rtm as Address,
+          address: requireAddresses(addresses).rtm,
           abi: rtmAbi,
           functionName: "approve",
           args: [intent.approve.spender as Address, approveAmount],
@@ -218,7 +219,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
         );
       }
       const joinHash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: "join",
         args: [
@@ -278,7 +279,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
     setJoinError("");
     try {
       const hash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: "joinMining",
         args: [contest.id as `0x${string}`, true],
@@ -307,7 +308,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
     setActionError("");
     try {
       const hash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: "expire",
         args: [contest.id as `0x${string}`],
@@ -336,7 +337,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
     setActionError("");
     try {
       const hash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: "withdrawStake",
         args: [contest.id as `0x${string}`],
@@ -364,7 +365,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
     setActionError("");
     try {
       const hash = await writeContractAsync({
-        address: meta.addresses.arena as Address,
+        address: requireAddresses(addresses).arena,
         abi: arenaAbi,
         functionName: "collectPenalties",
         args: [contest.id as `0x${string}`],

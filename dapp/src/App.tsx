@@ -4,6 +4,7 @@ import Overview from "./pages/Overview";
 import Arena from "./pages/Arena";
 import ContestDetail from "./pages/ContestDetail";
 import Defend from "./pages/Defend";
+import Byoa from "./pages/Byoa";
 import Mine from "./pages/Mine";
 import Leaderboard from "./pages/Leaderboard";
 import Market from "./pages/Market";
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="arena" element={<Arena />} />
         <Route path="arena/:contestId" element={<ContestDetail mode="arena" />} />
         <Route path="defend" element={<Defend />} />
+        <Route path="byoa" element={<Byoa />} />
         <Route path="mine" element={<Mine />} />
         <Route path="mine/:contestId" element={<ContestDetail mode="mine" />} />
         <Route path="leaderboard" element={<Leaderboard />} />

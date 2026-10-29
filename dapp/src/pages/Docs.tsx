@@ -454,8 +454,8 @@ export default function Docs() {
                 <summary>{t("API offline or contract calls fail", "API 离线或合约读取失败")}</summary>
                 <p>
                   {t(
-                    "Confirm the local stack is running, the API health endpoint responds, and the Besu RPC is producing blocks. If you reset the chain, also reset addresses/registry volumes; otherwise the API will point at old contracts.",
-                    "确认本地栈正在运行、API 健康检查有响应、Besu RPC 在出块。如果重置了链，也必须同时重置地址/registry 数据卷，否则 API 会指向旧合约。",
+                    "Confirm the local stack is running, the API health endpoint responds, and the Besu RPC is producing blocks. Contract addresses come only from the API, so on-chain reads and writes pause while it is offline. If you reset the chain, also reset the registry volume: the stack refuses to start when the registry has no code on the chain.",
+                    "确认本地栈正在运行、API 健康检查有响应、Besu RPC 在出块。合约地址只从 API 获取，API 离线时链上读写会暂停。如果重置了链，也必须同时重置 registry 数据卷：registry 里的地址在链上没有合约代码时，栈会拒绝启动。",
                   )}
                 </p>
               </details>

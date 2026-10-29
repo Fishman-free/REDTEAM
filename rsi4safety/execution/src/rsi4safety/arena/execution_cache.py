@@ -33,7 +33,7 @@ class ExecutionCacheMixin:
         if not path.exists():
             return None
         try:
-            entry = json.loads(path.read_text())
+            entry = json.loads(path.read_text(encoding="utf-8"))
             if entry["key"] != key or entry["digest"] != digest(entry["payload"]):
                 return None
         except (ValueError, KeyError, TypeError):

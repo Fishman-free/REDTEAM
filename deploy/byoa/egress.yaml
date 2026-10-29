@@ -1,0 +1,56 @@
+# Minimal Envoy egress proxy for the BYOA simulator.
+#
+# Only hosts listed in the defender's public egress declaration may be
+# reached.  The platform validates the declaration; this file is the runtime
+# enforcement point inside the CVM.  Replace `models.example` and
+# `risk.example` with the declared hosts (or render this file from the
+# manifest in the S5 build).
+static_resources:
+  listeners:
+    - name: sealed_egress
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8080 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: byoa_egress
+                route_config:
+                  name: allowlist
+                  virtual_hosts:
+                    - name: declared_models
+                      domains: ["models.example"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route: { cluster: models }
+                    - name: declared_oracles
+                      domains: ["risk.example"]
+                      routes:
+                        - match: { prefix: "/check" }
+                          route: { cluster: oracle }
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: models
+      connect_timeout: 5s
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: models
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: models.example, port_value: 443 }
+    - name: oracle
+      connect_timeout: 5s
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: oracle
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: risk.example, port_value: 443 }
