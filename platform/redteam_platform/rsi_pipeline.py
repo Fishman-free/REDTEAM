@@ -672,6 +672,10 @@ class RepairVerifier:
                     wallet_address=self.wallet_address,
                     content=content,
                     channel="external",
+                    # 平台在真实回合里会把 claimed_sender 设成攻方地址；
+                    # 回放必须一致，否则模型可能因为没有兜底地址而"看起来安全"，
+                    # 把无效修复判成通过。
+                    claimed_sender=case.attacker,
                     messages=messages,
                 )
             except Exception as exc:  # model/protocol failure is not a pass
