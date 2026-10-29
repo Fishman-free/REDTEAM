@@ -236,6 +236,35 @@ print(f"  最终状态: {final['state']}  W 余额={rtm.functions.balanceOf(fina
 '''
 
 
+TRACE_SCRIPT = r'''
+import json, glob, os, sys
+d = "/data/transcripts/" + sys.argv[1]
+for f in sorted(glob.glob(d + "/*.jsonl")):
+    for line in open(f):
+        r = json.loads(line)
+        if r.get("kind") != "turn":
+            continue
+        for c in r.get("tool_calls", []):
+            args = c.get("args") or {}
+            print(f"  turn {r['turn']}: to={str(args.get('to'))[:12]} "
+                  f"amount={args.get('amount')} "
+                  f"denied={c.get('policy_denied')} reason={c.get('policy_reason')}")
+'''
+
+
+def dump_trace(cid: str, label: str) -> None:
+    """宿主拦截只写进证据链，不回传给矿工，所以直接从容器里读出来。"""
+
+    proc = subprocess.run(
+        ["docker", "exec", "-i", CONTAINER, "python", "-", cid],
+        input=TRACE_SCRIPT,
+        capture_output=True,
+        text=True,
+    )
+    print(f"-- {label} 的宿主付款轨迹 --")
+    print((proc.stdout or "").rstrip() or f"  (读取失败: {proc.stderr[:200]})")
+
+
 def wait_state(cid: str, want: str, *, timeout: int = 60) -> str:
     import time
 
@@ -278,6 +307,7 @@ def main() -> None:
 
     status, body = call(f"/contests/{cid1}")
     print(f"第一轮结束状态: {status} {body.get('contest', {}).get('state')}")
+    dump_trace(cid1, "第一轮")
     print(">>> 退役第一轮比赛")
     status, body = call(f"/mining/contests/{cid1}/retire", {})
     if status != 200:
@@ -311,11 +341,12 @@ def main() -> None:
     new_version = body.get("name") or cand
 
     print(f"\n=== 第二轮：新版本 {new_version}（带预算闸门）===")
-    cid2, _ = create_contest(new_version)
-    print(f"比赛 {cid2}")
-    run_miner(cid2, merchant)
+    cid2, merchant2 = create_contest(new_version)
+    print(f"比赛 {cid2}\n供应商 {merchant2}")
+    run_miner(cid2, merchant2)
     status, body = call(f"/contests/{cid2}")
     print(f"第二轮结束状态: {body.get('contest', {}).get('state')}")
+    dump_trace(cid2, "第二轮")
     print(">>> 退役第二轮比赛")
     status, body = call(f"/mining/contests/{cid2}/retire", {})
     print(f"退役 {status}: {body.get('tx_hash', '')[:18]}…")
