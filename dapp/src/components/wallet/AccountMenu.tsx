@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  BookOpen,
   ChevronDown,
   Copy,
   Droplets,
@@ -14,6 +15,7 @@ import { Identicon } from "./Identicon";
 import { useOnClickOutside, useCopy } from "../../lib/hooks";
 import { usePlatform, useRtmBalance } from "../../lib/platform";
 import { CHAIN_ID, ensureChain, isSupportedChain } from "../../lib/chain";
+import { useI18n } from "../../lib/i18n";
 import { errorText, formatRtm, shortAddr } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
 import { Badge } from "../ui/Badge";
@@ -24,6 +26,7 @@ export function AccountMenu() {
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { meta } = usePlatform();
+  const { t } = useI18n();
   const rtm = useRtmBalance(address);
   const native = useBalance({ address, query: { enabled: Boolean(address) } });
   const [open, setOpen] = useState(false);
@@ -44,7 +47,11 @@ export function AccountMenu() {
       try {
         await ensureChain();
       } catch {
-        toast({ title: "切换网络失败", description: errorText(reason), tone: "error" });
+        toast({
+          title: t("Network switch failed", "切换网络失败"),
+          description: errorText(reason),
+          tone: "error",
+        });
       }
     } finally {
       setSwitching(false);
@@ -64,7 +71,9 @@ export function AccountMenu() {
         <span className="account__trigger-text">
           <span className="account__address mono">{shortAddr(address)}</span>
           <span className={`account__network ${isSupportedChain(chainId) ? "" : "is-wrong"}`}>
-            {isSupportedChain(chainId) ? meta.network : `错误网络 #${chainId}`}
+            {isSupportedChain(chainId)
+              ? meta.network
+              : t(`Wrong network #${chainId}`, `错误网络 #${chainId}`)}
           </span>
         </span>
         <ChevronDown size={14} className={open ? "rotate-180" : ""} />
@@ -82,18 +91,18 @@ export function AccountMenu() {
                 onClick={() => void copy(address)}
               >
                 <Copy size={11} />
-                {copied ? "已复制" : "复制完整地址"}
+                {copied ? t("Copied", "已复制") : t("Copy full address", "复制完整地址")}
               </button>
             </div>
           </div>
 
           <div className="account__balances">
             <div>
-              <span>RTM 余额</span>
+              <span><span className="preserve-case">tRTM</span> {t("balance", "余额")}</span>
               <strong className="tabular">{formatRtm(rtm.data)}</strong>
             </div>
             <div>
-              <span>Gas（G）</span>
+              <span>{t("Gas (G)", "Gas（G）")}</span>
               <strong className="tabular">
                 {native.data ? `${Number(native.data.formatted).toFixed(3)}` : "—"}
               </strong>
@@ -101,7 +110,7 @@ export function AccountMenu() {
           </div>
 
           <div className="account__row">
-            <span className="account__row-label">网络</span>
+            <span className="account__row-label">{t("Network", "网络")}</span>
             {isSupportedChain(chainId) ? (
               <Badge tone="success" dot>
                 {meta.network} · {meta.chainId}
@@ -114,14 +123,18 @@ export function AccountMenu() {
                 disabled={switching}
               >
                 <RefreshCw size={12} className={switching ? "spin" : ""} />
-                切换到 {meta.chainId}
+                {t(`Switch to ${meta.chainId}`, `切换到 ${meta.chainId}`)}
               </button>
             )}
           </div>
 
           <Link className="account__action" to="/faucet" onClick={() => setOpen(false)}>
             <Droplets size={15} />
-            领取测试 RTM
+            {t("Claim test tRTM", "领取测试 tRTM")}
+          </Link>
+          <Link className="account__action" to="/docs" onClick={() => setOpen(false)}>
+            <BookOpen size={15} />
+            {t("Field manual", "使用文档")}
           </Link>
           <button
             type="button"
@@ -132,7 +145,7 @@ export function AccountMenu() {
             }}
           >
             <Wallet size={15} />
-            刷新余额
+            {t("Refresh balances", "刷新余额")}
           </button>
           <button
             type="button"
@@ -143,7 +156,7 @@ export function AccountMenu() {
             }}
           >
             <LogOut size={15} />
-            断开钱包
+            {t("Disconnect wallet", "断开钱包")}
           </button>
           {isSupportedChain(chainId) && (
             <a

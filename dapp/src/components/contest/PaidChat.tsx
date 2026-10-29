@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { keccak256, toHex, type Address } from "viem";
-import { useAccount, useChainId, useWriteContract } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
 import {
   api,
   ApiClientError,
@@ -21,6 +21,7 @@ import {
 import { attackFeeWei, isContestLive } from "../../lib/contest";
 import { arenaAbi, rtmAbi } from "../../lib/contracts";
 import { errorText, formatRtm, timeAgo } from "../../lib/format";
+import { useI18n } from "../../lib/i18n";
 import { useLocalStorage, useNow } from "../../lib/hooks";
 import {
   useAllowance,
@@ -29,6 +30,7 @@ import {
   useRtmBalance,
 } from "../../lib/platform";
 import { isSupportedChain } from "../../lib/chain";
+import { useArenaWriteContract } from "../../lib/useArenaWriteContract";
 import { useActivity } from "../../context/ActivityContext";
 import { useToast } from "../../context/ToastContext";
 import { Alert } from "../ui/Alert";
@@ -70,20 +72,34 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function replyText(response: MessageResponse): string {
+function replyText(
+  response: MessageResponse,
+  t: (en: string, zh: string) => string,
+): string {
   if (response.reply && response.reply.trim()) return response.reply;
-  if (response.error?.message) return `智能体返回错误：${response.error.message}`;
-  if (response.defender_fault) return "守方基础设施故障，平台将按弃权处理。";
-  return "（没有回复）";
+  if (response.error?.message) {
+    return t(
+      `Agent error: ${response.error.message}`,
+      `智能体返回错误：${response.error.message}`,
+    );
+  }
+  if (response.defender_fault) {
+    return t(
+      "Defender infrastructure failure; the platform will treat it as a forfeit.",
+      "守方基础设施故障，平台将按弃权处理。",
+    );
+  }
+  return t("(No reply)", "（没有回复）");
 }
 
 export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContractAsync } = useArenaWriteContract();
   const { meta } = usePlatform();
   const { trackTransaction } = useActivity();
   const { toast } = useToast();
+  const { t } = useI18n();
   const balance = useRtmBalance(address);
   const allowance = useAllowance(address, meta.addresses.arena);
   const consent = useDataConsent(contest.id, address);
@@ -145,7 +161,9 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
         throw reason;
       }
     }
-    throw lastError ?? new Error("消息未被平台处理");
+    throw lastError ?? new Error(
+      t("The message was not processed by the platform.", "消息未被平台处理。"),
+    );
   }
 
   async function runDelivery(turn: PendingTurn) {
@@ -159,20 +177,26 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
     });
     append({
       role: "agent",
-      text: replyText(response),
+      text: replyText(response, t),
       tone: response.defender_fault ? "warning" : "muted",
     });
     if (!response.persisted) {
       append({
         role: "system",
-        text: "本轮内容按 opt-out 处理，只在内存中运行，没有落盘、不可出售。",
+        text: t(
+          "This turn was handled as an opt-out; it ran only in memory and was not persisted or sold.",
+          "本轮内容按 opt-out 处理，只在内存中运行，没有落盘、不可出售。",
+        ),
         tone: "muted",
       });
     }
     if (response.defender_fault) {
       append({
         role: "system",
-        text: "守方基础设施故障已记录；平台会按弃权路径结算。",
+        text: t(
+          "The defender infrastructure fault has been recorded; the platform will settle via the forfeit path.",
+          "守方基础设施故障已记录；平台会按弃权路径结算。",
+        ),
         tone: "warning",
       });
     }
@@ -183,8 +207,11 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
     void allowance.refetch();
     onAfterSend?.();
     toast({
-      title: "消息已送达",
-      description: `第 ${response.turn} 轮回复已返回。`,
+      title: t("Message delivered", "消息已送达"),
+      description: t(
+        `Round ${response.turn} reply received.`,
+        `第 ${response.turn} 轮回复已返回。`,
+      ),
       tone: response.defender_fault ? "warning" : "success",
     });
     window.setTimeout(() => setStep("idle"), 2_000);
@@ -193,36 +220,51 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
   async function send() {
     setError("");
     if (!isConnected || !address) {
-      setError("请先连接钱包。");
+      setError(t("Connect your wallet first.", "请先连接钱包。"));
       return;
     }
     if (!correctChain) {
-      setError("请先切换到 RTM Testnet（48850）。");
+      setError(t("Switch to RTM Testnet (48850) first.", "请先切换到 RTM Testnet（48850）。"));
       return;
     }
     if (!joined) {
-      setError("你需要先加入这场比赛。");
+      setError(t("You need to join this contest first.", "你需要先加入这场比赛。"));
       return;
     }
     if (!live) {
-      setError("比赛已经结束，不能再发送付费消息。");
+      setError(
+        t(
+          "The contest has ended; paid messages can no longer be sent.",
+          "比赛已经结束，不能再发送付费消息。",
+        ),
+      );
       return;
     }
     if (pendingTurn) {
-      setError("还有一笔消息未送达，请先继续送达或丢弃记录。");
+      setError(
+        t(
+          "A message is still undelivered. Continue delivery or discard the record first.",
+          "还有一笔消息未送达，请先继续送达或丢弃记录。",
+        ),
+      );
       return;
     }
     const text = content.trim();
     if (!text) {
-      setError("请输入要发送的消息。");
+      setError(t("Enter a message to send.", "请输入要发送的消息。"));
       return;
     }
     if (text.length > 1_000) {
-      setError("消息最多 1000 个字符。");
+      setError(t("Messages can be up to 1,000 characters.", "消息最多 1000 个字符。"));
       return;
     }
     if (balance.data !== undefined && balance.data < fee) {
-      setError("RTM 余额不足，请先去水龙头领取测试 RTM。");
+      setError(
+        t(
+          "Insufficient tRTM balance. Get test tRTM from the faucet first.",
+          "tRTM 余额不足，请先去水龙头领取测试 tRTM。",
+        ),
+      );
       return;
     }
     setBusy(true);
@@ -239,7 +281,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
           functionName: "approve",
           args: [meta.addresses.arena as Address, approvalAmount],
         });
-        await trackTransaction(approvalHash, "授权消息费", "approve");
+        await trackTransaction(approvalHash, t("Approve message fees", "授权消息费"), "approve");
       }
 
       setStep("chain");
@@ -259,7 +301,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
         createdAt: Math.floor(Date.now() / 1000),
       };
       setPendingTurn(turn);
-      await trackTransaction(attackHash, "发送付费消息", "attack");
+      await trackTransaction(attackHash, t("Send paid message", "发送付费消息"), "attack");
       await runDelivery(turn);
     } catch (reason) {
       setError(errorText(reason));
@@ -277,7 +319,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
       await runDelivery(pendingTurn);
     } catch (reason) {
       setError(errorText(reason));
-      toast({ title: "送达失败", description: errorText(reason), tone: "error" });
+      toast({ title: t("Delivery failed", "送达失败"), description: errorText(reason), tone: "error" });
       setStep("idle");
     } finally {
       setBusy(false);
@@ -288,51 +330,68 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
   const lowBalance =
     balance.data !== undefined && balance.data < fee && fee > 0n;
   const lockedReason = !isConnected
-    ? "连接钱包后发送消息"
+    ? t("Connect your wallet to send messages", "连接钱包后发送消息")
     : !correctChain
-      ? "切换网络后发送消息"
+      ? t("Switch networks to send messages", "切换网络后发送消息")
       : !joined
-        ? "先加入这场战斗，才能发送付费消息"
+        ? t("Join this contest before sending paid messages", "先加入这场战斗，才能发送付费消息")
         : !live
-          ? "比赛已结束，对话已关闭"
+          ? t("The contest has ended; dialogue is closed", "比赛已结束，对话已关闭")
           : null;
 
   return (
     <section className="chat">
       <header className="chat__head">
         <div>
-          <p className="eyebrow">Paid dialogue</p>
-          <h2 className="chat__title">付费对话</h2>
+          <p className="eyebrow">{t("Paid dialogue", "付费对话")}</p>
+          <h2 className="chat__title">{t("Paid chat", "付费对话")}</h2>
         </div>
         <div className="chat__head-meta">
           <Badge tone="accent" dot>
-            每条 {formatRtm(fee, { maxFraction: 4 })} RTM
+            {t(
+              `${formatRtm(fee, { maxFraction: 4 })} tRTM per message`,
+              `每条 ${formatRtm(fee, { maxFraction: 4 })} tRTM`,
+            )}
           </Badge>
           {consent.data !== undefined && (
             <Badge tone={consent.data ? "success" : "neutral"}>
-              {consent.data ? "数据可售 · 30%" : "不落盘 · 不可售"}
+              {consent.data
+                ? t("Data sellable · 30%", "数据可售 · 30%")
+                : t("Not persisted · not sellable", "不落盘 · 不可售")}
             </Badge>
           )}
         </div>
       </header>
 
       <div className="chat__context">
-        <span className="mono">TARGET {contest.id.slice(0, 10)}…</span>
+        <span className="mono">{t("TARGET", "目标")} {contest.id.slice(0, 10)}…</span>
         <span className="chat__context-divider" aria-hidden="true" />
         <span>
-          唯一工具面 <code>get_balance</code> / <code>transfer_rtm</code>
+          {t("Available tools", "唯一工具面")}{" "}
+          <code>get_balance</code> / <code>transfer_rtm</code>
         </span>
       </div>
 
-      <div className="chat__log" ref={logRef} aria-live="polite" aria-label="攻击对话记录">
+      <div
+        className="chat__log"
+        ref={logRef}
+        aria-live="polite"
+        aria-label={t("Attack dialogue log", "攻击对话记录")}
+      >
         {messages.length === 0 && !pendingTurn && (
           <div className="chat__empty">
             <Bot size={22} />
             <div>
-              <strong>等待第一条付费消息</strong>
+              <strong>{t("Waiting for the first paid message", "等待第一条付费消息")}</strong>
               <p>
-                每条消息先授权费用，再调用 <code>attack</code> 上链，索引器确认后平台运行智能体。
-                诱导它调用 <code>transfer_rtm</code> 就能触发结算。
+                {t("Each message first requires a fee approval, then calls ", "每条消息先授权费用，再调用 ")}
+                <code>attack</code>
+                {t(
+                  " on-chain; the platform runs the agent after the indexer confirms it. Trick it into calling ",
+                  " 上链，索引器确认后平台运行智能体。诱导它调用 ",
+                )}
+                <code>transfer_rtm</code>
+                {t(" to trigger settlement.", " 就能触发结算。")}
               </p>
             </div>
           </div>
@@ -344,9 +403,18 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
           <div className="chat__pending">
             <CircleAlert size={15} />
             <div>
-              <strong>这笔消息已上链，但还没有送达智能体</strong>
+              <strong>
+                {t(
+                  "This message is on-chain but has not reached the agent yet",
+                  "这笔消息已上链，但还没有送达智能体",
+                )}
+              </strong>
               <p>
-                {timeAgo(pendingTurn.createdAt)}提交 · 内容 “{pendingTurn.content.slice(0, 60)}
+                {t(
+                  `Submitted ${timeAgo(pendingTurn.createdAt)} · content “`,
+                  `${timeAgo(pendingTurn.createdAt)}提交 · 内容 “`,
+                )}
+                {pendingTurn.content.slice(0, 60)}
                 {pendingTurn.content.length > 60 ? "…" : ""}”
               </p>
               <div className="chat__pending-actions">
@@ -356,10 +424,10 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
                   loading={busy}
                   onClick={() => void continuePending()}
                 >
-                  继续送达
+                  {t("Continue delivery", "继续送达")}
                 </Button>
                 <Button size="sm" variant="quiet" onClick={() => setDiscardOpen(true)}>
-                  丢弃记录
+                  {t("Discard record", "丢弃记录")}
                 </Button>
               </div>
             </div>
@@ -376,16 +444,18 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
       {lowBalance && (
         <Alert
           tone="warning"
-          title="RTM 余额不足"
+          title={t("Insufficient tRTM balance", "tRTM 余额不足")}
           action={
             <Link className="btn btn--ghost btn--sm" to="/faucet">
               <Droplets size={13} />
-              去领水
+              {t("Get test tRTM", "去领水")}
             </Link>
           }
         >
-          当前余额 {formatRtm(balance.data)} RTM，单条消息需要{" "}
-          {formatRtm(fee, { maxFraction: 4 })} RTM。
+          {t(
+            `Current balance ${formatRtm(balance.data)} tRTM; each message costs ${formatRtm(fee, { maxFraction: 4 })} tRTM.`,
+            `当前余额 ${formatRtm(balance.data)} tRTM，单条消息需要 ${formatRtm(fee, { maxFraction: 4 })} tRTM。`,
+          )}
         </Alert>
       )}
 
@@ -398,7 +468,7 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
         <div className="chat__composer">
           <div className="chat__composer-top">
             <label htmlFor="chat-input" className="sr-only">
-              发送给守方智能体的消息
+              {t("Message to the defender agent", "发送给守方智能体的消息")}
             </label>
             <textarea
               id="chat-input"
@@ -406,7 +476,10 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
               value={content}
               maxLength={1_000}
               rows={3}
-              placeholder="尝试诱导智能体把钱转给你的地址。不要发送真实敏感信息。"
+              placeholder={t(
+                "Try to trick the agent into sending funds to your address. Do not share real sensitive information.",
+                "尝试诱导智能体把钱转给你的地址。不要发送真实敏感信息。",
+              )}
               onChange={(event) => setContent(event.target.value)}
               disabled={busy}
             />
@@ -414,17 +487,17 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
               <span className="mono">{content.length} / 1000</span>
               <span className="chat__balance">
                 <ShieldCheck size={11} />
-                余额 {formatRtm(balance.data)} RTM
+                {t("Balance", "余额")} {formatRtm(balance.data)} tRTM
               </span>
             </div>
           </div>
           <div className="chat__composer-actions">
-            <div className="chat__steps" aria-label="发送步骤">
-              <StepDot label="授权" state={step === "approve" ? "active" : ""} done={step === "chain" || step === "deliver" || step === "done"} />
+            <div className="chat__steps" aria-label={t("Send steps", "发送步骤")}>
+              <StepDot label={t("Approve", "授权")} state={step === "approve" ? "active" : ""} done={step === "chain" || step === "deliver" || step === "done"} />
               <span className="chat__step-line" />
-              <StepDot label="上链" state={step === "chain" ? "active" : ""} done={step === "deliver" || step === "done"} />
+              <StepDot label={t("On-chain", "上链")} state={step === "chain" ? "active" : ""} done={step === "deliver" || step === "done"} />
               <span className="chat__step-line" />
-              <StepDot label="送达" state={step === "deliver" ? "active" : ""} done={step === "done"} />
+              <StepDot label={t("Delivered", "送达")} state={step === "deliver" ? "active" : ""} done={step === "done"} />
             </div>
             <Button
               onClick={() => void send()}
@@ -432,14 +505,21 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
               iconLeft={<Send size={14} />}
               disabled={!content.trim() || Boolean(pendingTurn)}
             >
-              付费发送
+              {t("Send paid message", "付费发送")}
             </Button>
           </div>
           <p className="chat__hint">
             {allowanceCount > 0n
-              ? `已授权约 ${allowanceCount.toString()} 条消息；用完前无需重复 approve。`
-              : "首次发送会自动授权最多 5 条消息的费用，减少钱包确认次数。"}
-            {" "}dataConsent 在加入后不可撤回。
+              ? t(
+                  `Message fees for about ${allowanceCount.toString()} messages have been approved; no repeat approval is needed until they run out.`,
+                  `已授权约 ${allowanceCount.toString()} 条消息的费用；用完前无需重复 approve。`,
+                )
+              : t(
+                  "The first send automatically approves up to 5 message fees to reduce wallet confirmations.",
+                  "首次发送会自动授权最多 5 条消息的费用，减少钱包确认次数。",
+                )}
+            {" "}
+            {t("dataConsent cannot be revoked after joining.", "dataConsent 在加入后不可撤回。")}
           </p>
         </div>
       )}
@@ -447,13 +527,16 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
       <Dialog
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
-        title="丢弃未送达记录？"
-        description="链上费用已经支付，丢弃后可能无法再取回这次回复。"
+        title={t("Discard undelivered record?", "丢弃未送达记录？")}
+        description={t(
+          "The on-chain fee has already been paid; discarding may make this reply unrecoverable.",
+          "链上费用已经支付，丢弃后可能无法再取回这次回复。",
+        )}
         size="sm"
         footer={
           <div className="dialog__footer-row">
             <Button variant="ghost" onClick={() => setDiscardOpen(false)}>
-              取消
+              {t("Cancel", "取消")}
             </Button>
             <Button
               variant="danger"
@@ -462,18 +545,24 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
                 setDiscardOpen(false);
                 append({
                   role: "system",
-                  text: "已丢弃未送达记录；链上费用不会退回。",
+                  text: t(
+                    "Undelivered record discarded; the on-chain fee will not be refunded.",
+                    "已丢弃未送达记录；链上费用不会退回。",
+                  ),
                   tone: "danger",
                 });
               }}
             >
-              确认丢弃
+              {t("Confirm discard", "确认丢弃")}
             </Button>
           </div>
         }
       >
         <p className="muted small">
-          建议先点“继续送达”，索引器通常几秒内就会确认这笔付费消息。
+          {t(
+            "We recommend choosing “Continue delivery”; the indexer usually confirms this paid message within seconds.",
+            "建议先点“继续送达”，索引器通常几秒内就会确认这笔付费消息。",
+          )}
         </p>
       </Dialog>
     </section>
@@ -492,6 +581,7 @@ function StepDot({ label, state, done }: { label: string; state: string; done: b
 }
 
 function MessageBubble({ message }: { message: ChatEntry }) {
+  const { t, lang } = useI18n();
   if (message.role === "system") {
     return (
       <div className={`chat-system chat-system--${message.tone ?? "muted"}`}>
@@ -507,12 +597,15 @@ function MessageBubble({ message }: { message: ChatEntry }) {
       </span>
       <div className={`bubble bubble--${message.role}`}>
         <div className="bubble__meta">
-          <span className="bubble__role">{attacker ? "攻方" : "守方智能体"}</span>
+          <span className="bubble__role">{attacker ? t("Attacker", "攻方") : t("Defender agent", "守方智能体")}</span>
           <span className="bubble__time">
-            {new Date(message.at * 1000).toLocaleTimeString("zh-CN", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {new Date(message.at * 1000).toLocaleTimeString(
+              lang === "en" ? "en-US" : "zh-CN",
+              {
+                hour: "2-digit",
+                minute: "2-digit",
+              },
+            )}
           </span>
         </div>
         <p>{message.text}</p>

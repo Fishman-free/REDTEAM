@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
 import { Wallet } from "lucide-react";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { ConnectButton } from "./ConnectButton";
-import { isSupportedChain } from "../../lib/chain";
+import { CHAIN_ID, ensureChain, isSupportedChain } from "../../lib/chain";
+import { useI18n } from "../../lib/i18n";
 import { Button } from "../ui/Button";
-import { useSwitchChain } from "wagmi";
-import { CHAIN_ID, ensureChain } from "../../lib/chain";
 import { useState } from "react";
 import { useToast } from "../../context/ToastContext";
 import { errorText } from "../../lib/format";
@@ -16,16 +15,20 @@ interface ConnectPromptProps {
   compact?: boolean;
 }
 
-export function ConnectPrompt({
-  title = "连接钱包后开始",
-  description = "钱包只用于签名交易；平台不会托管你的私钥。",
-  compact = false,
-}: ConnectPromptProps) {
+export function ConnectPrompt({ title, description, compact = false }: ConnectPromptProps) {
   const { isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const [pending, setPending] = useState(false);
   const { toast } = useToast();
+  const { t } = useI18n();
+  const heading = title ?? t("Connect a wallet to start", "连接钱包后开始");
+  const body =
+    description ??
+    t(
+      "Your wallet only signs transactions; the platform never holds your private key.",
+      "钱包只用于签名交易；平台不会托管你的私钥。",
+    );
 
   if (!isConnected) {
     return (
@@ -34,10 +37,10 @@ export function ConnectPrompt({
           <Wallet size={20} />
         </span>
         <div>
-          <h3>{title}</h3>
-          <p>{description}</p>
+          <h3>{heading}</h3>
+          <p>{body}</p>
         </div>
-        <ConnectButton label="连接钱包" size={compact ? "sm" : "md"} />
+        <ConnectButton label={t("Connect wallet", "连接钱包")} size={compact ? "sm" : "md"} />
       </div>
     );
   }
@@ -51,7 +54,11 @@ export function ConnectPrompt({
         try {
           await ensureChain();
         } catch {
-          toast({ title: "切换失败", description: errorText(reason), tone: "error" });
+          toast({
+            title: t("Switch failed", "切换失败"),
+            description: errorText(reason),
+            tone: "error",
+          });
         }
       } finally {
         setPending(false);
@@ -63,11 +70,16 @@ export function ConnectPrompt({
           <Wallet size={20} />
         </span>
         <div>
-          <h3>网络不正确</h3>
-          <p>请切换到 RTM Testnet（{CHAIN_ID}）后再继续。</p>
+          <h3>{t("Wrong network", "网络不正确")}</h3>
+          <p>
+            {t(
+              `Switch to RTM Testnet (${CHAIN_ID}) before continuing.`,
+              `请切换到 RTM Testnet（${CHAIN_ID}）后再继续。`,
+            )}
+          </p>
         </div>
         <Button size={compact ? "sm" : "md"} variant="secondary" loading={pending} onClick={() => void change()}>
-          切换网络
+          {t("Switch network", "切换网络")}
         </Button>
       </div>
     );

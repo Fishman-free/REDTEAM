@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 export type ToastTone = "info" | "success" | "error" | "warning";
 
@@ -54,6 +55,7 @@ function ToastCard({
   onDismiss: (id: string) => void;
 }) {
   const [paused, setPaused] = useState(false);
+  const { t } = useI18n();
   const remaining = useRef(record.duration ?? 5_500);
   const startedAt = useRef(0);
   const timer = useRef<number | null>(null);
@@ -93,7 +95,7 @@ function ToastCard({
       <button
         type="button"
         className="toast__close"
-        aria-label="关闭通知"
+        aria-label={t("Dismiss notification", "关闭通知")}
         onClick={() => onDismiss(record.id)}
       >
         <X size={14} />
@@ -105,6 +107,7 @@ function ToastCard({
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
+  const { t } = useI18n();
 
   const dismiss = useCallback((id: string) => {
     setToasts((current) => current.filter((item) => item.id !== id));
@@ -127,7 +130,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {createPortal(
-        <div className="toast-viewport" aria-label="通知">
+        <div className="toast-viewport" aria-label={t("Notifications", "通知")}>
           {toasts.map((record) => (
             <ToastCard key={record.id} record={record} onDismiss={dismiss} />
           ))}

@@ -16,11 +16,12 @@ import {
   type PlatformMeta,
 } from "./api";
 import { ADDRESSES, arenaAbi, dataMarketAbi, faucetAbi, rtmAbi } from "./contracts";
+import { walletRpcUrl } from "./chain";
 
 export const FALLBACK_META: PlatformMeta = {
   network: "besu-testnet",
   chainId: 48850,
-  rpc: "http://127.0.0.1:8546",
+  rpc: walletRpcUrl(),
   addresses: { ...ADDRESSES },
   fees: {
     attackFeeBps: 50,
