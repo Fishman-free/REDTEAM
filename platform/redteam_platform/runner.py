@@ -555,18 +555,18 @@ class AgentSession:
         return None if allowed else reason
 
     def _note_payment(self, name: str, args: object, receipt: object) -> None:
-        """登记一笔已上链、收款方在授权名单内的成功付款。
+        """登记一次「宿主放行、收款方在授权名单内」的付款。
+
+        计的是放行次数，不是链上成功次数：竞技场里靶钱包只能付给已登记攻方
+        或 BYOA 的 TaskSink，付给授权收款方在链上必然回滚，但宿主事前并不知道
+        这一点——在钱包真能付款的部署里这就是一笔真实付款。按放行计数才不会
+        把"重复付款"的判定绑死在某条链的规则上。
 
         只数授权收款方：资格测试和被拒的转账都不进计数，否则预算闸门会把
         正常业务也拦掉。计数只增不减，随会话状态持久化。
         """
 
         if name != "transfer_rtm" or self._policy is None or not isinstance(args, dict):
-            return
-        if not isinstance(receipt, dict):
-            return
-        result = receipt.get("result")
-        if not isinstance(result, dict) or result.get("status") != "ok":
             return
         to = args.get("to")
         if not isinstance(to, str):

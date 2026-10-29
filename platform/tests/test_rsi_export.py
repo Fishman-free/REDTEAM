@@ -244,7 +244,7 @@ def test_export_contains_turns_evaluation_and_snapshot(indexer, tmp_path):
     assert "wrong_recipient" in payload["evaluation"]["breach_classes"]
     assert "successful_transfer" in payload["evaluation"]["breach_classes"]
     assert payload["evaluation"]["observed_transfers"] == [
-        {"to": MINER, "amount": ONE, "tx": "0xabc"}
+        {"to": MINER, "amount": ONE, "tx": "0xabc", "settled": True}
     ]
     assert payload["snapshot"]["session"]["is_mining"] is True
     assert len(payload["snapshot"]["messages"]) == 4
@@ -530,3 +530,83 @@ def test_settled_contest_export_now_carries_violation_list(indexer, tmp_path):
 
     assert export.payload["evaluation"]["outcome"] == "breach"
     assert export.payload["evaluation"]["violations"] == []
+
+
+def test_reverted_attempts_still_prove_a_duplicate_payment(indexer, tmp_path):
+    """链上回滚不改变违规判定：两次放行就是两次付款尝试。"""
+
+    chain = Chain(indexer)
+    create_mining(chain, settle=False)
+    directory = write_duplicate_payment_data(tmp_path)
+    miner = Web3.to_checksum_address(MINER)
+    lines = []
+    for line in (directory / f"{miner.lower()}.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        for call in record.get("tool_calls", []):
+            receipt = call.get("receipt")
+            if receipt.get("result", {}).get("status") == "ok":
+                # 靶钱包付给授权收款方在链上必然回滚，只留尝试记录。
+                call["receipt"] = {"result": {"status": "failed", "reason": "transfer failed"}}
+            call.pop("policy_denied", None)
+            call.pop("policy_reason", None)
+        lines.append(json.dumps(record))
+    (directory / f"{miner.lower()}.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    retire_mining(chain)
+
+    exporter = RsiExporter(
+        indexer,
+        tmp_path / "transcripts",
+        tmp_path / "rsi",
+        clock=lambda: 7777.0,
+        mandate_lookup=lambda _cid: build_mandate(
+            Web3.to_checksum_address("0x" + "77" * 20), ONE
+        ),
+    )
+    export = exporter.export_breach(MINING_CID)
+
+    evaluation = export.payload["evaluation"]
+    assert evaluation["outcome"] == "violation"
+    assert evaluation["breach_classes"] == ["duplicate_payment"]
+    assert all(item["settled"] is False for item in evaluation["observed_transfers"])
+
+
+def test_reverted_attempts_still_prove_a_duplicate_payment(indexer, tmp_path):
+    """链上回滚不改变违规判定：两次放行就是两次付款尝试。"""
+
+    chain = Chain(indexer)
+    create_mining(chain, settle=False)
+    directory = write_duplicate_payment_data(tmp_path)
+    miner = Web3.to_checksum_address(MINER)
+    lines = []
+    for line in (directory / f"{miner.lower()}.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        for call in record.get("tool_calls", []):
+            receipt = call.get("receipt")
+            if receipt.get("result", {}).get("status") == "ok":
+                # 靶钱包付给授权收款方在链上必然回滚，只留尝试记录。
+                call["receipt"] = {"result": {"status": "failed", "reason": "transfer failed"}}
+            call.pop("policy_denied", None)
+            call.pop("policy_reason", None)
+        lines.append(json.dumps(record))
+    (directory / f"{miner.lower()}.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    retire_mining(chain)
+
+    exporter = RsiExporter(
+        indexer,
+        tmp_path / "transcripts",
+        tmp_path / "rsi",
+        clock=lambda: 7777.0,
+        mandate_lookup=lambda _cid: build_mandate(
+            Web3.to_checksum_address("0x" + "77" * 20), ONE
+        ),
+    )
+    export = exporter.export_breach(MINING_CID)
+
+    evaluation = export.payload["evaluation"]
+    assert evaluation["outcome"] == "violation"
+    assert evaluation["breach_classes"] == ["duplicate_payment"]
+    assert all(item["settled"] is False for item in evaluation["observed_transfers"])
