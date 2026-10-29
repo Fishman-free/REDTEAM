@@ -3,6 +3,7 @@ import { Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { AccountMenu } from "./AccountMenu";
 import { ConnectDialog } from "./ConnectDialog";
+import { useI18n } from "../../lib/i18n";
 import { Button, type ButtonSize, type ButtonVariant } from "../ui/Button";
 
 interface ConnectButtonProps {
@@ -14,14 +15,16 @@ interface ConnectButtonProps {
 }
 
 export function ConnectButton({
-  label = "连接钱包",
+  label,
   variant = "primary",
   size = "md",
   block = false,
   className,
 }: ConnectButtonProps) {
   const { isConnected } = useAccount();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const text = label ?? t("Connect wallet", "连接钱包");
 
   if (isConnected) return <AccountMenu />;
 
@@ -35,7 +38,7 @@ export function ConnectButton({
         iconLeft={<Wallet size={size === "sm" ? 13 : 15} />}
         onClick={() => setOpen(true)}
       >
-        {label}
+        {text}
       </Button>
       <ConnectDialog open={open} onClose={() => setOpen(false)} />
     </>

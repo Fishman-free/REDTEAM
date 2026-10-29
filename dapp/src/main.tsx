@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
 import App from "./App";
 import { wagmiConfig } from "./lib/chain";
+import { I18nProvider, getLang } from "./lib/i18n";
 import { PlatformProvider } from "./lib/platform";
 import { ToastProvider } from "./context/ToastContext";
 import { ActivityProvider } from "./context/ActivityContext";
@@ -14,6 +15,7 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/ibm-plex-mono/600.css";
 import "./theme.css";
+import "./supplement.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,14 +49,19 @@ class ErrorBoundary extends Component<
 
   render() {
     if (this.state.error) {
+      const english = getLang() === "en";
       return (
         <div className="crash-screen">
           <p className="eyebrow">Runtime fault</p>
-          <h1>界面遇到未处理的错误</h1>
-          <p>刷新页面通常可以恢复。如果问题持续，请检查浏览器控制台。</p>
+          <h1>{english ? "The interface hit an unhandled error" : "界面遇到未处理的错误"}</h1>
+          <p>
+            {english
+              ? "Refreshing the page usually recovers. If the problem persists, check the browser console."
+              : "刷新页面通常可以恢复。如果问题持续，请检查浏览器控制台。"}
+          </p>
           <pre>{this.state.error.message}</pre>
           <button className="btn btn--primary" onClick={() => window.location.reload()}>
-            重新加载
+            {english ? "Reload" : "重新加载"}
           </button>
         </div>
       );
@@ -66,19 +73,21 @@ class ErrorBoundary extends Component<
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <PlatformProvider>
-            <ToastProvider>
-              <ActivityProvider>
-                <BrowserRouter>
-                  <App />
-                </BrowserRouter>
-              </ActivityProvider>
-            </ToastProvider>
-          </PlatformProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
+      <I18nProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClient}>
+            <PlatformProvider>
+              <ToastProvider>
+                <ActivityProvider>
+                  <BrowserRouter>
+                    <App />
+                  </BrowserRouter>
+                </ActivityProvider>
+              </ToastProvider>
+            </PlatformProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </I18nProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

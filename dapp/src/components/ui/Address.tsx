@@ -1,5 +1,6 @@
 import { Check, Copy, ExternalLink } from "lucide-react";
 import { explorerAddressUrl, explorerTxUrl, shortAddr, shortHash } from "../../lib/format";
+import { useI18n } from "../../lib/i18n";
 import { useCopy } from "../../lib/hooks";
 
 interface CopyButtonProps {
@@ -8,8 +9,12 @@ interface CopyButtonProps {
   className?: string;
 }
 
-export function CopyButton({ value, label = "复制", className = "" }: CopyButtonProps) {
+export function CopyButton({ value, label, className = "" }: CopyButtonProps) {
   const [copied, copy] = useCopy();
+  const { t } = useI18n();
+  const accessibleLabel = copied
+    ? t("Copied", "已复制")
+    : (label ?? t("Copy", "复制"));
   return (
     <button
       type="button"
@@ -18,8 +23,8 @@ export function CopyButton({ value, label = "复制", className = "" }: CopyButt
         event.stopPropagation();
         void copy(value);
       }}
-      aria-label={copied ? "已复制" : label}
-      title={copied ? "已复制" : label}
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
     </button>

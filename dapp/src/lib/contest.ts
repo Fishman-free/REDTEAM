@@ -1,4 +1,5 @@
 import type { Contest, PlatformMeta } from "./api";
+import { getLang } from "./i18n";
 
 export function contestEndMs(contest: Contest): number {
   if (contest.is_mining) return Number.POSITIVE_INFINITY;
@@ -60,6 +61,11 @@ export function contestStateForDisplay(
   contest: Contest,
   now: number,
 ): { state: string; label: string } {
-  if (needsExpire(contest, now)) return { state: "pending", label: "待结算" };
+  if (needsExpire(contest, now)) {
+    return {
+      state: "pending",
+      label: getLang() === "en" ? "Needs settlement" : "待结算",
+    };
+  }
   return { state: contest.state, label: contest.state };
 }

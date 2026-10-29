@@ -7,6 +7,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
 import { useScrollLock } from "../../lib/hooks";
 
 interface DialogProps {
@@ -37,6 +38,7 @@ export function Dialog({
   closeOnOverlay = true,
   className = "",
 }: DialogProps) {
+  const { t } = useI18n();
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -120,7 +122,12 @@ export function Dialog({
               </p>
             )}
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭对话框">
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label={t("Close dialog", "关闭对话框")}
+          >
             <X size={17} />
           </button>
         </header>

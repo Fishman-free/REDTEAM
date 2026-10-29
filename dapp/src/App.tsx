@@ -9,6 +9,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Market from "./pages/Market";
 import MarketDetail from "./pages/MarketDetail";
 import Faucet from "./pages/Faucet";
+import Docs from "./pages/Docs";
 import Ops from "./pages/Ops";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="market" element={<Market />} />
         <Route path="market/:contestId" element={<MarketDetail />} />
         <Route path="faucet" element={<Faucet />} />
+        <Route path="docs" element={<Docs />} />
         <Route path="ops" element={<Ops />} />
         <Route path="*" element={<NotFound />} />
       </Route>

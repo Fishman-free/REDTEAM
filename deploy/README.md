@@ -20,9 +20,13 @@ bash deploy/up.sh
 启动后：
 
 - dApp：<http://localhost:3000>
+- 应用内文档：<http://localhost:3000/docs>
 - 运营入口：<http://localhost:3000/ops>（管理密钥在 `deploy/.env.stack`）
 - API 健康检查（只绑回环）：<http://127.0.0.1:8080/health>
 - 链 RPC（只绑回环）：`http://127.0.0.1:8546`
+- 钱包推荐 RPC：`http://localhost:3000/rpc`（同源 BFF，始终指向本栈）
+
+> 本机可能同时存在多套 Chain ID 为 `48850` 的旧本地链。钱包里已有同 Chain ID 网络时，单纯“切换网络”不会改 RPC，交易可能发到别的链。请删除旧网络后从当前页面重新添加，或把 RPC 改为上面的同源 `/rpc`。
 
 停止：
 
@@ -108,5 +112,6 @@ bash deploy/up.sh
 - **端口冲突**：编辑 `deploy/.env.stack` 的 `BESU_RPC_PORT` / `API_PORT` / `WEB_PORT`。
 - **contracts 容器失败**：`docker compose ... logs contracts`。首次构建要下载 Solidity 编译器。
 - **Web 显示 API 离线**：`docker compose ... logs api`，检查 vault/contracts 是否完成。
+- **交易一直 Pending / 钱包超时**：确认钱包 RPC 指向 `http://<host>:<WEB_PORT>/rpc`，并确认没有另一个同 Chain ID 的旧本地栈占用钱包网络配置。
 - **Windows**：在 Git Bash 中运行 `bash deploy/up.sh`，确保 Docker Desktop 已启动。
 - **重新构建前端**：`docker compose ... up -d --build web`。

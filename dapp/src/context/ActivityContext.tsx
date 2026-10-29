@@ -7,7 +7,9 @@ import {
 } from "react";
 import { useChainId, usePublicClient } from "wagmi";
 import type { TransactionReceipt } from "viem";
+import { assertWalletUsesAppChain } from "../lib/chain";
 import { useLocalStorage } from "../lib/hooks";
+import { useI18n } from "../lib/i18n";
 import { errorText, shortHash } from "../lib/format";
 import { useToast } from "./ToastContext";
 
@@ -28,6 +30,7 @@ interface ActivityContextValue {
   records: ActivityRecord[];
   pendingCount: number;
   trackTransaction: (hash: `0x${string}`, label: string, kind?: string) => Promise<TransactionReceipt>;
+  refreshTransaction: (id: string) => Promise<void>;
   clear: () => void;
   remove: (id: string) => void;
 }
@@ -35,12 +38,14 @@ interface ActivityContextValue {
 const ActivityContext = createContext<ActivityContextValue | null>(null);
 
 const STORAGE_KEY = "rtm.activity.v1";
+const CONFIRMATION_TIMEOUT_MS = 90_000;
 
 export function ActivityProvider({ children }: { children: ReactNode }) {
   const [records, setRecords] = useLocalStorage<ActivityRecord[]>(STORAGE_KEY, []);
   const publicClient = usePublicClient();
   const chainId = useChainId();
   const { toast } = useToast();
+  const { t } = useI18n();
 
   const update = useCallback(
     (id: string, patch: Partial<ActivityRecord>) => {
@@ -49,6 +54,44 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
       );
     },
     [setRecords],
+  );
+
+  const explainMissingTransaction = useCallback(
+    async (
+      hash: `0x${string}`,
+    ): Promise<{ message: string; status: "pending" | "failed" }> => {
+      if (!publicClient) {
+        return {
+          message: t("The application RPC is unavailable.", "本站 RPC 不可用。"),
+          status: "failed",
+        };
+      }
+      const transaction = await publicClient
+        .getTransaction({ hash })
+        .catch(() => null);
+      if (transaction) {
+        return {
+          message: t(
+            "The transaction was broadcast but is still waiting to be mined. Check it again in the activity drawer.",
+            "交易已经广播，但还没有被打包。可以在交易活动中点击“重新检查”。",
+          ),
+          status: "pending",
+        };
+      }
+      try {
+        await assertWalletUsesAppChain(publicClient);
+      } catch (reason) {
+        return { message: errorText(reason), status: "failed" };
+      }
+      return {
+        message: t(
+          "The transaction never reached the chain used by this site. Check that your wallet RPC matches the site RPC, then request a new ticket and retry.",
+          "这笔交易没有到达本站使用的链。请确认钱包 RPC 与本站一致，然后重新领取票据并重试。",
+        ),
+        status: "failed",
+      };
+    },
+    [publicClient, t],
   );
 
   const trackTransaction = useCallback(
@@ -68,52 +111,92 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         return [record, ...without].slice(0, 60);
       });
       toast({
-        title: "交易已提交",
+        title: t("Transaction submitted", "交易已提交"),
         description: `${label} · ${shortHash(hash)}`,
         tone: "info",
         duration: 3_500,
       });
 
       if (!publicClient) {
-        update(id, { status: "failed", error: "RPC 未就绪" });
-        toast({ title: "RPC 未就绪", tone: "error" });
-        throw new Error("RPC 未就绪");
+        const message = t("The application RPC is not ready.", "本站 RPC 尚未就绪。");
+        update(id, { status: "failed", error: message });
+        toast({ title: message, tone: "error" });
+        throw new Error(message);
       }
 
       try {
         const receipt = await publicClient.waitForTransactionReceipt({
           hash,
-          timeout: 180_000,
+          timeout: CONFIRMATION_TIMEOUT_MS,
+          pollingInterval: 1_500,
         });
         if (receipt.status !== "success") {
-          update(id, { status: "reverted", error: "交易执行失败" });
+          update(id, { status: "reverted", error: t("Transaction reverted", "交易执行失败") });
           toast({
-            title: "交易执行失败",
-            description: `${label} 在链上被回滚。`,
+            title: t("Transaction reverted", "交易执行失败"),
+            description: t(
+              `${label} was reverted on-chain.`,
+              `${label} 在链上被回滚。`,
+            ),
             tone: "error",
           });
-          throw new Error("交易执行失败");
+          throw new Error(t("Transaction reverted", "交易执行失败"));
         }
-        update(id, { status: "confirmed" });
+        update(id, { status: "confirmed", error: undefined });
         toast({
-          title: "交易已确认",
+          title: t("Transaction confirmed", "交易已确认"),
           description: `${label} · ${shortHash(hash)}`,
           tone: "success",
           duration: 4_000,
         });
         return receipt;
       } catch (error) {
-        const message = errorText(error);
-        update(id, { status: "failed", error: message });
+        const diagnosis = await explainMissingTransaction(hash);
+        update(id, { status: diagnosis.status, error: diagnosis.message });
         toast({
-          title: "交易未完成",
-          description: message,
+          title: t("Transaction not confirmed", "交易尚未确认"),
+          description: diagnosis.message,
           tone: "error",
+          duration: 8_000,
         });
         throw error;
       }
     },
-    [chainId, publicClient, setRecords, toast, update],
+    [chainId, explainMissingTransaction, publicClient, setRecords, t, toast, update],
+  );
+
+  const refreshTransaction = useCallback(
+    async (id: string) => {
+      const record = records.find((item) => item.id === id);
+      if (!record?.hash || !publicClient) return;
+      const hash = record.hash as `0x${string}`;
+      toast({
+        title: t("Checking transaction", "正在检查交易"),
+        description: shortHash(hash),
+        tone: "info",
+        duration: 2_500,
+      });
+      try {
+        const receipt = await publicClient.getTransactionReceipt({ hash });
+        if (receipt.status === "success") {
+          update(id, { status: "confirmed", error: undefined });
+          toast({ title: t("Transaction confirmed", "交易已确认"), tone: "success" });
+        } else {
+          update(id, { status: "reverted", error: t("Transaction reverted", "交易执行失败") });
+          toast({ title: t("Transaction reverted", "交易执行失败"), tone: "error" });
+        }
+      } catch {
+        const diagnosis = await explainMissingTransaction(hash);
+        update(id, { status: diagnosis.status, error: diagnosis.message });
+        toast({
+          title: t("Still waiting", "仍未找到交易"),
+          description: diagnosis.message,
+          tone: "info",
+          duration: 7_000,
+        });
+      }
+    },
+    [explainMissingTransaction, publicClient, records, t, toast, update],
   );
 
   const clear = useCallback(() => setRecords([]), [setRecords]);
@@ -125,8 +208,15 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   const pendingCount = records.filter((record) => record.status === "pending").length;
 
   const value = useMemo(
-    () => ({ records, pendingCount, trackTransaction, clear, remove }),
-    [clear, pendingCount, records, remove, trackTransaction],
+    () => ({
+      records,
+      pendingCount,
+      trackTransaction,
+      refreshTransaction,
+      clear,
+      remove,
+    }),
+    [clear, pendingCount, records, refreshTransaction, remove, trackTransaction],
   );
 
   return <ActivityContext.Provider value={value}>{children}</ActivityContext.Provider>;

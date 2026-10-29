@@ -18,16 +18,19 @@ import { SyncStatus } from "./SyncStatus";
 import { OfflineBanner } from "./OfflineBanner";
 import { ActivityDrawer } from "./ActivityDrawer";
 import { NetworkBanner } from "../wallet/NetworkBanner";
+import { RpcBanner } from "../wallet/RpcBanner";
 import { ConnectButton } from "../wallet/ConnectButton";
+import { LanguageToggle } from "../ui/LanguageToggle";
 import { useActivity } from "../../context/ActivityContext";
 import { usePlatform } from "../../lib/platform";
+import { useI18n } from "../../lib/i18n";
 import { useDocumentTitle } from "../../lib/hooks";
 import { Dialog } from "../ui/Dialog";
 
 interface NavItem {
   to: string;
-  label: string;
   en: string;
+  zh: string;
   icon: ReactNode;
 }
 
@@ -40,36 +43,40 @@ const GROUPS: NavGroup[] = [
   {
     label: "OPERATIONS",
     items: [
-      { to: "/", label: "总览", en: "Overview", icon: <LayoutDashboard size={16} /> },
-      { to: "/arena", label: "竞技场", en: "Arena", icon: <Swords size={16} /> },
-      { to: "/defend", label: "守方", en: "Defend", icon: <Shield size={16} /> },
-      { to: "/mine", label: "挖矿", en: "Mine", icon: <Pickaxe size={16} /> },
+      { to: "/", en: "Overview", zh: "总览", icon: <LayoutDashboard size={16} /> },
+      { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={16} /> },
+      { to: "/defend", en: "Defend", zh: "守方", icon: <Shield size={16} /> },
+      { to: "/mine", en: "Mine", zh: "挖矿", icon: <Pickaxe size={16} /> },
     ],
   },
   {
     label: "INTELLIGENCE",
     items: [
-      { to: "/leaderboard", label: "排行榜", en: "Ranks", icon: <Trophy size={16} /> },
-      { to: "/market", label: "数据市场", en: "Market", icon: <Database size={16} /> },
+      { to: "/leaderboard", en: "Ranks", zh: "排行榜", icon: <Trophy size={16} /> },
+      { to: "/market", en: "Market", zh: "数据市场", icon: <Database size={16} /> },
     ],
   },
   {
     label: "SUPPORT",
-    items: [{ to: "/faucet", label: "测试水龙头", en: "Faucet", icon: <Droplets size={16} /> }],
+    items: [
+      { to: "/faucet", en: "Faucet", zh: "测试水龙头", icon: <Droplets size={16} /> },
+      { to: "/docs", en: "Guide", zh: "使用文档", icon: <BookOpen size={16} /> },
+    ],
   },
 ];
 
 const MOBILE_PRIMARY: NavItem[] = [
-  { to: "/", label: "总览", en: "Home", icon: <LayoutDashboard size={18} /> },
-  { to: "/arena", label: "竞技场", en: "Arena", icon: <Swords size={18} /> },
-  { to: "/defend", label: "守方", en: "Defend", icon: <Shield size={18} /> },
-  { to: "/mine", label: "挖矿", en: "Mine", icon: <Pickaxe size={18} /> },
+  { to: "/", en: "Home", zh: "总览", icon: <LayoutDashboard size={18} /> },
+  { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={18} /> },
+  { to: "/defend", en: "Defend", zh: "守方", icon: <Shield size={18} /> },
+  { to: "/mine", en: "Mine", zh: "挖矿", icon: <Pickaxe size={18} /> },
 ];
 
 const MOBILE_MORE: NavItem[] = [
-  { to: "/leaderboard", label: "排行榜", en: "Ranks", icon: <Trophy size={17} /> },
-  { to: "/market", label: "数据市场", en: "Market", icon: <Database size={17} /> },
-  { to: "/faucet", label: "测试水龙头", en: "Faucet", icon: <Droplets size={17} /> },
+  { to: "/leaderboard", en: "Ranks", zh: "排行榜", icon: <Trophy size={17} /> },
+  { to: "/market", en: "Market", zh: "数据市场", icon: <Database size={17} /> },
+  { to: "/faucet", en: "Faucet", zh: "测试水龙头", icon: <Droplets size={17} /> },
+  { to: "/docs", en: "Guide", zh: "使用文档", icon: <BookOpen size={17} /> },
 ];
 
 function pageTitle(pathname: string): { en: string; zh: string } {
@@ -83,12 +90,14 @@ function pageTitle(pathname: string): { en: string; zh: string } {
   if (pathname.startsWith("/market/")) return { en: "Dataset", zh: "数据详情" };
   if (pathname === "/market") return { en: "Market", zh: "数据市场" };
   if (pathname === "/faucet") return { en: "Faucet", zh: "测试水龙头" };
+  if (pathname === "/docs") return { en: "Guide", zh: "使用文档" };
   if (pathname === "/ops") return { en: "Operations", zh: "运营控制台" };
   return { en: "Unknown", zh: "未找到页面" };
 }
 
 function SidebarStatus() {
   const { meta, online, status } = usePlatform();
+  const { t } = useI18n();
   const lastBlock = status?.indexer?.lastBlock;
   const lag = status?.indexer?.lag;
 
@@ -111,7 +120,7 @@ function SidebarStatus() {
           <dt>BLOCK</dt>
           <dd className="mono">
             {lastBlock !== null && lastBlock !== undefined
-              ? lastBlock.toLocaleString("zh-CN")
+              ? lastBlock.toLocaleString("en-US")
               : "—"}
           </dd>
         </div>
@@ -124,7 +133,7 @@ function SidebarStatus() {
       </dl>
       <NavLink to="/faucet" className="sidebar-status__link">
         <Droplets size={12} />
-        测试网水龙头
+        {t("Testnet faucet", "测试网水龙头")}
         <span aria-hidden="true">→</span>
       </NavLink>
     </div>
@@ -132,13 +141,14 @@ function SidebarStatus() {
 }
 
 function Sidebar() {
+  const { t, lang } = useI18n();
   return (
     <aside className="sidebar">
-      <NavLink to="/" className="sidebar__brand" aria-label="RTM Arena 首页">
+      <NavLink to="/" className="sidebar__brand" aria-label={t("RTM Arena home", "RTM Arena 首页")}>
         <Wordmark />
       </NavLink>
       <div className="sidebar__divider" />
-      <nav className="sidebar__nav" aria-label="主导航">
+      <nav className="sidebar__nav" aria-label={t("Main navigation", "主导航")}>
         {GROUPS.map((group) => (
           <div className="nav-group" key={group.label}>
             <p className="nav-group__label">{group.label}</p>
@@ -155,8 +165,8 @@ function Sidebar() {
                   {item.icon}
                 </span>
                 <span className="nav-item__text">
-                  <span className="nav-item__label">{item.label}</span>
-                  <span className="nav-item__en">{item.en}</span>
+                  <span className="nav-item__label">{t(item.en, item.zh)}</span>
+                  {lang === "zh" && <span className="nav-item__en">{item.en}</span>}
                 </span>
                 <span className="nav-item__index mono">{String(index + 1).padStart(2, "0")}</span>
               </NavLink>
@@ -175,17 +185,18 @@ function Sidebar() {
 }
 
 function MobileNav({ onMore }: { onMore: () => void }) {
+  const { t } = useI18n();
   const location = useLocation();
   const moreActive = MOBILE_MORE.some((item) => location.pathname.startsWith(item.to));
   return (
-    <nav className="mobile-nav" aria-label="移动端导航">
+    <nav className="mobile-nav" aria-label={t("Mobile navigation", "移动端导航")}>
       {MOBILE_PRIMARY.map((item) => {
         const active =
           item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
         return (
           <NavLink key={item.to} to={item.to} className={`mobile-nav__item ${active ? "is-active" : ""}`}>
             {item.icon}
-            <span>{item.label}</span>
+            <span>{t(item.en, item.zh)}</span>
           </NavLink>
         );
       })}
@@ -195,7 +206,7 @@ function MobileNav({ onMore }: { onMore: () => void }) {
         onClick={onMore}
       >
         <MoreHorizontal size={18} />
-        <span>更多</span>
+        <span>{t("More", "更多")}</span>
       </button>
     </nav>
   );
@@ -203,8 +214,9 @@ function MobileNav({ onMore }: { onMore: () => void }) {
 
 function MobileMoreDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
+  const { t, lang } = useI18n();
   return (
-    <Dialog open={open} onClose={onClose} title="更多" eyebrow="Navigation" size="sm">
+    <Dialog open={open} onClose={onClose} title={t("More", "更多")} eyebrow="Navigation" size="sm">
       <div className="more-list">
         {MOBILE_MORE.map((item) => (
           <button
@@ -218,15 +230,20 @@ function MobileMoreDialog({ open, onClose }: { open: boolean; onClose: () => voi
           >
             <span className="more-list__icon">{item.icon}</span>
             <span>
-              <strong>{item.label}</strong>
-              <small>{item.en}</small>
+              <strong>{t(item.en, item.zh)}</strong>
+              {lang === "zh" && <small>{item.en}</small>}
             </span>
             <span className="more-list__arrow" aria-hidden="true">→</span>
           </button>
         ))}
         <div className="more-list__note">
           <BookOpen size={14} />
-          <span>测试网资产无价值。所有攻防数据只用于防御研究。</span>
+          <span>
+            {t(
+              "Testnet assets have no value. All attack data is used for defensive research only.",
+              "测试网资产无价值。所有攻防数据只用于防御研究。",
+            )}
+          </span>
         </div>
       </div>
     </Dialog>
@@ -238,8 +255,10 @@ export function AppShell() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { pendingCount } = useActivity();
+  const { t, lang } = useI18n();
   const title = pageTitle(location.pathname);
-  useDocumentTitle(`${title.zh} · RTM Arena`);
+  const localizedTitle = lang === "en" ? title.en : title.zh;
+  useDocumentTitle(`${localizedTitle} · RTM Arena`);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
@@ -249,20 +268,23 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
-        跳到主要内容
+        {t("Skip to main content", "跳到主要内容")}
       </a>
       <Sidebar />
       <div className="app-main">
         <header className="topbar">
-          <NavLink to="/" className="topbar__brand" aria-label="RTM Arena 首页">
+          <NavLink to="/" className="topbar__brand" aria-label={t("RTM Arena home", "RTM Arena 首页")}>
             <Wordmark compact />
           </NavLink>
           <div className="topbar__title">
-            <span className="topbar__en mono">{title.en}</span>
+            <span className="topbar__en mono">
+              {lang === "zh" ? title.en : t("Field operations", "现场操作")}
+            </span>
             <span className="topbar__divider" aria-hidden="true">/</span>
-            <h1>{title.zh}</h1>
+            <h1>{localizedTitle}</h1>
           </div>
           <div className="topbar__actions">
+            <LanguageToggle />
             <div className="topbar__sync">
               <SyncStatus />
             </div>
@@ -270,8 +292,8 @@ export function AppShell() {
               type="button"
               className="icon-btn icon-btn--badged"
               onClick={() => setActivityOpen(true)}
-              aria-label="打开交易活动"
-              title="交易活动"
+              aria-label={t("Open transaction activity", "打开交易活动")}
+              title={t("Transaction activity", "交易活动")}
             >
               <Activity size={17} />
               {pendingCount > 0 && <span className="icon-btn__badge">{pendingCount}</span>}
@@ -280,6 +302,7 @@ export function AppShell() {
           </div>
         </header>
         <NetworkBanner />
+        <RpcBanner />
         <OfflineBanner />
         <main className="main" id="main">
           <div className="page" key={location.pathname}>
@@ -289,10 +312,10 @@ export function AppShell() {
         <footer className="site-footer">
           <div>
             <span className="mono">RTM//ARENA</span>
-            <span> · 防御性安全评测实验</span>
+            <span> · {t("Defensive security evaluation lab", "防御性安全评测实验")}</span>
           </div>
           <div>
-            <span>Testnet assets have no value.</span>
+            <span>{t("Testnet assets have no value.", "测试网资产无价值。")}</span>
             <span className="mono"> · CHAIN 48850</span>
           </div>
         </footer>
