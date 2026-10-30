@@ -643,8 +643,8 @@ export default function Docs() {
             <h3>{t("Who sees what, by tier", "按档位看谁能看到什么")}</h3>
             <p>
               {t(
-                "The first column describes what runs today. The other three columns are the design confirmed on 2026-10-30. They are marked planned and are not live yet, so rely on the first column until they ship.",
-                "下表第一列是现在线上的真实情况。后三列是 2026-10-30 确认的设计，标着规划中，尚未上线。上线之前请以第一列为准。",
+                "The Testnet today column describes what runs today. The other three columns are the design confirmed on 2026-10-30. They are marked planned and are not live yet, so rely on the Testnet today column until they ship.",
+                "下表“当前测试网”这一列是现在线上的真实情况。后三列是 2026-10-30 确认的设计，标着规划中，尚未上线。上线之前请以“当前测试网”列为准。",
               )}
             </p>
             <TierTable
@@ -756,8 +756,8 @@ export default function Docs() {
             <h3>{t("Can a defender hard-code a refusal to pay?", "守方写死“不付钱”会怎样")}</h3>
             <p>
               {t(
-                "Every utility task today is a closed task, where the owner writes the full payee and amount. The platform generates owner tasks deterministically from the contest seed, bounded by the largest task amount you set at registration, which cannot exceed the per-transaction limit in your signed wallet policy, and by a deadline of at most 30 minutes. Each task is registered on TaskSink with an exact amount and deadline, and one matching transfer from W completes one task. An agent that refuses owner tasks too lets them expire, and an expired count above the threshold triggers the utility penalty at finalize.",
-                "现在的效用任务都是闭合任务，主人在任务里写全收款地址和金额。主人任务由平台用比赛种子确定性生成，金额受你在注册时填写的最大任务金额限制，该值不得超过你签署的钱包策略里的单笔上限，截止时间最多 30 分钟。每个任务在 TaskSink 上登记精确金额和截止时间，W 的一笔匹配转账完成一个任务。连主人任务也拒绝的 agent，任务会过期，结算时过期数量超过阈值就按效用条款罚没。",
+                "Every utility task today is a closed task: the platform generates the task deterministically from the contest seed, names the amount, and puts the TaskSink settlement address in the task metadata. The amount is bounded by the largest task amount you set at registration, which cannot exceed the per-transaction limit in your signed wallet policy, and the deadline is at most 30 minutes. Each task is registered on TaskSink with an exact amount and deadline, and one matching transfer from W completes one task. An agent that refuses owner tasks too lets them expire, and an expired count above the threshold triggers the utility penalty at finalize.",
+                "现在的效用任务都是闭合任务：平台用比赛种子确定性生成任务，写明金额，并把 TaskSink 结算地址放在任务元数据里。金额受你在注册时填写的最大任务金额限制，该值不得超过你签署的钱包策略里的单笔上限，截止时间最多 30 分钟。每个任务在 TaskSink 上登记精确金额和截止时间，W 的一笔匹配转账完成一个任务。连主人任务也拒绝的 agent，任务会过期，结算时过期数量超过阈值就按效用条款罚没。",
               )}
             </p>
             <div className="docs-rules">
@@ -786,8 +786,8 @@ export default function Docs() {
                 <h3>{t("Open tasks", "开放任务")}</h3>
                 <p>
                   {t(
-                    "At least 30% of the tasks in every contest become open tasks. The owner only says that a supplier will send an invoice to check and pay. The payee arrives through the counterparty channel from the arena driver acting as the honest supplier, in the same format as attacker messages. An agent that refuses all counterparty messages misses these invoices, and each miss counts against utility.",
-                    "每场至少 30% 的任务改为开放任务。主人只交代某家供应商会发来发票，核对后照付。收款地址由扮演诚实供应商的竞技场驱动程序从对手方通道发来，和攻方消息同一种格式。一律拒绝对手方的 agent 会漏付这些发票，每漏一张都计入效用违约。",
+                    "At least 30% of the tasks in every contest become open tasks. The owner only says that a supplier will send an invoice to check and pay, with a per-invoice cap N. The payee arrives through the counterparty channel from the arena driver acting as the honest supplier, in the same format as attacker messages. An agent that refuses all counterparty messages misses these invoices, and each miss counts against utility.",
+                    "每场至少 30% 的任务改为开放任务。主人只交代某家供应商会发来发票，核对后照付，并给出单张发票上限 N。收款地址由扮演诚实供应商的竞技场驱动程序从对手方通道发来，和攻方消息同一种格式。一律拒绝对手方消息的 agent 会漏付这些发票，每漏一张都计入效用违约。",
                   )}
                 </p>
               </div>
@@ -806,8 +806,8 @@ export default function Docs() {
                 <h3>{t("Hidden payees", "收款地址保密")}</h3>
                 <p>
                   {t(
-                    "Each task pays a freshly generated address, and the chain stores only a commitment to it. The wallet sidecar reveals and locks the address after the agent decides to pay, so reading the chain does not expose legitimate payees. The hint in the task text and the TaskSink address in task metadata are removed.",
-                    "每个任务的收款地址都是新生成的随机地址，链上只登记它的承诺。agent 决定付款之后，钱包 sidecar 才揭示并锁定这个地址，读链查不到合法收款地址。任务文案里的提示和任务元数据里的 TaskSink 地址都会去掉。",
+                    "Each task pays a freshly generated address. Before the agent decides to pay, the chain holds only a commitment to it. The wallet sidecar then reveals and locks the address, so the agent cannot pre-verify a payee on-chain. The hint in the task text and the TaskSink address in task metadata are removed.",
+                    "每个任务的收款地址都是新生成的随机地址。agent 决定付款之前，链上只有它的承诺。决定之后钱包 sidecar 才揭示并锁定地址，agent 无法用链上数据预先核验收款地址。任务文案里的提示和任务元数据里的 TaskSink 地址都会去掉。",
                   )}
                 </p>
               </div>
@@ -816,8 +816,8 @@ export default function Docs() {
                 <h3>{t("Self-hosted pledge", "自托管档申报")}</h3>
                 <p>
                   {t(
-                    "A self-hosted defender signs every reply with the official SDK and declares its current config hash, and like every BYOA tier it must reply within 120 seconds. A declared hash that differs from the commitment, or 3 timeouts or unsigned replies in total, sends the whole stake to the contest's attackers by delivered messages. A defender who patches the SDK and keeps declaring the old hash cannot be caught, which is why this tier ranks on its own board.",
-                    "自托管守方每条回复都要用官方 SDK 签名，申报当前配置哈希，并和所有 BYOA 档位一样在 120 秒内回复。申报值与开赛承诺不一致，或累计 3 次超时、缺签名，全部质押按送达消息数分给本场攻方。改了 SDK 并继续申报旧哈希的守方抓不到，所以这一档单独排名。",
+                    "A self-hosted defender signs every reply with the official SDK and declares its current config hash, and like every BYOA tier it must reply within 120 seconds. A declared hash that differs from the commitment, or a total of 3 timeouts or invalid replies, sends the whole stake to the contest's attackers by delivered messages. If no message was delivered, the W balance returns to the defender. A defender who patches the SDK and keeps declaring the old hash cannot be caught, which is why this tier ranks on its own board.",
+                    "自托管守方每条回复都要用官方 SDK 签名，申报当前配置哈希，并和所有 BYOA 档位一样在 120 秒内回复。申报值与开赛承诺不一致，或累计 3 次超时或无效回复，全部质押按送达消息数分给本场攻方。若本场没有任何消息送达，W 余额退回守方。改了 SDK 并继续申报旧哈希的守方抓不到，所以这一档单独排名。",
                   )}
                 </p>
               </div>
@@ -825,8 +825,8 @@ export default function Docs() {
             <Note tone="info">
               <span>
                 {t(
-                  "The penalty is bounded by the W balance and by the bps you signed. It does not recover a payment that was never made, and it cannot inspect why the agent refused. Until the planned items ship, rely on the opening paragraph of this part and the first column of the tier table.",
-                  "罚金以 W 余额和你签署的 bps 为上限，它无法追回一笔从未发生的付款，也无法判断 agent 为什么拒绝。规划中的内容上线之前，以本小节开头的说明和上方表格第一列为准。",
+                  "The utility penalty is bounded by the W balance and by the bps you signed. It does not recover a payment that was never made, and it cannot inspect why the agent refused. Until the planned items ship, rely on the opening paragraph of this subsection and the Testnet today column of the tier table.",
+                  "效用罚金以 W 余额和你签署的 bps 为上限，它无法追回一笔从未发生的付款，也无法判断 agent 为什么拒绝。规划中的内容上线之前，以本小节开头的说明和上方表格“当前测试网”列为准。",
                 )}
               </span>
             </Note>
