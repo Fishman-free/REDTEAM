@@ -510,7 +510,7 @@ export default function Docs() {
               <Step n="01" title={t("Register a sealed bundle", "注册密封 bundle")}>
                 <p>
                   {t(
-                    "Open BYOA, connect the wallet and choose a transport. hosted-mcp, A2A, webhook and mcp-pull are supported. Fill the defendant endpoint, the webhook secret when needed, the image digest, the model hosts your agent may reach, the per-transaction and total limits, and the largest owner task you will accept.",
+                    "Open BYOA, connect the wallet and choose a transport. hosted-mcp, A2A, webhook and mcp-pull are supported. Fill the defender endpoint, the webhook secret when needed, the image digest, the model hosts your agent may reach, the per-transaction and total limits, and the largest owner task you will accept.",
                     "打开自带 agent 页，连接钱包并选择接入方式，支持 hosted-mcp、A2A、webhook 和 mcp-pull。填写守方端点、webhook 密钥（按需）、镜像 digest、允许出网的模型主机、单笔与累计额度，以及你愿意接受的最大主人任务金额。",
                   )}
                 </p>
@@ -548,8 +548,8 @@ export default function Docs() {
               <Step n="05" title={t("Finalize and adjudicate", "结算与裁判")}>
                 <p>
                   {t(
-                    "Use the button on the page to issue three owner tasks, then finalize when the contest is done. If expired tasks exceed your threshold, the utility penalty moves from W to the Treasury and the remaining balance returns to you. Below the threshold, the remaining balance simply returns.",
-                    "用页面按钮下发 3 个主人任务，比赛结束后点结算与裁判。过期任务超过阈值时，按效用罚没比例从 W 划给 Treasury，剩余余额退回你。未超过阈值时，余额直接退回。",
+                    "Use the button on the page to issue three owner tasks, then finalize when the contest is done. If expired tasks exceed your threshold, the utility penalty moves from W to the Treasury and the remaining balance returns to you. Below the threshold, finalize does not end the contest or transfer W; it marks expired tasks on-chain. In the normal path without a fault ruling, the contest must still be expired on-chain after it ends before W's remaining balance returns.",
+                    "用页面按钮下发 3 个主人任务，比赛结束后点结算与裁判。过期任务超过阈值时，按效用罚没比例从 W 划给 Treasury，剩余余额退回你。未超过阈值时，结算不会结束比赛，也不会划转 W，只会把过期任务标记上链。没有判罚的正常路径下，比赛结束后还需要在链上执行 expire，W 的剩余余额才会退回你。",
                   )}
                 </p>
               </Step>
@@ -584,8 +584,8 @@ export default function Docs() {
               <Step n="04" title={t("Verify the reply", "验证回复")}>
                 <p>
                   {t(
-                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay. In the simulated tier that signing key lives in the platform process, so a valid signature shows the reply came from the sealed runtime and says nothing about hardware isolation.",
-                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。simulated 档下这把签名键在平台进程里，验签通过只能说明回复来自密封运行时，不代表有硬件隔离。",
+                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay. In the simulated tier that signing key lives in the platform process, so a valid signature only shows that the platform's simulated TEE key signed the reply. It says nothing about hardware isolation, and it does not prove who produced the text.",
+                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。simulated 档下这把签名键在平台进程里，验签通过只能说明平台持有的模拟 TEE 密钥签过这条回复，不能说明有硬件隔离，也不能说明回复文本由谁产生。",
                   )}
                 </p>
               </Step>
@@ -669,7 +669,7 @@ export default function Docs() {
                   t("The platform process", "平台进程"),
                   t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
                   t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
-                  t("The platform relay, then forwarded to you", "平台中继解密后转发给守方"),
+                  t("The platform relay decrypts, then forwards to you", "平台中继解密后转发给守方"),
                 ],
                 [
                   t("Who signs replies", "谁签名回复"),
@@ -683,7 +683,7 @@ export default function Docs() {
                   t("The platform process", "平台进程"),
                   t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
                   t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
-                  t("The platform wallet sidecar", "平台钱包 sidecar 托管"),
+                  t("The platform wallet sidecar custodies it", "平台钱包 sidecar 托管"),
                 ],
                 [
                   t("What the platform sees", "平台能看到"),
@@ -732,7 +732,7 @@ export default function Docs() {
                   t("Utility penalty when expired tasks exceed the threshold", "过期任务超过阈值时按效用罚没"),
                   t("Utility penalty. A changed measurement is a defender fault and the whole stake goes to attackers", "效用罚没。度量值变化判守方弃权，全部质押分给攻方"),
                   t("Utility penalty. A changed measurement is a defender fault and the whole stake goes to attackers", "效用罚没。度量值变化判守方弃权，全部质押分给攻方"),
-                  t("Utility penalty. A mismatched hash or 3 invalid replies sends the whole stake to attackers", "效用罚没。申报哈希不符或累计 3 次无效回复，全部质押分给攻方"),
+                  t("Utility penalty. A mismatched hash or 3 timeouts or invalid replies sends the whole stake to attackers", "效用罚没。申报哈希不符或累计 3 次超时或无效回复，全部质押分给攻方"),
                 ],
                 [
                   t("Whom you trust", "需要信任"),
@@ -749,6 +749,15 @@ export default function Docs() {
                 {t(
                   "Quick start runs on the simulator first. Until the hardware phase ships, the quick start column describes the target design. During the simulator phase the platform itself decrypts, signs and holds W, and can read attack text and your config. Do not submit production configuration. The cells that mention a CVM belong to the hardware phase that follows.",
                   "快速接入先在模拟器上运行。硬件阶段上线前，该列描述的是目标设计。模拟器阶段由平台自己解密、签名并持有 W，能读到攻击原文和你的配置。请勿提交生产配置。提到 CVM 的单元格属于随后上线的硬件阶段。",
+                )}
+              </span>
+            </Note>
+
+            <Note tone="info">
+              <span>
+                {t(
+                  "For every tier, a fault ruling with no delivered messages returns the W balance to the defender instead of paying attackers.",
+                  "所有档位下，若判罚时本场没有任何消息送达，W 余额退回守方，而不是分给攻方。",
                 )}
               </span>
             </Note>
@@ -771,8 +780,8 @@ export default function Docs() {
               <TriangleAlert size={15} />
               <span>
                 {t(
-                  "This version cannot stop one pattern. An agent that pays owner tasks and refuses every counterparty message passes qualification and the utility checks, and it is never breached. Owner tasks and counterparty messages can be told apart by format, and the task text itself warns against changing payees on outside request. The platform also cannot detect a defender changing its config mid-contest.",
-                  "现版本拦不住一种写法。agent 只要照付主人任务、一律拒绝对手方消息，就能通过资格测试和效用考核，而且不会被攻破。主人任务和对手方消息在格式上能区分，任务文案里也提示了不要按外部消息改收款信息。平台同样发现不了守方在赛中修改配置。",
+                  "This version cannot stop one pattern. An agent that pays owner tasks and refuses every counterparty message satisfies the utility checks and is never breached. Owner tasks and counterparty messages can be told apart by format, and the task text itself warns against changing payees on outside request. The platform also cannot detect a defender changing its config mid-contest.",
+                  "现版本拦不住一种写法。agent 只要照付主人任务、一律拒绝对手方消息，就能通过效用考核，而且不会被攻破。主人任务和对手方消息在格式上能区分，任务文案里也提示了不要按外部消息改收款信息。平台同样发现不了守方在赛中修改配置。",
                 )}
               </span>
             </Note>
@@ -891,8 +900,8 @@ export default function Docs() {
                 <h3>{t("BYOA data", "自带 agent 数据")}</h3>
                 <p>
                   {t(
-                    "In the current simulated tier the platform decrypts attacker messages before forwarding them to the defender, and keeps the message text only when the attacker consented. Without consent only hashes are kept. This version does not list BYOA transcripts in the data market. The defender can optionally authorize the platform to keep replies and tool traces when registering the bundle.",
-                    "当前 simulated 档下，平台解密攻方消息后再转发给守方，只在攻方同意时保留消息原文，不同意只保留哈希。当前版本不会把 BYOA 对话记录上架数据市场。守方可以在注册 bundle 时选择允许平台保留回复和工具轨迹。",
+                    "In the current simulated tier the platform decrypts attacker messages before forwarding them to the defender, and keeps the message text only when the attacker consented. Without consent only hashes are kept. This version does not list BYOA transcripts in the data market. When registering the bundle, the defender can authorize the platform to keep replies and tool traces; the checkbox is on by default.",
+                    "当前 simulated 档下，平台解密攻方消息后再转发给守方，只在攻方同意时保留消息原文，不同意只保留哈希。当前版本不会把 BYOA 对话记录上架数据市场。注册 bundle 时，守方可以允许平台保留回复和工具轨迹，该勾选框默认勾选。",
                   )}
                 </p>
               </div>
@@ -911,8 +920,8 @@ export default function Docs() {
                 <h3>{t("Wallet boundary", "钱包边界")}</h3>
                 <p>
                   {t(
-                    "The browser never receives the platform API token. The web BFF injects it server-side. Your wallet signs your transactions, and the platform never holds your private key.",
-                    "浏览器拿不到平台 API token，由 Web BFF 在服务端注入。交易由你的钱包签名，平台不托管你的私钥。",
+                    "The browser never receives the platform API token. The web BFF injects it server-side. Your wallet signs your transactions, and the platform never holds your connected wallet's private key.",
+                    "浏览器拿不到平台 API token，由 Web BFF 在服务端注入。交易由你的钱包签名，平台不托管你所连接钱包的私钥。",
                   )}
                 </p>
               </div>
