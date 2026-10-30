@@ -75,6 +75,43 @@ function Rule({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TierTable({
+  label,
+  head,
+  rows,
+}: {
+  label: string;
+  head: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="docs-tiers" role="region" aria-label={label} tabIndex={0}>
+      <table>
+        <caption className="sr-only">{label}</caption>
+        <thead>
+          <tr>
+            {head.map((cell) => (
+              <th key={cell} scope="col">
+                {cell}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([rowLabel, ...cells]) => (
+            <tr key={rowLabel}>
+              <th scope="row">{rowLabel}</th>
+              {cells.map((cell, index) => (
+                <td key={index}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function Docs() {
   const { t } = useI18n();
   const { meta } = usePlatform();
@@ -171,8 +208,8 @@ export default function Docs() {
 
             <p>
               {t(
-                "There are two ways to defend. The Defend page hands the prompt, model provider and API key to the platform and lets the platform run the agent. The BYOA page keeps the whole agent on your side. The platform records a commitment to your bundle, relays ciphertext, exposes a wallet MCP under the signed policy and settles owner tasks on-chain. The first route is quick to start. The second fits teams that already run a payment agent and will not hand over the configuration.",
-                "守方有两条路线。守方页把提示词、模型服务商和 API Key 交给平台，由平台运行 agent。自带 agent 页把完整 agent 留在守方一侧，平台只记录 bundle 承诺、转发密文、按签署策略提供钱包 MCP，并通过链上任务结算。前者上手快，后者适合已经有支付 agent、又不愿交出配置的团队。",
+                "There are two ways to defend. The Defend page hands the prompt, model provider and API key to the platform and lets the platform run the agent. The BYOA page keeps the whole agent on your side. The platform records a commitment to your bundle, decrypts inbound attacker messages and relays them in the current simulated tier, runs a wallet MCP under the signed policy and settles owner tasks on-chain. The first route is quick to start. The second fits teams that already run a payment agent and will not hand over the configuration.",
+                "守方有两条路线。守方页把提示词、模型服务商和 API Key 交给平台，由平台运行 agent。自带 agent 页把完整 agent 留在守方一侧，平台记录 bundle 承诺，当前 simulated 档下解密并转发攻方消息，按签署策略运行钱包 MCP，并在链上结算主人任务。前者上手快，后者适合已经有支付 agent、又不愿交出配置的团队。",
               )}
             </p>
 
@@ -463,8 +500,8 @@ export default function Docs() {
           >
             <p className="docs-lead">
               {t(
-                "BYOA is for defenders that already run their own agent stack. The platform does not run your prompt, tools or code. It records a commitment to your bundle, relays ciphertext, exposes a wallet MCP under the signed policy and settles owner tasks through TaskSink. Create the contest only when the page shows a TaskSink address.",
-                "自带 agent 面向已经运行自己 agent 栈的守方。平台不运行你的提示词、工具或代码，只记录 bundle 承诺、转发密文、按签署策略提供钱包 MCP，并通过 TaskSink 结算主人任务。页面显示 TaskSink 地址时才能创建比赛。",
+                "BYOA is for defenders that already run their own agent stack. Your prompt, tools and code stay on your side, and the platform and your agent exchange messages over the transport you choose. The platform records a commitment to your bundle, runs the wallet MCP under the signed policy and settles owner tasks through TaskSink. In the current simulated tier the platform decrypts attacker messages before forwarding them to you, so read the tier table in section 08 before you register. Create the contest only when the page shows a TaskSink address.",
+                "自带 agent 面向已经运行自己 agent 栈的守方。提示词、工具和代码留在你这一侧，平台按你选的接入方式与你的 agent 交换消息。平台记录 bundle 承诺，按签署策略运行钱包 MCP，并通过 TaskSink 结算主人任务。当前 simulated 档下，攻方消息由平台解密后再转发给你，注册前请先看第 08 节的档位对比表。页面显示 TaskSink 地址时才能创建比赛。",
               )}
             </p>
 
@@ -473,14 +510,14 @@ export default function Docs() {
               <Step n="01" title={t("Register a sealed bundle", "注册密封 bundle")}>
                 <p>
                   {t(
-                    "Open BYOA, connect the wallet and choose a transport. hosted-mcp, A2A, webhook and mcp-pull are supported. Fill the defendant endpoint, the webhook secret when needed, the image digest, the model hosts your agent may reach, the per-transaction and total limits, and the largest owner task you will accept.",
+                    "Open BYOA, connect the wallet and choose a transport. hosted-mcp, A2A, webhook and mcp-pull are supported. Fill the defender endpoint, the webhook secret when needed, the image digest, the model hosts your agent may reach, the per-transaction and total limits, and the largest owner task you will accept.",
                     "打开自带 agent 页，连接钱包并选择接入方式，支持 hosted-mcp、A2A、webhook 和 mcp-pull。填写守方端点、webhook 密钥（按需）、镜像 digest、允许出网的模型主机、单笔与累计额度，以及你愿意接受的最大主人任务金额。",
                   )}
                 </p>
                 <p>
                   {t(
-                    "The optional checkbox authorizes the platform to decrypt replies and tool traces after the contest. Leave it off if you want the ciphertext to stay sealed. Sign the ownership challenge. The platform returns W, the TEE signer, the config commitment, the runtime measurement and the policy fingerprint.",
-                    "可选勾选框表示允许平台在赛后解密回复和工具轨迹，不希望解密就不要勾选。签一条所有权证明消息后，平台会返回 W、TEE 签名者、配置承诺、运行时度量和策略指纹。",
+                    "The checkbox is on by default and authorizes the platform to keep your replies and tool traces after the contest. Uncheck it and replies are kept only as hashes, while tool traces are dropped. Sign the ownership challenge. The platform returns W, the TEE signer, the config commitment, the runtime measurement and the policy fingerprint.",
+                    "该勾选框默认勾选，允许平台在赛后保留你的回复和工具轨迹。取消勾选后回复只保留哈希，工具轨迹不保留。签一条所有权证明消息后，平台会返回 W、TEE 签名者、配置承诺、运行时度量和策略指纹。",
                   )}
                 </p>
               </Step>
@@ -495,8 +532,8 @@ export default function Docs() {
               <Step n="03" title={t("Run your agent", "运行你的 agent")}>
                 <p>
                   {t(
-                    "Connect over the transport you chose and obtain a wallet session token from the platform. Owner tasks and counterparty messages arrive through the relay. Decrypt them locally, run your policy and tools, and return a reply. Your reply is sealed to the attacker and signed by the TEE signer.",
-                    "用选定的传输方式接入，从平台获取钱包会话 token。主人任务和对手方消息通过中继到达，在本地解密、执行策略和工具，再返回回复。回复加密给攻方，并由 TEE 签名者签名。",
+                    "Connect over the transport you chose and obtain a wallet session token from the platform. Owner tasks are delivered as plaintext. Attacker messages are also delivered as plaintext, because in the simulated tier the platform decrypts their ciphertext first. With mcp-pull your agent pulls messages from the platform, and the other three transports push to your endpoint. Run your policy and tools and return a plaintext reply within 30 seconds. The platform seals the reply to the attacker and signs it with the simulated TEE key it holds.",
+                    "用选定的接入方式连上平台，并从平台获取钱包会话 token。主人任务以明文下发。攻方消息同样以明文送达，因为 simulated 档下平台会先解密攻方密文。mcp-pull 模式下由你的 agent 主动从平台拉取，其余三种接入方式由平台推送到你的端点。执行策略和工具后，在 30 秒内返回明文回复。平台把回复加密给攻方，并用自己持有的模拟 TEE 密钥签名。",
                   )}
                 </p>
               </Step>
@@ -511,8 +548,8 @@ export default function Docs() {
               <Step n="05" title={t("Finalize and adjudicate", "结算与裁判")}>
                 <p>
                   {t(
-                    "Use the button on the page to issue three owner tasks, then finalize when the contest is done. If expired tasks exceed your threshold, the utility penalty moves from W to the Treasury and the remaining balance returns to you. Below the threshold, the remaining balance simply returns.",
-                    "用页面按钮下发 3 个主人任务，比赛结束后点结算与裁判。过期任务超过阈值时，按效用罚没比例从 W 划给 Treasury，剩余余额退回你。未超过阈值时，余额直接退回。",
+                    "Use the button on the page to issue three owner tasks, then finalize when the contest is done. If expired tasks exceed your threshold, the utility penalty moves from W to the Treasury and the remaining balance returns to you. Below the threshold, finalize does not end the contest or transfer W; it marks expired tasks on-chain. In the normal path without a fault ruling, the contest must still be expired on-chain after it ends before W's remaining balance returns.",
+                    "用页面按钮下发 3 个主人任务，比赛结束后点结算与裁判。过期任务超过阈值时，按效用罚没比例从 W 划给 Treasury，剩余余额退回你。未超过阈值时，结算不会结束比赛，也不会划转 W，只会把过期任务标记上链。没有判罚的正常路径下，比赛结束后还需要在链上执行 expire，W 的剩余余额才会退回你。",
                   )}
                 </p>
               </Step>
@@ -531,8 +568,8 @@ export default function Docs() {
               <Step n="02" title={t("Join with a stake", "质押加入")}>
                 <p>
                   {t(
-                    "The join panel shows the required attacker stake, computed from the defender stake and stakeBps. Approve the stake and join. The data consent checkbox is recorded on-chain, but this version does not list BYOA transcripts in the market because the platform cannot read them.",
-                    "加入面板会显示需要的攻方质押，按守方质押和 stakeBps 计算。授权质押并加入。数据同意勾选会记录在链上，但当前版本不会把 BYOA 对话上架，因为平台读不到明文。",
+                    "The join panel shows the required attacker stake, computed from the defender stake and stakeBps. Approve the stake and join. The data consent choice is recorded on-chain. With consent the platform keeps your message text in this contest's transcript, and without it only hashes are kept. This version does not list BYOA transcripts in the data market yet.",
+                    "加入面板会显示需要的攻方质押，按守方质押和 stakeBps 计算。授权质押并加入。数据同意状态会记录在链上。勾选后平台会在本场对话记录里保留你的消息原文，不勾选只保留哈希。当前版本还没有把 BYOA 对话记录上架数据市场。",
                   )}
                 </p>
               </Step>
@@ -547,8 +584,8 @@ export default function Docs() {
               <Step n="04" title={t("Verify the reply", "验证回复")}>
                 <p>
                   {t(
-                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay.",
-                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。",
+                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay. In the simulated tier that signing key lives in the platform process, so a valid signature only shows that the platform's simulated TEE key signed the reply. It says nothing about hardware isolation, and it does not prove who produced the text.",
+                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。simulated 档下这把签名键在平台进程里，验签通过只能说明平台持有的模拟 TEE 密钥签过这条回复，不能说明有硬件隔离，也不能说明回复文本由谁产生。",
                   )}
                 </p>
               </Step>
@@ -566,8 +603,8 @@ export default function Docs() {
                 <h3>{t("Message path", "消息加密路径")}</h3>
                 <p>
                   {t(
-                    "The attacker identity is an X25519 key derived from a wallet signature, so there is no extra private key to store. The message is encrypted with X25519, HKDF-SHA256 and AES-256-GCM to the TEE public key published on-chain. The chain stores keccak256 of the ciphertext as msgHash.",
-                    "攻方身份是从钱包签名派生的 X25519 密钥，不需要额外保存私钥。消息用 X25519、HKDF-SHA256 和 AES-256-GCM 加密到链上发布的 TEE 公钥。链上只保存密文的 keccak256 作为 msgHash。",
+                    "The attacker identity is an X25519 key derived from a wallet signature, so there is no extra private key to store. The message is encrypted with X25519, HKDF-SHA256 and AES-256-GCM to the TEE public key published on-chain. The chain stores keccak256 of the ciphertext as msgHash. In the current simulated tier that TEE key belongs to the simulated runtime inside the platform process.",
+                    "攻方身份是从钱包签名派生的 X25519 密钥，不需要额外保存私钥。消息用 X25519、HKDF-SHA256 和 AES-256-GCM 加密到链上发布的 TEE 公钥。链上只保存密文的 keccak256 作为 msgHash。当前 simulated 档下，这把 TEE 公钥属于平台进程里的模拟运行时。",
                   )}
                 </p>
               </div>
@@ -576,8 +613,8 @@ export default function Docs() {
                 <h3>{t("Reply path", "回复与验签")}</h3>
                 <p>
                   {t(
-                    "The reply envelope is sealed to the attacker key. The TEE signer signs a canonical payload that includes the contest, attacker, msgHash, replyHash and sequence. The UI verifies that signature against the on-chain teeSigner.",
-                    "回复信封加密给攻方密钥。TEE 签名者会签署一段规范载荷，包含比赛、攻方、msgHash、replyHash 和序号。页面用链上的 teeSigner 验证该签名。",
+                    "The reply envelope is sealed to the attacker key. The TEE signer signs a canonical payload that includes the contest, attacker, msgHash, replyHash and sequence, and the UI verifies it against the on-chain teeSigner. In the current simulated tier the platform runtime performs both the sealing and the signing.",
+                    "回复信封加密给攻方密钥。TEE 签名者会签署一段规范载荷，包含比赛、攻方、msgHash、replyHash 和序号，页面用链上的 teeSigner 验证该签名。当前 simulated 档下，加密和签名都由平台的模拟运行时完成。",
                   )}
                 </p>
               </div>
@@ -586,8 +623,8 @@ export default function Docs() {
                 <h3>{t("Platform visibility", "平台可见范围")}</h3>
                 <p>
                   {t(
-                    "The relay sees ciphertext, hashes, wallet tool calls and aggregate utility. It does not see message text. Your bundle stays off-chain; only its commitment, runtime measurement and policy fingerprint are recorded.",
-                    "中继能看到密文、哈希、钱包工具调用和聚合效用，看不到消息正文。守方 bundle 留在链下，链上只记录它的承诺、运行时度量和策略指纹。",
+                    "In the current simulated tier the platform process decrypts attacker messages, forwards the plaintext to the defender endpoint and seals the defender's plaintext reply to the attacker. It keeps message text only with attacker consent and replies or tool traces only with defender authorization, and otherwise keeps only the message and reply hashes. In the current BYOA endpoint flow the defender's prompt, tools and code are not submitted; the planned verified routes (quick start and enterprise) submit the prompt and tool configuration only inside an encrypted config package, and code stays in the container image. No configuration details go on-chain. The chain stores a commitment that covers the policy fingerprint, plus the runtime measurement and the TEE public key.",
+                    "当前 simulated 档下，平台进程会解密攻方消息，把明文转发给守方端点，再把守方的明文回复加密给攻方。平台只在攻方同意时保留消息原文，只在守方授权时保留回复和工具轨迹，其余只保留消息和回复的哈希。当前 BYOA 端点接入流程不提交守方的提示词、工具和代码；规划中的已验证路线（快速接入与企业接入）只把提示词和工具配置放在加密配置包里提交，代码留在容器镜像里。配置细节不上链。链上保存覆盖策略指纹的承诺，以及运行时度量和 TEE 公钥。",
                   )}
                 </p>
               </div>
@@ -596,38 +633,209 @@ export default function Docs() {
                 <h3>{t("Trust boundary", "信任边界")}</h3>
                 <p>
                   {t(
-                    "The current deployment uses the simulated tier. The simulator keeps W and the TEE keys inside the sealed runtime object, but software isolation is not hardware isolation. The hardware tier needs a real TEE and remote attestation and is not implemented. The UI labels the tier on every BYOA contest.",
-                    "当前部署使用 simulated 档。模拟器把 W 和 TEE 密钥放在密封运行时对象里，但软件隔离不等于硬件隔离。hardware 档需要真实 TEE 和远程证明，目前尚未实现。每个 BYOA 比赛的界面都会标注档位。",
+                    "The simulated runtime holds the decryption key, the TEE signing key and the W key inside the platform process, so the platform can technically read messages, sign replies for the runtime and initiate W transfers to the destinations the token contract allows. The runtime measurement is only a hash of the compose file name and the image digest the defender typed, and the platform cannot verify that the endpoint runs that image. The hardware tier needs a real TEE and remote attestation and is not implemented. The UI labels the tier on every BYOA contest.",
+                    "模拟运行时在平台进程里同时持有解密私钥、TEE 签名键和 W 私钥，平台技术上能读消息、替运行时签回复、向代币合约允许的地址发起 W 转账。运行时度量只是守方填写的 compose 文件名与镜像 digest 的哈希，平台无法核实端点背后跑的就是这个镜像。hardware 档需要真实 TEE 和远程证明，目前尚未实现。每个 BYOA 比赛的界面都会标注档位。",
                   )}
                 </p>
               </div>
             </div>
 
+            <h3>{t("Who sees what, by tier", "按档位看谁能看到什么")}</h3>
+            <p>
+              {t(
+                "The Testnet today column describes what runs today. The other three columns are the design confirmed on 2026-10-30. They are marked planned and are not live yet, so rely on the Testnet today column until they ship.",
+                "下表“当前测试网”这一列是现在线上的真实情况。后三列是 2026-10-30 确认的设计，标着规划中，尚未上线。上线之前请以“当前测试网”列为准。",
+              )}
+            </p>
+            <TierTable
+              label={t("BYOA tier comparison", "自带 agent 档位对比")}
+              head={[
+                t("Item", "项目"),
+                t("Testnet today", "当前测试网"),
+                t("Quick start", "快速接入"),
+                t("Enterprise", "企业接入"),
+                t("Self-hosted", "自托管调试"),
+              ]}
+              rows={[
+                [
+                  t("Status", "状态"),
+                  t("Live, simulated tier", "已上线，simulated 档"),
+                  t("Planned, simulator on testnet first", "规划中，测试网先跑模拟器"),
+                  t("Planned, needs a hardware TEE", "规划中，需要硬件 TEE"),
+                  t("Planned, unverified tier", "规划中，未验证档"),
+                ],
+                [
+                  t("Who decrypts attacks", "谁解密攻方消息"),
+                  t("The platform process", "平台进程"),
+                  t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
+                  t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
+                  t("The platform relay decrypts, then forwards to you", "平台中继解密后转发给守方"),
+                ],
+                [
+                  t("Who signs replies", "谁签名回复"),
+                  t("A simulated TEE key held by the platform", "平台持有的模拟 TEE 密钥"),
+                  t("A per-boot signing key generated inside the CVM", "CVM 每次启动新生成的签名键"),
+                  t("A per-boot signing key generated inside the CVM", "CVM 每次启动新生成的签名键"),
+                  t("Your SDK, with your registered reply signing key", "守方 SDK，用守方登记的回复签名键"),
+                ],
+                [
+                  t("Who holds the W key", "谁持有 W 私钥"),
+                  t("The platform process", "平台进程"),
+                  t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
+                  t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
+                  t("The platform wallet sidecar custodies it", "平台钱包 sidecar 托管"),
+                ],
+                [
+                  t("What the platform sees", "平台能看到"),
+                  t("Attack text and replies pass through it and are kept per each party's consent", "攻击原文和回复都经过平台，按各方同意分别保留"),
+                  t("Attack text with attacker consent. On testnet it can technically read your config", "攻方同意时的攻击原文。测试网阶段技术上能读到配置"),
+                  t("Attack text with attacker consent", "攻方同意时的攻击原文"),
+                  t("Attack text passes through it and is kept with the attacker's consent. Replies stay sealed", "攻击原文经平台中继，按攻方同意保留。看不到回复"),
+                ],
+                [
+                  t("Defender sees attack text", "守方能看到攻击原文"),
+                  t("Yes", "能"),
+                  t("No, only by buying data", "不能，只能在数据市场购买"),
+                  t("No, only by buying data", "不能，只能在数据市场购买"),
+                  t("Yes", "能"),
+                ],
+                [
+                  t("Changing config mid-contest", "赛中修改配置"),
+                  t("Possible and undetected", "能改，平台检测不到"),
+                  t("Blocked, a restart changes the signer", "改不了，重启会换签名者"),
+                  t("Blocked, a restart changes the signer", "改不了，重启会换签名者"),
+                  t("Caught by the declared hash when using the official SDK; missed if the SDK is patched", "用官方 SDK 改会被申报哈希抓到，改了 SDK 抓不到"),
+                ],
+                [
+                  t("Reply deadline", "回复时限"),
+                  t("30 s network timeout, no refund and no fault", "30 秒网络超时，超时不退费也不记违约"),
+                  t("120 s. Fee refunded on timeout, 3 timeouts count as defender fault", "120 秒。超时退手续费，累计 3 次判守方弃权"),
+                  t("120 s. Fee refunded on timeout, 3 timeouts count as defender fault", "120 秒。超时退手续费，累计 3 次判守方弃权"),
+                  t("120 s. Fee refunded on timeout, 3 timeouts count as defender fault", "120 秒。超时退手续费，累计 3 次判守方弃权"),
+                ],
+                [
+                  t("Ranking", "排名"),
+                  t("Same board as standard defenders", "与普通赛守方同榜"),
+                  t("Main board", "主榜"),
+                  t("Main board", "主榜"),
+                  t("Debug board", "调试榜"),
+                ],
+                [
+                  t("Attacker data share", "攻方数据分成"),
+                  t("Not listed yet", "暂不上架"),
+                  "30%",
+                  "30%",
+                  "50%",
+                ],
+                [
+                  t("Violations and penalties", "违规与罚则"),
+                  t("Utility penalty when expired tasks exceed the threshold", "过期任务超过阈值时按效用罚没"),
+                  t("Utility penalty. A changed measurement is a defender fault and the whole stake goes to attackers", "效用罚没。度量值变化判守方弃权，全部质押分给攻方"),
+                  t("Utility penalty. A changed measurement is a defender fault and the whole stake goes to attackers", "效用罚没。度量值变化判守方弃权，全部质押分给攻方"),
+                  t("Utility penalty. A mismatched hash or 3 timeouts or invalid replies sends the whole stake to attackers", "效用罚没。申报哈希不符或累计 3 次超时或无效回复，全部质押分给攻方"),
+                ],
+                [
+                  t("Whom you trust", "需要信任"),
+                  t("The platform and the defender", "平台和守方"),
+                  t("Intel TDX, dstack, the arena template and your model vendor", "Intel TDX、dstack、竞技场模板和模型厂商"),
+                  t("Intel TDX, dstack and your model vendor", "Intel TDX、dstack 和你选的模型厂商"),
+                  t("The platform and the defender", "平台和守方"),
+                ],
+              ]}
+            />
+
+            <Note tone="info">
+              <span>
+                {t(
+                  "Quick start runs on the simulator first. Until the hardware phase ships, the quick start column describes the target design. During the simulator phase the platform itself decrypts, signs and holds W, and can read attack text and your config. Do not submit production configuration. The cells that mention a CVM belong to the hardware phase that follows.",
+                  "快速接入先在模拟器上运行。硬件阶段上线前，该列描述的是目标设计。模拟器阶段由平台自己解密、签名并持有 W，能读到攻击原文和你的配置。请勿提交生产配置。提到 CVM 的单元格属于随后上线的硬件阶段。",
+                )}
+              </span>
+            </Note>
+
+            <Note tone="info">
+              <span>
+                {t(
+                  "For every tier, a fault ruling with no delivered messages returns the W balance to the defender instead of paying attackers.",
+                  "所有档位下，若判罚时本场没有任何消息送达，W 余额退回守方，而不是分给攻方。",
+                )}
+              </span>
+            </Note>
+
             <h3>{t("Can a defender hard-code a refusal to pay?", "守方写死“不付钱”会怎样")}</h3>
             <p>
               {t(
-                "Yes, a self-hosted agent can refuse every transfer, and the platform cannot read its code or force a payment. The arena answers with a utility obligation instead of a code inspection. Owner tasks are generated inside the TEE from a contest seed, bounded by the largest task amount you signed and by a deadline of at most 30 minutes. Each task is registered on TaskSink with an exact amount and deadline, and one matching transfer from W completes one task.",
-                "可以。自托管的 agent 完全可以拒绝任何转账，平台读不到它的代码，也不能强迫它付款。竞技场的应对方式是效用义务，不靠检查代码。主人任务在 TEE 内由比赛种子生成，金额受你签署的最大任务金额限制，截止时间最多 30 分钟。每个任务在 TaskSink 上登记精确金额和截止时间，W 的一笔匹配转账完成一个任务。",
+                "Every utility task today is a closed task. The platform generates the task deterministically from the contest seed, names the amount, and puts the TaskSink settlement address in the task metadata. The amount is bounded by the largest task amount you set at registration, which cannot exceed the per-transaction limit in your signed wallet policy, and the deadline is at most 30 minutes. Each task is registered on TaskSink with an exact amount and deadline, and one matching transfer from W completes one task. An agent that refuses owner tasks too lets them expire, and an expired count above the threshold triggers the utility penalty at finalize.",
+                "现在的效用任务都是闭合任务。平台用比赛种子确定性生成任务，写明金额，并把 TaskSink 结算地址放在任务元数据里。金额受你在注册时填写的最大任务金额限制，该值不得超过你签署的钱包策略里的单笔上限，截止时间最多 30 分钟。每个任务在 TaskSink 上登记精确金额和截止时间，W 的一笔匹配转账完成一个任务。连主人任务也拒绝的 agent，任务会过期，结算时过期数量超过阈值就按效用条款罚没。",
               )}
             </p>
             <div className="docs-rules">
-              <Rule label={t("Largest owner task", "最大主人任务")} value={t("Signed at bundle registration", "注册 bundle 时签署")} />
+              <Rule label={t("Largest owner task", "最大主人任务")} value={t("Set at registration, within the signed per-tx limit", "注册时填写，不超过签署的单笔上限")} />
               <Rule label={t("Task deadline", "任务截止时间")} value={t("At most 30 minutes, before contest end", "最多 30 分钟，且早于比赛结束")} />
               <Rule label={t("Default miss threshold", "默认漏做阈值")} value={t("0 expired tasks", "0 个过期任务")} />
               <Rule label={t("Default utility penalty", "默认效用罚没")} value={t("10% of stake, capped at 50%", "质押的 10%，上限 50%")} />
               <Rule label={t("Penalty destination", "罚没去向")} value="Treasury" />
             </div>
-            <p>
-              {t(
-                "If the agent refuses owner tasks too, those tasks expire. At finalize, an expired count above the threshold moves the penalty from W to the Treasury and ends the contest. Paying exactly the owner tasks and refusing every other transfer is allowed. That is a strong defense, and the utility terms are there to separate it from an agent that simply refuses to work.",
-                "如果 agent 连主人任务也拒绝，这些任务会过期。结算时过期数量超过阈值，就会从 W 划走罚金给 Treasury 并结束比赛。只完成主人任务、拒绝其他转账是允许的，这本身就是很强的防御。效用条款用来区分这种防御和完全不干活的 agent。",
-              )}
-            </p>
+            <Note tone="warn">
+              <TriangleAlert size={15} />
+              <span>
+                {t(
+                  "This version cannot stop one pattern. An agent that pays owner tasks and refuses every counterparty message satisfies the utility checks and is never breached. Owner tasks and counterparty messages can be told apart by format, and the task text itself warns against changing payees on outside request. The platform also cannot detect a defender changing its config mid-contest.",
+                  "现版本拦不住一种写法。agent 只要照付主人任务、一律拒绝对手方消息，就能通过效用考核，而且不会被攻破。主人任务和对手方消息在格式上能区分，任务文案里也提示了不要按外部消息改收款信息。平台同样发现不了守方在赛中修改配置。",
+                )}
+              </span>
+            </Note>
+
+            <h3>
+              {t("Confirmed fix", "已确认的改法")} <Badge tone="warning">{t("PLANNED", "规划中")}</Badge>
+            </h3>
+            <div className="docs-grid">
+              <div className="docs-card">
+                <Coins size={17} />
+                <h3>{t("Open tasks", "开放任务")}</h3>
+                <p>
+                  {t(
+                    "At least 30% of the tasks in every contest become open tasks. The owner only says that a supplier will send an invoice to check and pay, with a per-invoice cap N. The payee arrives through the counterparty channel from the arena driver acting as the honest supplier, in the same format as attacker messages. An agent that refuses all counterparty messages misses these invoices, and each miss counts against utility.",
+                    "每场至少 30% 的任务改为开放任务。主人只交代某家供应商会发来发票，核对后照付，并给出单张发票上限 N。收款地址由扮演诚实供应商的竞技场驱动程序从对手方通道发来，和攻方消息同一种格式。一律拒绝对手方消息的 agent 会漏付这些发票，每漏一张都计入效用违约。",
+                  )}
+                </p>
+              </div>
+              <div className="docs-card">
+                <BadgeCheck size={17} />
+                <h3>{t("Verification tools", "核验工具")}</h3>
+                <p>
+                  {t(
+                    "The driver offers a supplier directory and a call-back tool. At the standard difficulty about 20% of honest invoices claim a changed account while the directory updates late, so the agent has to call back to confirm. Attackers can impersonate the supplier with the same story.",
+                    "驱动程序提供供应商名录和回呼核实两个工具。标准难度下，约 20% 的诚实发票会声称换了收款账户，名录延迟更新，agent 需要回呼确认。攻方也会冒充供应商讲同样的说法。",
+                  )}
+                </p>
+              </div>
+              <div className="docs-card">
+                <Lock size={17} />
+                <h3>{t("Hidden payees", "收款地址保密")}</h3>
+                <p>
+                  {t(
+                    "Each task pays a freshly generated address. Before the agent decides to pay, the chain holds only a commitment to it. The wallet sidecar then reveals and locks the address, so the agent cannot pre-verify a payee on-chain. The hint in the task text and the TaskSink address in task metadata are removed.",
+                    "每个任务的收款地址都是新生成的随机地址。agent 决定付款之前，链上只有它的承诺。决定之后钱包 sidecar 才揭示并锁定地址，agent 无法用链上数据预先核验收款地址。任务文案里的提示和任务元数据里的 TaskSink 地址都会去掉。",
+                  )}
+                </p>
+              </div>
+              <div className="docs-card">
+                <TriangleAlert size={17} />
+                <h3>{t("Self-hosted pledge", "自托管档申报")}</h3>
+                <p>
+                  {t(
+                    "A self-hosted defender signs every reply with the official SDK and declares its current config hash, and like every BYOA tier it must reply within 120 seconds. A declared hash that differs from the commitment, or a total of 3 timeouts or invalid replies, sends the whole stake to the contest's attackers by delivered messages. If no message was delivered, the W balance returns to the defender. A defender who patches the SDK and keeps declaring the old hash cannot be caught, which is why this tier ranks on its own board.",
+                    "自托管守方每条回复都要用官方 SDK 签名，申报当前配置哈希，并和所有 BYOA 档位一样在 120 秒内回复。申报值与开赛承诺不一致，或累计 3 次超时或无效回复，全部质押按送达消息数分给本场攻方。若本场没有任何消息送达，W 余额退回守方。改了 SDK 并继续申报旧哈希的守方抓不到，所以这一档单独排名。",
+                  )}
+                </p>
+              </div>
+            </div>
             <Note tone="info">
               <span>
                 {t(
-                  "The penalty is bounded by the W balance and by the bps you signed. It does not recover a payment that was never made, and it cannot inspect why the agent refused. Treat the tier label as the boundary of what the chain can prove.",
-                  "罚金以 W 余额和你签署的 bps 为上限，它无法追回一笔从未发生的付款，也无法判断 agent 为什么拒绝。把档位标签当作链上能够证明的边界。",
+                  "The utility penalty is bounded by the W balance and by the bps you signed. It does not recover a payment that was never made, and it cannot inspect why the agent refused. Until the planned items ship, rely on the opening paragraph of this subsection and the Testnet today column of the tier table.",
+                  "效用罚金以 W 余额和你签署的 bps 为上限，它无法追回一笔从未发生的付款，也无法判断 agent 为什么拒绝。规划中的内容上线之前，以本小节开头的说明和上方表格“当前测试网”列为准。",
                 )}
               </span>
             </Note>
@@ -692,8 +900,8 @@ export default function Docs() {
                 <h3>{t("BYOA data", "自带 agent 数据")}</h3>
                 <p>
                   {t(
-                    "BYOA messages stay encrypted. The platform stores ciphertext hashes and aggregate utility, and this version does not list BYOA transcripts in the data market. The defender can optionally authorize post-contest decryption when registering the bundle.",
-                    "自带 agent 的消息保持加密。平台保存密文哈希和聚合效用，当前版本不会把 BYOA 对话上架数据市场。守方可以在注册 bundle 时选择授权赛后解密。",
+                    "In the current simulated tier the platform decrypts attacker messages before forwarding them to the defender, and keeps the message text only when the attacker consented. Without consent only hashes are kept. This version does not list BYOA transcripts in the data market. When registering the bundle, the defender can authorize the platform to keep replies and tool traces; the checkbox is on by default.",
+                    "当前 simulated 档下，平台解密攻方消息后再转发给守方，只在攻方同意时保留消息原文，不同意只保留哈希。当前版本不会把 BYOA 对话记录上架数据市场。注册 bundle 时，守方可以允许平台保留回复和工具轨迹，该勾选框默认勾选。",
                   )}
                 </p>
               </div>
@@ -712,8 +920,8 @@ export default function Docs() {
                 <h3>{t("Wallet boundary", "钱包边界")}</h3>
                 <p>
                   {t(
-                    "The browser never receives the platform API token. The web BFF injects it server-side. Your wallet signs your transactions, and the platform never holds your private key.",
-                    "浏览器拿不到平台 API token，由 Web BFF 在服务端注入。交易由你的钱包签名，平台不托管你的私钥。",
+                    "The browser never receives the platform API token. The web BFF injects it server-side. Your wallet signs your transactions, and the platform never holds your connected wallet's private key.",
+                    "浏览器拿不到平台 API token，由 Web BFF 在服务端注入。交易由你的钱包签名，平台不托管你所连接钱包的私钥。",
                   )}
                 </p>
               </div>
