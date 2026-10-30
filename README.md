@@ -2,13 +2,13 @@
 
 **研究 AI 在“替人办事、提出付款请求”时，如何守住用户授权，并把发现的问题变成可验证的修复。**
 
-[查看完整项目网站](https://fishman-free.github.io/REDTEAM/) · [当前研究方案](docs/RESEARCH_PLAN.md) · [运行指南](rsi4safety/payment_agents/README.md)
+[在线体验 RTM Arena](https://arena.agenttrust.site/) · [查看完整项目网站](https://fishman-free.github.io/REDTEAM/) · [当前研究方案](docs/RESEARCH_PLAN.md) · [运行指南](rsi4safety/payment_agents/README.md)
 
 > **当前进度（2026-10-10）**：攻防实验原型、真实模型的限定验证、单页展示网站和 Flower 本地 NFT 原型均已完成对应实现。项目仍处于研究与产品验证阶段，**不是已交付的企业安全平台，也不是公众支付或代币交易平台**。
 >
 > **RTM Arena 测试网（2026-10-28）**：`dapp/` 已重做为面向公开演示的完整产品界面，包含守方/攻方/矿工完整链路、独立 `/ops` 管理页、同源 BFF（浏览器不持有平台 token）和自动索引器。`bash deploy/up.sh` 可一键启动 Besu + 合约部署 + vault + API + Web + 演示模型；详见 [`deploy/README.md`](deploy/README.md) 与 [`dapp/README.md`](dapp/README.md)。测试网资产无价值；演示模型不是真实安全结论。
 >
-> **想直接体验？** 见下方 [RTM Arena 测试网：启动与使用指南](#rtm-arena-guide)。如果部署者已经给你网址，你不需要安装 Docker，直接从“玩家入口”开始。
+> **想直接体验？** 公开演示地址：<https://arena.agenttrust.site/>，无需安装 Docker，直接从“玩家入口”开始；本地部署见下方 [RTM Arena 测试网：启动与使用指南](#rtm-arena-guide)。
 
 ## 一、项目要解决什么问题？
 
