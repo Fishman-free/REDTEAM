@@ -171,8 +171,8 @@ export default function Docs() {
 
             <p>
               {t(
-                "There are two ways to defend. The Defend page hands the prompt, model provider and API key to the platform and lets the platform run the agent. The BYOA page keeps the whole agent on your side. The platform records a commitment to your bundle, relays ciphertext, exposes a wallet MCP under the signed policy and settles owner tasks on-chain. The first route is quick to start. The second fits teams that already run a payment agent and will not hand over the configuration.",
-                "守方有两条路线。守方页把提示词、模型服务商和 API Key 交给平台，由平台运行 agent。自带 agent 页把完整 agent 留在守方一侧，平台只记录 bundle 承诺、转发密文、按签署策略提供钱包 MCP，并通过链上任务结算。前者上手快，后者适合已经有支付 agent、又不愿交出配置的团队。",
+                "There are two ways to defend. The Defend page hands the prompt, model provider and API key to the platform and lets the platform run the agent. The BYOA page keeps the whole agent on your side. The platform records a commitment to your bundle, decrypts inbound attacker messages and relays them in the current simulated tier, runs a wallet MCP under the signed policy and settles owner tasks on-chain. The first route is quick to start. The second fits teams that already run a payment agent and will not hand over the configuration.",
+                "守方有两条路线。守方页把提示词、模型服务商和 API Key 交给平台，由平台运行 agent。自带 agent 页把完整 agent 留在守方一侧，平台记录 bundle 承诺，当前 simulated 档下解密并转发攻方消息，按签署策略运行钱包 MCP，并在链上结算主人任务。前者上手快，后者适合已经有支付 agent、又不愿交出配置的团队。",
               )}
             </p>
 
@@ -463,8 +463,8 @@ export default function Docs() {
           >
             <p className="docs-lead">
               {t(
-                "BYOA is for defenders that already run their own agent stack. The platform does not run your prompt, tools or code. It records a commitment to your bundle, relays ciphertext, exposes a wallet MCP under the signed policy and settles owner tasks through TaskSink. Create the contest only when the page shows a TaskSink address.",
-                "自带 agent 面向已经运行自己 agent 栈的守方。平台不运行你的提示词、工具或代码，只记录 bundle 承诺、转发密文、按签署策略提供钱包 MCP，并通过 TaskSink 结算主人任务。页面显示 TaskSink 地址时才能创建比赛。",
+                "BYOA is for defenders that already run their own agent stack. Your prompt, tools and code stay on your side, and the platform and your agent exchange messages over the transport you choose. The platform records a commitment to your bundle, runs the wallet MCP under the signed policy and settles owner tasks through TaskSink. In the current simulated tier the platform decrypts attacker messages before forwarding them to you, so read the tier table in section 08 before you register. Create the contest only when the page shows a TaskSink address.",
+                "自带 agent 面向已经运行自己 agent 栈的守方。提示词、工具和代码留在你这一侧，平台按你选的接入方式与你的 agent 交换消息。平台记录 bundle 承诺，按签署策略运行钱包 MCP，并通过 TaskSink 结算主人任务。当前 simulated 档下，攻方消息由平台解密后再转发给你，注册前请先看第 08 节的档位对比表。页面显示 TaskSink 地址时才能创建比赛。",
               )}
             </p>
 
@@ -479,8 +479,8 @@ export default function Docs() {
                 </p>
                 <p>
                   {t(
-                    "The optional checkbox authorizes the platform to decrypt replies and tool traces after the contest. Leave it off if you want the ciphertext to stay sealed. Sign the ownership challenge. The platform returns W, the TEE signer, the config commitment, the runtime measurement and the policy fingerprint.",
-                    "可选勾选框表示允许平台在赛后解密回复和工具轨迹，不希望解密就不要勾选。签一条所有权证明消息后，平台会返回 W、TEE 签名者、配置承诺、运行时度量和策略指纹。",
+                    "The checkbox is on by default and authorizes the platform to keep your replies and tool traces after the contest. Uncheck it and replies are kept only as hashes, while tool traces are dropped. Sign the ownership challenge. The platform returns W, the TEE signer, the config commitment, the runtime measurement and the policy fingerprint.",
+                    "该勾选框默认勾选，允许平台在赛后保留你的回复和工具轨迹。取消勾选后回复只保留哈希，工具轨迹不保留。签一条所有权证明消息后，平台会返回 W、TEE 签名者、配置承诺、运行时度量和策略指纹。",
                   )}
                 </p>
               </Step>
@@ -495,8 +495,8 @@ export default function Docs() {
               <Step n="03" title={t("Run your agent", "运行你的 agent")}>
                 <p>
                   {t(
-                    "Connect over the transport you chose and obtain a wallet session token from the platform. Owner tasks and counterparty messages arrive through the relay. Decrypt them locally, run your policy and tools, and return a reply. Your reply is sealed to the attacker and signed by the TEE signer.",
-                    "用选定的传输方式接入，从平台获取钱包会话 token。主人任务和对手方消息通过中继到达，在本地解密、执行策略和工具，再返回回复。回复加密给攻方，并由 TEE 签名者签名。",
+                    "Connect over the transport you chose and obtain a wallet session token from the platform. Owner tasks are delivered as plaintext. Attacker messages are also delivered as plaintext, because in the simulated tier the platform decrypts their ciphertext first. With mcp-pull your agent pulls messages from the platform, and the other three transports push to your endpoint. Run your policy and tools and return a plaintext reply within 30 seconds. The platform seals the reply to the attacker and signs it with the simulated TEE key it holds.",
+                    "用选定的接入方式连上平台，并从平台获取钱包会话 token。主人任务以明文下发。攻方消息同样以明文送达，因为 simulated 档下平台会先解密攻方密文。mcp-pull 模式下由你的 agent 主动从平台拉取，其余三种接入方式由平台推送到你的端点。执行策略和工具后，在 30 秒内返回明文回复。平台把回复加密给攻方，并用自己持有的模拟 TEE 密钥签名。",
                   )}
                 </p>
               </Step>
@@ -531,8 +531,8 @@ export default function Docs() {
               <Step n="02" title={t("Join with a stake", "质押加入")}>
                 <p>
                   {t(
-                    "The join panel shows the required attacker stake, computed from the defender stake and stakeBps. Approve the stake and join. The data consent checkbox is recorded on-chain, but this version does not list BYOA transcripts in the market because the platform cannot read them.",
-                    "加入面板会显示需要的攻方质押，按守方质押和 stakeBps 计算。授权质押并加入。数据同意勾选会记录在链上，但当前版本不会把 BYOA 对话上架，因为平台读不到明文。",
+                    "The join panel shows the required attacker stake, computed from the defender stake and stakeBps. Approve the stake and join. The data consent choice is recorded on-chain. With consent the platform keeps your message text in this contest's transcript, and without it only hashes are kept. This version does not list BYOA transcripts in the data market yet.",
+                    "加入面板会显示需要的攻方质押，按守方质押和 stakeBps 计算。授权质押并加入。数据同意状态会记录在链上。勾选后平台会在本场对话记录里保留你的消息原文，不勾选只保留哈希。当前版本还没有把 BYOA 对话记录上架数据市场。",
                   )}
                 </p>
               </Step>
@@ -547,8 +547,8 @@ export default function Docs() {
               <Step n="04" title={t("Verify the reply", "验证回复")}>
                 <p>
                   {t(
-                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay.",
-                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。",
+                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay. In the simulated tier that signing key lives in the platform process, so a valid signature shows the reply came from the sealed runtime and says nothing about hardware isolation.",
+                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。simulated 档下这把签名键在平台进程里，验签通过只能说明回复来自密封运行时，不代表有硬件隔离。",
                   )}
                 </p>
               </Step>
@@ -692,8 +692,8 @@ export default function Docs() {
                 <h3>{t("BYOA data", "自带 agent 数据")}</h3>
                 <p>
                   {t(
-                    "BYOA messages stay encrypted. The platform stores ciphertext hashes and aggregate utility, and this version does not list BYOA transcripts in the data market. The defender can optionally authorize post-contest decryption when registering the bundle.",
-                    "自带 agent 的消息保持加密。平台保存密文哈希和聚合效用，当前版本不会把 BYOA 对话上架数据市场。守方可以在注册 bundle 时选择授权赛后解密。",
+                    "In the current simulated tier the platform decrypts attacker messages before forwarding them to the defender, and keeps the message text only when the attacker consented. Without consent only hashes are kept. This version does not list BYOA transcripts in the data market. The defender can optionally authorize the platform to keep replies and tool traces when registering the bundle.",
+                    "当前 simulated 档下，平台解密攻方消息后再转发给守方，只在攻方同意时保留消息原文，不同意只保留哈希。当前版本不会把 BYOA 对话记录上架数据市场。守方可以在注册 bundle 时选择允许平台保留回复和工具轨迹。",
                   )}
                 </p>
               </div>
