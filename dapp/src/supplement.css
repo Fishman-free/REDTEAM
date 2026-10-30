@@ -506,6 +506,56 @@
   text-align: right;
 }
 
+.docs-tiers {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.docs-tiers table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.docs-tiers th,
+.docs-tiers td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.docs-tiers thead th {
+  color: var(--ink);
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.docs-tiers tbody th {
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.docs-tiers td {
+  color: var(--ink);
+}
+
+/* 第一列数据是线上真实情况，轻微高亮以区分规划中的三列 */
+.docs-tiers thead th:nth-child(2),
+.docs-tiers td:nth-child(2) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.docs-tiers tbody tr:last-child th,
+.docs-tiers tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 .docs-faq {
   margin-top: 18px;
   border-top: 1px solid var(--line);

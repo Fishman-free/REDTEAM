@@ -75,6 +75,43 @@ function Rule({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TierTable({
+  label,
+  head,
+  rows,
+}: {
+  label: string;
+  head: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="docs-tiers" role="region" aria-label={label} tabIndex={0}>
+      <table>
+        <caption className="sr-only">{label}</caption>
+        <thead>
+          <tr>
+            {head.map((cell) => (
+              <th key={cell} scope="col">
+                {cell}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([rowLabel, ...cells]) => (
+            <tr key={rowLabel}>
+              <th scope="row">{rowLabel}</th>
+              {cells.map((cell, index) => (
+                <td key={index}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function Docs() {
   const { t } = useI18n();
   const { meta } = usePlatform();
@@ -566,8 +603,8 @@ export default function Docs() {
                 <h3>{t("Message path", "消息加密路径")}</h3>
                 <p>
                   {t(
-                    "The attacker identity is an X25519 key derived from a wallet signature, so there is no extra private key to store. The message is encrypted with X25519, HKDF-SHA256 and AES-256-GCM to the TEE public key published on-chain. The chain stores keccak256 of the ciphertext as msgHash.",
-                    "攻方身份是从钱包签名派生的 X25519 密钥，不需要额外保存私钥。消息用 X25519、HKDF-SHA256 和 AES-256-GCM 加密到链上发布的 TEE 公钥。链上只保存密文的 keccak256 作为 msgHash。",
+                    "The attacker identity is an X25519 key derived from a wallet signature, so there is no extra private key to store. The message is encrypted with X25519, HKDF-SHA256 and AES-256-GCM to the TEE public key published on-chain. The chain stores keccak256 of the ciphertext as msgHash. In the current simulated tier that TEE key belongs to the simulated runtime inside the platform process.",
+                    "攻方身份是从钱包签名派生的 X25519 密钥，不需要额外保存私钥。消息用 X25519、HKDF-SHA256 和 AES-256-GCM 加密到链上发布的 TEE 公钥。链上只保存密文的 keccak256 作为 msgHash。当前 simulated 档下，这把 TEE 公钥属于平台进程里的模拟运行时。",
                   )}
                 </p>
               </div>
@@ -576,8 +613,8 @@ export default function Docs() {
                 <h3>{t("Reply path", "回复与验签")}</h3>
                 <p>
                   {t(
-                    "The reply envelope is sealed to the attacker key. The TEE signer signs a canonical payload that includes the contest, attacker, msgHash, replyHash and sequence. The UI verifies that signature against the on-chain teeSigner.",
-                    "回复信封加密给攻方密钥。TEE 签名者会签署一段规范载荷，包含比赛、攻方、msgHash、replyHash 和序号。页面用链上的 teeSigner 验证该签名。",
+                    "The reply envelope is sealed to the attacker key. The TEE signer signs a canonical payload that includes the contest, attacker, msgHash, replyHash and sequence, and the UI verifies it against the on-chain teeSigner. In the current simulated tier the platform runtime performs both the sealing and the signing.",
+                    "回复信封加密给攻方密钥。TEE 签名者会签署一段规范载荷，包含比赛、攻方、msgHash、replyHash 和序号，页面用链上的 teeSigner 验证该签名。当前 simulated 档下，加密和签名都由平台的模拟运行时完成。",
                   )}
                 </p>
               </div>
@@ -586,8 +623,8 @@ export default function Docs() {
                 <h3>{t("Platform visibility", "平台可见范围")}</h3>
                 <p>
                   {t(
-                    "The relay sees ciphertext, hashes, wallet tool calls and aggregate utility. It does not see message text. Your bundle stays off-chain; only its commitment, runtime measurement and policy fingerprint are recorded.",
-                    "中继能看到密文、哈希、钱包工具调用和聚合效用，看不到消息正文。守方 bundle 留在链下，链上只记录它的承诺、运行时度量和策略指纹。",
+                    "In the current simulated tier the platform process decrypts attacker messages, forwards the plaintext to the defender endpoint and seals the defender's plaintext reply to the attacker. It keeps message text only with attacker consent and replies or tool traces only with defender authorization, and otherwise keeps only the message and reply hashes. In the current BYOA endpoint flow the defender's prompt, tools and code are not submitted; the planned verified routes (quick start and enterprise) submit the prompt and tool configuration only inside an encrypted config package, and code stays in the container image. No configuration details go on-chain: the chain stores a commitment that covers the policy fingerprint, plus the runtime measurement and the TEE public key.",
+                    "当前 simulated 档下，平台进程会解密攻方消息，把明文转发给守方端点，再把守方的明文回复加密给攻方。平台只在攻方同意时保留消息原文，只在守方授权时保留回复和工具轨迹，其余只保留消息和回复的哈希。当前 BYOA 端点接入流程不提交守方的提示词、工具和代码；规划中的已验证路线（快速接入与企业接入）只把提示词和工具配置放在加密配置包里提交，代码留在容器镜像里。配置细节不上链：链上保存覆盖策略指纹的承诺，以及运行时度量和 TEE 公钥。",
                   )}
                 </p>
               </div>
@@ -596,12 +633,125 @@ export default function Docs() {
                 <h3>{t("Trust boundary", "信任边界")}</h3>
                 <p>
                   {t(
-                    "The current deployment uses the simulated tier. The simulator keeps W and the TEE keys inside the sealed runtime object, but software isolation is not hardware isolation. The hardware tier needs a real TEE and remote attestation and is not implemented. The UI labels the tier on every BYOA contest.",
-                    "当前部署使用 simulated 档。模拟器把 W 和 TEE 密钥放在密封运行时对象里，但软件隔离不等于硬件隔离。hardware 档需要真实 TEE 和远程证明，目前尚未实现。每个 BYOA 比赛的界面都会标注档位。",
+                    "The simulated runtime holds the decryption key, the TEE signing key and the W key inside the platform process, so the platform can technically read messages, sign replies for the runtime and initiate W transfers to the destinations the token contract allows. The runtime measurement is only a hash of the compose file name and the image digest the defender typed, and the platform cannot verify that the endpoint runs that image. The hardware tier needs a real TEE and remote attestation and is not implemented. The UI labels the tier on every BYOA contest.",
+                    "模拟运行时在平台进程里同时持有解密私钥、TEE 签名键和 W 私钥，平台技术上能读消息、替运行时签回复、向代币合约允许的地址发起 W 转账。运行时度量只是守方填写的 compose 文件名与镜像 digest 的哈希，平台无法核实端点背后跑的就是这个镜像。hardware 档需要真实 TEE 和远程证明，目前尚未实现。每个 BYOA 比赛的界面都会标注档位。",
                   )}
                 </p>
               </div>
             </div>
+
+            <h3>{t("Who sees what, by tier", "按档位看谁能看到什么")}</h3>
+            <p>
+              {t(
+                "The first column describes what runs today. The other three columns are the design confirmed on 2026-10-30. They are marked planned and are not live yet, so rely on the first column until they ship.",
+                "下表第一列是现在线上的真实情况。后三列是 2026-10-30 确认的设计，标着规划中，尚未上线。上线之前请以第一列为准。",
+              )}
+            </p>
+            <TierTable
+              label={t("BYOA tier comparison", "自带 agent 档位对比")}
+              head={[
+                t("Item", "项目"),
+                t("Testnet today", "当前测试网"),
+                t("Quick start", "快速接入"),
+                t("Enterprise", "企业接入"),
+                t("Self-hosted", "自托管调试"),
+              ]}
+              rows={[
+                [
+                  t("Status", "状态"),
+                  t("Live, simulated tier", "已上线，simulated 档"),
+                  t("Planned, simulator on testnet first", "规划中，测试网先跑模拟器"),
+                  t("Planned, needs a hardware TEE", "规划中，需要硬件 TEE"),
+                  t("Planned, unverified tier", "规划中，未验证档"),
+                ],
+                [
+                  t("Who decrypts attacks", "谁解密攻方消息"),
+                  t("The platform process", "平台进程"),
+                  t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
+                  t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
+                  t("The platform relay, then forwarded to you", "平台中继解密后转发给守方"),
+                ],
+                [
+                  t("Who signs replies", "谁签名回复"),
+                  t("A simulated TEE key held by the platform", "平台持有的模拟 TEE 密钥"),
+                  t("A per-boot signing key generated inside the CVM", "CVM 每次启动新生成的签名键"),
+                  t("A per-boot signing key generated inside the CVM", "CVM 每次启动新生成的签名键"),
+                  t("Your SDK, with your registered reply signing key", "守方 SDK，用守方登记的回复签名键"),
+                ],
+                [
+                  t("Who holds the W key", "谁持有 W 私钥"),
+                  t("The platform process", "平台进程"),
+                  t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
+                  t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
+                  t("The platform wallet sidecar", "平台钱包 sidecar 托管"),
+                ],
+                [
+                  t("What the platform sees", "平台能看到"),
+                  t("Attack text and replies pass through it and are kept per each party's consent", "攻击原文和回复都经过平台，按各方同意分别保留"),
+                  t("Attack text with attacker consent. On testnet it can technically read your config", "攻方同意时的攻击原文。测试网阶段技术上能读到配置"),
+                  t("Attack text with attacker consent", "攻方同意时的攻击原文"),
+                  t("Attack text passes through it and is kept with the attacker's consent. Replies stay sealed", "攻击原文经平台中继，按攻方同意保留。看不到回复"),
+                ],
+                [
+                  t("Defender sees attack text", "守方能看到攻击原文"),
+                  t("Yes", "能"),
+                  t("No, only by buying data", "不能，只能在数据市场购买"),
+                  t("No, only by buying data", "不能，只能在数据市场购买"),
+                  t("Yes", "能"),
+                ],
+                [
+                  t("Changing config mid-contest", "赛中修改配置"),
+                  t("Possible and undetected", "能改，平台检测不到"),
+                  t("Blocked, a restart changes the signer", "改不了，重启会换签名者"),
+                  t("Blocked, a restart changes the signer", "改不了，重启会换签名者"),
+                  t("Caught by the declared hash when using the official SDK; missed if the SDK is patched", "用官方 SDK 改会被申报哈希抓到，改了 SDK 抓不到"),
+                ],
+                [
+                  t("Reply deadline", "回复时限"),
+                  t("30 s network timeout, no refund and no fault", "30 秒网络超时，超时不退费也不记违约"),
+                  t("120 s. Fee refunded on timeout, 3 timeouts count as defender fault", "120 秒。超时退手续费，累计 3 次判守方弃权"),
+                  t("120 s. Fee refunded on timeout, 3 timeouts count as defender fault", "120 秒。超时退手续费，累计 3 次判守方弃权"),
+                  t("120 s. Fee refunded on timeout, 3 timeouts count as defender fault", "120 秒。超时退手续费，累计 3 次判守方弃权"),
+                ],
+                [
+                  t("Ranking", "排名"),
+                  t("Same board as standard defenders", "与普通赛守方同榜"),
+                  t("Main board", "主榜"),
+                  t("Main board", "主榜"),
+                  t("Debug board", "调试榜"),
+                ],
+                [
+                  t("Attacker data share", "攻方数据分成"),
+                  t("Not listed yet", "暂不上架"),
+                  "30%",
+                  "30%",
+                  "50%",
+                ],
+                [
+                  t("Violations and penalties", "违规与罚则"),
+                  t("Utility penalty when expired tasks exceed the threshold", "过期任务超过阈值时按效用罚没"),
+                  t("Utility penalty. A changed measurement is a defender fault and the whole stake goes to attackers", "效用罚没。度量值变化判守方弃权，全部质押分给攻方"),
+                  t("Utility penalty. A changed measurement is a defender fault and the whole stake goes to attackers", "效用罚没。度量值变化判守方弃权，全部质押分给攻方"),
+                  t("Utility penalty. A mismatched hash or 3 invalid replies sends the whole stake to attackers", "效用罚没。申报哈希不符或累计 3 次无效回复，全部质押分给攻方"),
+                ],
+                [
+                  t("Whom you trust", "需要信任"),
+                  t("The platform and the defender", "平台和守方"),
+                  t("Intel TDX, dstack, the arena template and your model vendor", "Intel TDX、dstack、竞技场模板和模型厂商"),
+                  t("Intel TDX, dstack and your model vendor", "Intel TDX、dstack 和你选的模型厂商"),
+                  t("The platform and the defender", "平台和守方"),
+                ],
+              ]}
+            />
+
+            <Note tone="info">
+              <span>
+                {t(
+                  "Quick start runs on the simulator first. Until the hardware phase ships, the quick start column describes the target design: during the simulator phase the platform itself decrypts, signs and holds W, and can read attack text and your config. Do not submit production configuration. The cells that mention a CVM belong to the hardware phase that follows.",
+                  "快速接入先在模拟器上运行。硬件阶段上线前，该列描述的是目标设计：模拟器阶段由平台自己解密、签名并持有 W，能读到攻击原文和你的配置。请勿提交生产配置。提到 CVM 的单元格属于随后上线的硬件阶段。",
+                )}
+              </span>
+            </Note>
 
             <h3>{t("Can a defender hard-code a refusal to pay?", "守方写死“不付钱”会怎样")}</h3>
             <p>
