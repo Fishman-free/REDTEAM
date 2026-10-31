@@ -13,7 +13,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -31,6 +31,7 @@ import {
   useRtmBalance,
 } from "../lib/platform";
 import { CHAIN_ID, ensureChain, isSupportedChain } from "../lib/chain";
+import { useWalletChainId } from "../lib/useWalletChainId";
 import { contestEndMs } from "../lib/contest";
 import { readDefenderRegistration } from "../lib/defender";
 import {
@@ -119,7 +120,7 @@ function RoleCard({
 
 export default function Overview() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChainAsync } = useSwitchChain();
   const { toast } = useToast();
   const { t } = useI18n();

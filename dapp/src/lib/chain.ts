@@ -32,7 +32,9 @@ export const wagmiConfig = createConfig({
   chains: [besuTestnet],
   connectors: [injected({ shimDisconnect: true })],
   transports: {
-    [besuTestnet.id]: http(RPC_URL),
+    // The public testnet RPC occasionally stalls. One retry with a wider
+    // timeout keeps transient stalls from aborting reads and receipt waits.
+    [besuTestnet.id]: http(RPC_URL, { timeout: 20_000, retryCount: 1, retryDelay: 800 }),
   },
   ssr: false,
 });
@@ -84,6 +86,35 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   });
 }
 
+const PROBE_TIMEOUT_MS = 12_000;
+const PROBE_ATTEMPTS = 2;
+
+/**
+ * A slow wallet RPC is not a wrong-chain wallet. Retry a timed-out probe once
+ * so a transient stall does not block every write with a mismatch warning.
+ */
+async function probeProvider<T>(
+  provider: InjectedProvider,
+  method: string,
+  params?: unknown[],
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < PROBE_ATTEMPTS; attempt += 1) {
+    try {
+      return (await withTimeout(
+        provider.request({ method, params }),
+        PROBE_TIMEOUT_MS,
+      )) as T;
+    } catch (error) {
+      lastError = error;
+      const timedOut =
+        error instanceof Error && /did not respond in time/.test(error.message);
+      if (!timedOut) throw error;
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Several local stacks can expose the same chain id (48850) while holding
  * completely different state. Chain-id checks alone therefore cannot prove
@@ -94,10 +125,7 @@ export async function assertWalletUsesAppChain(publicClient: PublicClient): Prom
   const provider = injectedProvider();
   if (!provider) throw new Error("未检测到浏览器钱包扩展。");
 
-  const actualChainHex = (await withTimeout(
-    provider.request({ method: "eth_chainId" }),
-    8_000,
-  )) as string;
+  const actualChainHex = await probeProvider<string>(provider, "eth_chainId");
   const actualChainId = Number.parseInt(actualChainHex, 16);
   if (actualChainId !== CHAIN_ID) {
     throw new Error(
@@ -108,10 +136,7 @@ export async function assertWalletUsesAppChain(publicClient: PublicClient): Prom
   }
 
   const [walletHeadHex, appHead] = await Promise.all([
-    withTimeout(
-      provider.request({ method: "eth_blockNumber" }) as Promise<string>,
-      8_000,
-    ),
+    probeProvider<string>(provider, "eth_blockNumber"),
     publicClient.getBlockNumber(),
   ]);
   const walletHead = BigInt(walletHeadHex);
@@ -121,13 +146,10 @@ export async function assertWalletUsesAppChain(publicClient: PublicClient): Prom
   if (probeHeight <= 0n) return;
 
   const [walletBlock, appBlock] = await Promise.all([
-    withTimeout(
-      provider.request({
-        method: "eth_getBlockByNumber",
-        params: [`0x${probeHeight.toString(16)}`, false],
-      }) as Promise<RpcBlock | null>,
-      8_000,
-    ),
+    probeProvider<RpcBlock | null>(provider, "eth_getBlockByNumber", [
+      `0x${probeHeight.toString(16)}`,
+      false,
+    ]),
     publicClient.getBlock({ blockNumber: probeHeight }),
   ]);
 

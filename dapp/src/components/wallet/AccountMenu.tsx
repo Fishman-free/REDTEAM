@@ -10,11 +10,12 @@ import {
   RefreshCw,
   Wallet,
 } from "lucide-react";
-import { useAccount, useBalance, useChainId, useDisconnect, useSwitchChain } from "wagmi";
+import { useAccount, useBalance, useDisconnect, useSwitchChain } from "wagmi";
 import { Identicon } from "./Identicon";
 import { useOnClickOutside, useCopy } from "../../lib/hooks";
 import { usePlatform, useRtmBalance } from "../../lib/platform";
 import { CHAIN_ID, ensureChain, isSupportedChain } from "../../lib/chain";
+import { useWalletChainId } from "../../lib/useWalletChainId";
 import { useI18n } from "../../lib/i18n";
 import { errorText, formatRtm, shortAddr } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
@@ -22,7 +23,7 @@ import { Badge } from "../ui/Badge";
 
 export function AccountMenu() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { disconnect } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { meta } = usePlatform();

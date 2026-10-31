@@ -14,7 +14,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { useAccount, useChainId, useSignTypedData } from "wagmi";
+import { useAccount, useSignTypedData } from "wagmi";
 import { keccak256, stringToBytes, type Address } from "viem";
 import { api, type DefenderEntry } from "../lib/api";
 import { arenaAbi, rtmAbi } from "../lib/contracts";
@@ -26,7 +26,8 @@ import {
   shortAddr,
 } from "../lib/format";
 import { needsExpire } from "../lib/contest";
-import { isSupportedChain } from "../lib/chain";
+import { CHAIN_ID, isSupportedChain } from "../lib/chain";
+import { useWalletChainId } from "../lib/useWalletChainId";
 import { useI18n } from "../lib/i18n";
 import { useLocalStorage, useNow } from "../lib/hooks";
 import {
@@ -207,7 +208,7 @@ function DefenseRow({
 
 export default function Defend() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const walletChainId = useWalletChainId();
   const { meta, addresses } = usePlatform();
   const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useArenaWriteContract();
@@ -275,7 +276,7 @@ export default function Defend() {
       setRegisterError(t("Connect a wallet first.", "请先连接钱包。"));
       return;
     }
-    if (!isSupportedChain(chainId)) {
+    if (!isSupportedChain(walletChainId)) {
       setRegisterError(t("Switch to RTM Testnet (48850) first.", "请先切换到 RTM Testnet（48850）。"));
       return;
     }
@@ -325,7 +326,7 @@ export default function Defend() {
         domain: {
           name: "RTM Arena",
           version: "1",
-          chainId,
+          chainId: CHAIN_ID,
           verifyingContract: arena as Address,
         },
         types: {
@@ -379,7 +380,7 @@ export default function Defend() {
   async function createContest() {
     setCreateError("");
     if (!address || !registration) return;
-    if (!isSupportedChain(chainId)) {
+    if (!isSupportedChain(walletChainId)) {
       setCreateError(t("Switch to RTM Testnet (48850) first.", "请先切换到 RTM Testnet（48850）。"));
       return;
     }
@@ -416,7 +417,11 @@ export default function Defend() {
     }
     setCreating(true);
     try {
-      if ((allowance.data ?? 0n) < stakeWei) {
+      // Re-read instead of trusting the cache: a previous spend can consume the
+      // approval before this query catches up, and the create would revert.
+      const refreshed = await allowance.refetch();
+      const available = refreshed.error ? 0n : refreshed.data ?? 0n;
+      if (available < stakeWei) {
         const approvalHash = await writeContractAsync({
           address: requireAddresses(addresses).rtm,
           abi: rtmAbi,
@@ -481,7 +486,7 @@ export default function Defend() {
     }
   }
 
-  const formDisabled = !isConnected || !isSupportedChain(chainId);
+  const formDisabled = !isConnected || !isSupportedChain(walletChainId) || !addresses;
 
   const byokHelp = t(
     "BYOK means Bring Your Own Key. You connect an OpenAI-compatible model provider and give the platform an API key so your own agent can answer attackers. The key is encrypted into platform custody and is never written to browser storage.",
@@ -542,7 +547,7 @@ export default function Defend() {
             "注册、质押、创建比赛都使用你的钱包签名。平台只托管 agent Key 与靶钱包。",
           )}
         />
-      ) : !isSupportedChain(chainId) ? (
+      ) : !isSupportedChain(walletChainId) ? (
         <ConnectPrompt title={t("Switch to RTM Testnet first", "先切换到 RTM Testnet")} compact />
       ) : null}
 
@@ -874,7 +879,7 @@ export default function Defend() {
             <Button
               block
               loading={registering}
-              disabled={!isConnected || !isSupportedChain(chainId)}
+              disabled={!isConnected || !isSupportedChain(walletChainId) || !addresses}
               iconLeft={<BadgeCheck size={14} />}
               onClick={() => void register()}
             >

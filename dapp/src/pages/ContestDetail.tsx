@@ -21,7 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { formatEther, type Address } from "viem";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import { api } from "../lib/api";
 import {
   attackFeeWei,
@@ -52,6 +52,7 @@ import {
   useRtmBalance,
 } from "../lib/platform";
 import { isSupportedChain } from "../lib/chain";
+import { useWalletChainId } from "../lib/useWalletChainId";
 import { useArenaWriteContract } from "../lib/useArenaWriteContract";
 import { useActivity } from "../context/ActivityContext";
 import { useToast } from "../context/ToastContext";
@@ -110,7 +111,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
   const contest = query.data?.contest;
   const detail = query.data;
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { meta, addresses } = usePlatform();
   const { writeContractAsync } = useArenaWriteContract();
   const { trackTransaction } = useActivity();
@@ -205,7 +206,12 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
         data_consent: dataConsent,
       });
       const approveAmount = BigInt(intent.approve.amount);
-      if ((allowance.data ?? 0n) < approveAmount) {
+      // Same staleness trap as in the chat: an earlier join/spend can consume
+      // the cached allowance before the query catches up. Read it fresh, and
+      // treat a failed read as zero so we approve rather than revert.
+      const refreshed = await allowance.refetch();
+      const available = refreshed.error ? 0n : refreshed.data ?? 0n;
+      if (available < approveAmount) {
         const approvalHash = await writeContractAsync({
           address: requireAddresses(addresses).rtm,
           abi: rtmAbi,
