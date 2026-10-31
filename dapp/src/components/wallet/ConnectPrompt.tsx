@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { Wallet } from "lucide-react";
-import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { ConnectButton } from "./ConnectButton";
 import { CHAIN_ID, ensureChain, isSupportedChain } from "../../lib/chain";
+import { useWalletChainId } from "../../lib/useWalletChainId";
 import { useI18n } from "../../lib/i18n";
 import { Button } from "../ui/Button";
 import { useState } from "react";
@@ -17,7 +18,7 @@ interface ConnectPromptProps {
 
 export function ConnectPrompt({ title, description, compact = false }: ConnectPromptProps) {
   const { isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChainAsync } = useSwitchChain();
   const [pending, setPending] = useState(false);
   const { toast } = useToast();

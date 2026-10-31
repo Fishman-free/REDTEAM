@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { keccak256, toHex } from "viem";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import {
   api,
   ApiClientError,
@@ -30,7 +30,8 @@ import {
   usePlatform,
   useRtmBalance,
 } from "../../lib/platform";
-import { isSupportedChain } from "../../lib/chain";
+import { CHAIN_ID, isSupportedChain } from "../../lib/chain";
+import { useWalletChainId } from "../../lib/useWalletChainId";
 import { useArenaWriteContract } from "../../lib/useArenaWriteContract";
 import { useActivity } from "../../context/ActivityContext";
 import { useToast } from "../../context/ToastContext";
@@ -95,7 +96,7 @@ function replyText(
 
 export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const walletChainId = useWalletChainId();
   const { writeContractAsync } = useArenaWriteContract();
   const { meta, addresses } = usePlatform();
   const { trackTransaction } = useActivity();
@@ -106,13 +107,13 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
   const consent = useDataConsent(contest.id, address);
   const now = useNow(15_000);
   const live = isContestLive(contest, now);
-  const correctChain = isSupportedChain(chainId);
+  const correctChain = isSupportedChain(walletChainId);
   const fee = attackFeeWei(contest, meta);
 
   const storageSuffix = useMemo(() => {
     const who = address?.toLowerCase() ?? "guest";
-    return `${chainId}:${contest.id.toLowerCase()}:${who}`;
-  }, [address, chainId, contest.id]);
+    return `${CHAIN_ID}:${contest.id.toLowerCase()}:${who}`;
+  }, [address, contest.id]);
 
   const [messages, setMessages] = useLocalStorage<ChatEntry[]>(
     `rtm.chat.v1:${storageSuffix}`,
@@ -228,6 +229,15 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
       setError(t("Switch to RTM Testnet (48850) first.", "请先切换到 RTM Testnet（48850）。"));
       return;
     }
+    if (!addresses) {
+      setError(
+        t(
+          "The platform API is not reachable yet, so contract addresses are unavailable. Retry once it is back.",
+          "平台 API 尚未连通，暂时拿不到合约地址；请等 API 恢复后重试。",
+        ),
+      );
+      return;
+    }
     if (!joined) {
       setError(t("You need to join this contest first.", "你需要先加入这场比赛。"));
       return;
@@ -270,7 +280,11 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
     }
     setBusy(true);
     try {
-      const currentAllowance = allowance.data ?? 0n;
+      // The cached allowance can be stale: joining the contest spends the
+      // approval, but the query may still hold the pre-join value. Re-read it
+      // before skipping approve, or the first paid message reverts on-chain.
+      const refreshed = await allowance.refetch();
+      const currentAllowance = refreshed.error ? 0n : refreshed.data ?? 0n;
       if (currentAllowance < fee) {
         setStep("approve");
         const desired = fee * 5n;
@@ -334,11 +348,16 @@ export function PaidChat({ contest, joined, onAfterSend }: PaidChatProps) {
     ? t("Connect your wallet to send messages", "连接钱包后发送消息")
     : !correctChain
       ? t("Switch networks to send messages", "切换网络后发送消息")
-      : !joined
-        ? t("Join this contest before sending paid messages", "先加入这场战斗，才能发送付费消息")
-        : !live
-          ? t("The contest has ended; dialogue is closed", "比赛已结束，对话已关闭")
-          : null;
+      : !addresses
+        ? t(
+            "Waiting for the platform API before messages can be sent",
+            "正在等待平台 API，恢复后才能发送消息",
+          )
+        : !joined
+          ? t("Join this contest before sending paid messages", "先加入这场战斗，才能发送付费消息")
+          : !live
+            ? t("The contest has ended; dialogue is closed", "比赛已结束，对话已关闭")
+            : null;
 
   return (
     <section className="chat">

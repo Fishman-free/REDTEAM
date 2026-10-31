@@ -5,9 +5,9 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { useChainId, usePublicClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 import type { TransactionReceipt } from "viem";
-import { assertWalletUsesAppChain } from "../lib/chain";
+import { CHAIN_ID, assertWalletUsesAppChain } from "../lib/chain";
 import { useLocalStorage } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
 import { errorText, shortHash } from "../lib/format";
@@ -43,7 +43,6 @@ const CONFIRMATION_TIMEOUT_MS = 90_000;
 export function ActivityProvider({ children }: { children: ReactNode }) {
   const [records, setRecords] = useLocalStorage<ActivityRecord[]>(STORAGE_KEY, []);
   const publicClient = usePublicClient();
-  const chainId = useChainId();
   const { toast } = useToast();
   const { t } = useI18n();
 
@@ -106,7 +105,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
           kind,
           status: "pending",
           createdAt: Math.floor(Date.now() / 1000),
-          chainId,
+          chainId: CHAIN_ID,
         };
         return [record, ...without].slice(0, 60);
       });
@@ -162,7 +161,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [chainId, explainMissingTransaction, publicClient, setRecords, t, toast, update],
+    [explainMissingTransaction, publicClient, setRecords, t, toast, update],
   );
 
   const refreshTransaction = useCallback(

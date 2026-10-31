@@ -13,7 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { Address } from "viem";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import {
   api,
   ApiClientError,
@@ -44,7 +44,8 @@ import {
   usePlatform,
   useRtmBalance,
 } from "../lib/platform";
-import { isSupportedChain } from "../lib/chain";
+import { CHAIN_ID, isSupportedChain } from "../lib/chain";
+import { useWalletChainId } from "../lib/useWalletChainId";
 import { useArenaWriteContract } from "../lib/useArenaWriteContract";
 import { useActivity } from "../context/ActivityContext";
 import { useToast } from "../context/ToastContext";
@@ -87,7 +88,7 @@ export default function MarketDetail() {
   const contest = query.data?.contest;
   const detail = query.data;
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const walletChainId = useWalletChainId();
   const { addresses } = usePlatform();
   const { writeContractAsync } = useArenaWriteContract();
   const { trackTransaction } = useActivity();
@@ -99,7 +100,7 @@ export default function MarketDetail() {
   const allowance = useAllowance(address, addresses?.dataMarket);
   const balance = useRtmBalance(address);
   const [records, setRecords] = useLocalStorage<PurchaseRecord[]>(
-    `rtm.market.purchases.v1:${chainId}:${contestId?.toLowerCase() ?? "none"}:${address?.toLowerCase() ?? "guest"}`,
+    `rtm.market.purchases.v1:${CHAIN_ID}:${contestId?.toLowerCase() ?? "none"}:${address?.toLowerCase() ?? "guest"}`,
     [],
   );
   const [pending, setPending] = useState<PendingPurchase | null>(null);
@@ -112,7 +113,7 @@ export default function MarketDetail() {
     Boolean(address) && Boolean(contest) &&
     contest!.defender.toLowerCase() === address!.toLowerCase();
   const ended = Boolean(contest) && contest!.state !== "live";
-  const correctChain = isSupportedChain(chainId);
+  const correctChain = isSupportedChain(walletChainId);
   const ownPrice =
     contest && prices.priceBps !== undefined
       ? (BigInt(contest.stake) * prices.priceBps) / 10_000n
@@ -259,7 +260,11 @@ export default function MarketDetail() {
     }
     setBusy(key);
     try {
-      if ((allowance.data ?? 0n) < price) {
+      // The cached allowance may be from before an earlier purchase consumed
+      // it; read it fresh or this buy reverts on-chain.
+      const refreshed = await allowance.refetch();
+      const available = refreshed.error ? 0n : refreshed.data ?? 0n;
+      if (available < price) {
         const approvalHash = await writeContractAsync({
           address: requireAddresses(addresses).rtm,
           abi: rtmAbi,

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
-import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { CHAIN_ID, ensureChain, isSupportedChain } from "../../lib/chain";
+import { useWalletChainId } from "../../lib/useWalletChainId";
 import { useI18n } from "../../lib/i18n";
 import { errorText } from "../../lib/format";
 import { useToast } from "../../context/ToastContext";
@@ -9,7 +10,7 @@ import { Button } from "../ui/Button";
 
 export function NetworkBanner() {
   const { isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChainAsync } = useSwitchChain();
   const [pending, setPending] = useState(false);
   const { toast } = useToast();

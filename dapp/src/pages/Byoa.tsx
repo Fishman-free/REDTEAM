@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   useAccount,
-  useChainId,
   usePublicClient,
   useReadContract,
   useSignMessage,
@@ -36,7 +35,8 @@ import {
   type Identity,
 } from "../lib/byoaCrypto";
 import { errorText, shortAddr, shortHash } from "../lib/format";
-import { isSupportedChain } from "../lib/chain";
+import { CHAIN_ID, isSupportedChain } from "../lib/chain";
+import { useWalletChainId } from "../lib/useWalletChainId";
 import { useI18n } from "../lib/i18n";
 import { useLocalStorage } from "../lib/hooks";
 import { usePlatform } from "../lib/platform";
@@ -101,12 +101,12 @@ function ownershipChallenge(address: string, nonce: number, deadline: number) {
 
 export default function Byoa() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const walletChainId = useWalletChainId();
   const { meta, addresses } = usePlatform();
   const { signMessageAsync } = useSignMessage();
   const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useArenaWriteContract();
-  const publicClient = usePublicClient({ chainId });
+  const publicClient = usePublicClient({ chainId: CHAIN_ID });
   const { t } = useI18n();
   const { toast } = useToast();
 
@@ -232,7 +232,7 @@ export default function Byoa() {
 
   async function registerBundle() {
     setRegisterError("");
-    if (!address || !isSupportedChain(chainId)) {
+    if (!address || !isSupportedChain(walletChainId)) {
       setRegisterError(t("Connect the RTM Testnet wallet first.", "请先连接 RTM Testnet 钱包。"));
       return;
     }
@@ -306,7 +306,7 @@ export default function Byoa() {
   async function createContest() {
     setCreateError("");
     if (!bundle || !address || !arena || !rtm) return;
-    if (!isSupportedChain(chainId)) {
+    if (!isSupportedChain(walletChainId)) {
       setCreateError(t("Switch to RTM Testnet (48850).", "请切换到 RTM Testnet（48850）。"));
       return;
     }
@@ -348,7 +348,7 @@ export default function Byoa() {
         domain: {
           name: "RTM Arena",
           version: "1",
-          chainId,
+          chainId: CHAIN_ID,
           verifyingContract: arena,
         },
         types: BYOA_TYPES,
@@ -492,7 +492,7 @@ export default function Byoa() {
         domain: {
           name: "RTM Arena",
           version: "1",
-          chainId,
+          chainId: CHAIN_ID,
           verifyingContract: arena,
         },
         types: ATTACK_KEY_TYPES,

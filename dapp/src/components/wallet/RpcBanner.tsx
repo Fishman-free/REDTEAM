@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, RefreshCw, TriangleAlert } from "lucide-react";
-import { useAccount, useChainId, usePublicClient } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { CHAIN_ID, assertWalletUsesAppChain, isSupportedChain, walletRpcUrl } from "../../lib/chain";
+import { useWalletChainId } from "../../lib/useWalletChainId";
 import { errorText } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
 
@@ -12,7 +13,7 @@ import { useI18n } from "../../lib/i18n";
  */
 export function RpcBanner() {
   const { isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
   const { t } = useI18n();
   const [message, setMessage] = useState<string | null>(null);

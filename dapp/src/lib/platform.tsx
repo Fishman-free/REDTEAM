@@ -68,8 +68,12 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const metaQuery = useQuery({
     queryKey: ["platform", "meta"],
     queryFn: api.meta,
-    retry: 1,
+    retry: 3,
     staleTime: 60_000,
+    // Keep retrying in the background while there is no meta at all: without
+    // addresses every write is paused, so the page must recover on its own
+    // instead of waiting for someone to press Retry.
+    refetchInterval: (query) => (query.state.data ? false : 12_000),
     refetchOnWindowFocus: false,
   });
   const statusQuery = useQuery({
@@ -81,7 +85,10 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   });
 
   const meta: PlatformDefaults = metaQuery.data ?? FALLBACK_META;
-  const online = Boolean(metaQuery.data) || Boolean(statusQuery.data);
+  // Contract addresses come only from /meta. A healthy status endpoint cannot
+  // substitute for it: without addresses every write is paused, so the banner
+  // and its retry must stay visible even when the indexer status is reachable.
+  const online = Boolean(metaQuery.data);
 
   const value = useMemo<PlatformContextValue>(
     () => ({
