@@ -126,7 +126,7 @@ export default function Byoa() {
   const [perTxLimit, setPerTxLimit] = useState("5");
   const [totalLimit, setTotalLimit] = useState("20");
   const [maxTaskAmount, setMaxTaskAmount] = useState("5");
-  const [defenderConsent, setDefenderConsent] = useState(true);
+  const [defenderConsent, setDefenderConsent] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
   const [stake, setStake] = useState("50");
@@ -702,8 +702,8 @@ export default function Byoa() {
               onChange={setDefenderConsent}
             >
               {t(
-                "Authorize the platform to decrypt replies after the contest",
-                "允许平台在赛后解密回复与工具轨迹",
+                "Authorize the platform to keep replies and tool traces after the contest",
+                "允许平台在赛后保留回复和工具轨迹",
               )}
             </CheckboxField>
           </div>
