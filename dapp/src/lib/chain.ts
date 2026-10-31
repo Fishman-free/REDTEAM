@@ -1,4 +1,5 @@
 import { createConfig, http } from "wagmi";
+import { getAccount } from "wagmi/actions";
 import { injected } from "wagmi/connectors";
 import type { PublicClient } from "viem";
 import { getLang } from "./i18n";
@@ -61,8 +62,31 @@ interface RpcBlock {
   hash: string;
 }
 
-function injectedProvider(): InjectedProvider | null {
+function isInjectedProvider(value: unknown): value is InjectedProvider {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as InjectedProvider).request === "function"
+  );
+}
+
+/**
+ * Resolve the provider of the wallet the user actually connected.
+ *
+ * Several extensions can inject themselves at once. `window.ethereum` is
+ * whichever one won the injection race, which is not necessarily the wallet
+ * wagmi connected through EIP-6963 discovery. Probing or switching that global
+ * provider would report another wallet's chain (for example MetaMask on chain 1
+ * while Binance Wallet is on 48850) and block every write with a false alarm.
+ */
+async function injectedProvider(): Promise<InjectedProvider | null> {
   if (!isBrowser) return null;
+  const connector = getAccount(wagmiConfig).connector;
+  if (connector) {
+    const provider: unknown = await connector.getProvider();
+    return isInjectedProvider(provider) ? provider : null;
+  }
+  // Disconnected: fall back to the legacy global for pre-connect checks.
   const candidate = (window as unknown as { ethereum?: InjectedProvider }).ethereum;
   return candidate ?? null;
 }
@@ -122,7 +146,7 @@ async function probeProvider<T>(
  * both endpoints should already have; different hashes mean a different chain.
  */
 export async function assertWalletUsesAppChain(publicClient: PublicClient): Promise<void> {
-  const provider = injectedProvider();
+  const provider = await injectedProvider();
   if (!provider) throw new Error("未检测到浏览器钱包扩展。");
 
   const actualChainHex = await probeProvider<string>(provider, "eth_chainId");
@@ -167,7 +191,7 @@ export async function assertWalletUsesAppChain(publicClient: PublicClient): Prom
  * wallet, add it first. Throws a readable error when no wallet is available.
  */
 export async function ensureChain(): Promise<void> {
-  const provider = injectedProvider();
+  const provider = await injectedProvider();
   if (!provider) throw new Error("未检测到浏览器钱包扩展。");
   try {
     await provider.request({
