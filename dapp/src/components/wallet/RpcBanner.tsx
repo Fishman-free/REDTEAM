@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, RefreshCw, TriangleAlert } from "lucide-react";
 import { useAccount, usePublicClient } from "wagmi";
-import { CHAIN_ID, assertWalletUsesAppChain, isSupportedChain, walletRpcUrl } from "../../lib/chain";
+import {
+  CHAIN_ID,
+  assertWalletUsesAppChain,
+  ensureChain,
+  isSupportedChain,
+  walletRpcUrl,
+} from "../../lib/chain";
 import { useWalletChainId } from "../../lib/useWalletChainId";
 import { errorText } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
@@ -17,6 +23,7 @@ export function RpcBanner() {
   const publicClient = usePublicClient({ chainId: CHAIN_ID });
   const { t } = useI18n();
   const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const check = useCallback(() => {
     setMessage(null);
@@ -36,6 +43,20 @@ export function RpcBanner() {
 
   useEffect(() => check(), [check]);
 
+  async function switchNetwork() {
+    setPending(true);
+    try {
+      // Targets the connected connector, not whichever wallet owns
+      // window.ethereum, then re-runs the probe against that same wallet.
+      await ensureChain();
+      check();
+    } catch (reason) {
+      setMessage(errorText(reason));
+    } finally {
+      setPending(false);
+    }
+  }
+
   if (!message) return null;
 
   return (
@@ -51,6 +72,14 @@ export function RpcBanner() {
         </span>
       </div>
       <div className="rpc-banner__actions">
+        <button
+          type="button"
+          className="btn btn--secondary btn--sm"
+          onClick={() => void switchNetwork()}
+          disabled={pending}
+        >
+          {pending ? t("Switching…", "切换中…") : t("Switch network", "切换网络")}
+        </button>
         <button type="button" className="btn btn--ghost btn--sm" onClick={check}>
           <RefreshCw size={12} />
           {t("Recheck", "重新检查")}
