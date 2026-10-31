@@ -1,0 +1,16 @@
+# Minimal Phala dstack CVM for the RTM TEE pilot.
+#
+# Build cvm/ and push the image to a registry, then pin it by digest:
+#   docker build --platform linux/amd64 -f cvm/Dockerfile -t <registry>/rtm-tee-pilot:<tag> .
+#   docker push <registry>/rtm-tee-pilot:<tag>
+#   TEE_PILOT_IMAGE=<registry>/rtm-tee-pilot@sha256:... phala deploy ...
+services:
+  tee-pilot:
+    image: ${TEE_PILOT_IMAGE:?set TEE_PILOT_IMAGE to the pushed image digest}
+    ports:
+      - "8080:8080"
+    volumes:
+      # dstack guest agent: the only way to request a TDX quote from inside
+      # the CVM. It is not exposed to the host.
+      - /var/run/dstack.sock:/var/run/dstack.sock
+    restart: unless-stopped

@@ -146,6 +146,7 @@ Flower 用一朵“小花”记录经过审核的研究贡献，与 PayAssist �
 - [PayAssist 运行指南](rsi4safety/payment_agents/README.md)：模型、任务、命令和运行边界。
 - [Flower 技术说明](docs/FLOWER_RECOGNITION.md)：本地 NFT 流程与限制。
 - [商业计划 Markdown](docs/business/redteam-business-plan.md)：拟议服务和客户假设。
+- [TEE 可信执行环境手册](docs/TEE.md)：BYOA 三方保密的硬件基础、当前 simulated 基线与接入路线。
 
 ### 运行离线验证
 

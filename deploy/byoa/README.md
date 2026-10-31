@@ -48,7 +48,7 @@ defender 四个服务；defender 只连接 `sealed` 内网，唯一出网路径�
 `egress.yaml` 是 Envoy 允许列表示例，`egress-policy.example.json` 是对外公开的
 出网声明。
 
-真实 TEE 阶段：
+真实 TEE 阶段（背景、威胁模型与 P0–P4 路线见 `docs/TEE.md`）：
 
 1. 把 compose 的 hash 作为 `runtimeMeasurement` 写进链上；
 2. 由 CVM 内 TEE 密钥签 `TeeWalletBinding`，平台不能代签；
