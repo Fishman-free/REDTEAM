@@ -516,8 +516,8 @@ export default function Docs() {
                 </p>
                 <p>
                   {t(
-                    "The checkbox is on by default and authorizes the platform to keep your replies and tool traces after the contest. Uncheck it and replies are kept only as hashes, while tool traces are dropped. Sign the ownership challenge. The platform returns W, the TEE signer, the config commitment, the runtime measurement and the policy fingerprint.",
-                    "该勾选框默认勾选，允许平台在赛后保留你的回复和工具轨迹。取消勾选后回复只保留哈希，工具轨迹不保留。签一条所有权证明消息后，平台会返回 W、TEE 签名者、配置承诺、运行时度量和策略指纹。",
+                    "The checkbox is off by default. Check it to authorize the platform to keep your replies and tool traces after the contest. Without it, replies are kept only as hashes, while tool traces are dropped. Sign the ownership challenge. The platform returns W, the TEE signer, the config commitment, the runtime measurement and the policy fingerprint.",
+                    "该勾选框默认不勾选。勾选后允许平台在赛后保留你的回复和工具轨迹；不勾选时回复只保留哈希，工具轨迹不保留。签一条所有权证明消息后，平台会返回 W、TEE 签名者、配置承诺、运行时度量和策略指纹。",
                   )}
                 </p>
               </Step>
@@ -900,8 +900,8 @@ export default function Docs() {
                 <h3>{t("BYOA data", "自带 agent 数据")}</h3>
                 <p>
                   {t(
-                    "In the current simulated tier the platform decrypts attacker messages before forwarding them to the defender, and keeps the message text only when the attacker consented. Without consent only hashes are kept. This version does not list BYOA transcripts in the data market. When registering the bundle, the defender can authorize the platform to keep replies and tool traces; the checkbox is on by default.",
-                    "当前 simulated 档下，平台解密攻方消息后再转发给守方，只在攻方同意时保留消息原文，不同意只保留哈希。当前版本不会把 BYOA 对话记录上架数据市场。注册 bundle 时，守方可以允许平台保留回复和工具轨迹，该勾选框默认勾选。",
+                    "In the current simulated tier the platform decrypts attacker messages before forwarding them to the defender, and keeps the message text only when the attacker consented. Without consent only hashes are kept. This version does not list BYOA transcripts in the data market. When registering the bundle, the defender can authorize the platform to keep replies and tool traces; the checkbox is off by default.",
+                    "当前 simulated 档下，平台解密攻方消息后再转发给守方，只在攻方同意时保留消息原文，不同意只保留哈希。当前版本不会把 BYOA 对话记录上架数据市场。注册 bundle 时，守方可以允许平台保留回复和工具轨迹，该勾选框默认不勾选。",
                   )}
                 </p>
               </div>
