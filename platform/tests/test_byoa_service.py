@@ -8,6 +8,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import pytest
 from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
 from web3 import Web3
@@ -30,6 +31,7 @@ from redteam_platform.byoa.sealed import (
 from redteam_platform.byoa.service import (
     BundleRequest,
     ByoaService,
+    ByoaServiceError,
     ContestRequest,
     TurnRequest,
 )
@@ -76,6 +78,7 @@ class FakeGateway:
         self.tasks = []
         self.expired = []
         self.task_seq = 0
+        self.delivered_msgs = set()
 
     def byoa_nonce(self, defender):
         return 0
@@ -99,7 +102,15 @@ class FakeGateway:
 
     def mark_delivered_reply(self, contest_id, attacker, msg_hash, reply_hash):
         self.delivered = (contest_id, attacker, msg_hash, reply_hash)
+        self.delivered_msgs.add((contest_id.lower(), attacker.lower(), msg_hash.lower()))
         return "0x" + "dd" * 32
+
+    def is_message_delivered(self, contest_id, attacker, msg_hash):
+        return (
+            contest_id.lower(),
+            attacker.lower(),
+            msg_hash.lower(),
+        ) in self.delivered_msgs
 
     def expired_task_count(self, contest_id):
         return len(self.expired)
@@ -406,6 +417,20 @@ def test_sealed_turn_decrypts_in_tee_and_returns_ciphertext():
         assert state["encryption"] == "e2e"
         assert state["transcript"][-1]["content"] is None
         assert state["transcript"][-1]["reply"] is None
+
+        # Replaying the exact same paid turn must not run the defender again.
+        with pytest.raises(ByoaServiceError) as duplicate:
+            service.sealed_turn(
+                CONTEST,
+                tx_hash="0x" + "aa" * 32,
+                attacker=attacker.address,
+                ciphertext=envelope,
+                attacker_pubkey="0x" + pubkey.hex(),
+                key_signature=key_signature,
+                key_deadline=1900,
+            )
+        assert duplicate.value.status_code == 409
+        assert len(gateway.delivered_msgs) == 1
     finally:
         server.shutdown()
         server.server_close()

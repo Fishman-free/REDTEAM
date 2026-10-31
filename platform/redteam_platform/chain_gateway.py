@@ -427,6 +427,19 @@ class Web3ChainGateway:
 
         return self._mark_delivered(contest_id, attacker, msg_hash, reply_hash)
 
+    def is_message_delivered(
+        self, contest_id: str, attacker: str, msg_hash: str
+    ) -> bool:
+        """Read the on-chain delivered flag before replaying a paid BYOA turn."""
+
+        cid = normalize_contest_id(contest_id)
+        account = _require_address(attacker, "attacker")
+        digest = _bytes32(msg_hash, "msg_hash")
+        function = self._arena.get_function_by_signature(
+            "deliveredMsg(bytes32,address,bytes32)"
+        )
+        return bool(function(bytes.fromhex(cid[2:]), account, digest).call())
+
     def _mark_delivered(
         self,
         contest_id: str,
