@@ -156,6 +156,10 @@ class ByoaService:
         self.indexer = indexer
         self._bundles: dict[str, _BundleRecord] = {}
         self._contests: dict[str, _ContestRecord] = {}
+        # A paid BYOA turn can be replayed with the same tx hash.  The on-chain
+        # markDelivered duplicate check only runs after the defender agent has
+        # already executed, so keep a local delivered set as the first gate.
+        self._delivered_turns: set[tuple[str, str, str]] = set()
         self._lock = threading.RLock()
 
     # -- bundles --------------------------------------------------------
@@ -612,6 +616,23 @@ class ByoaService:
         if not isinstance(consent, bool):
             raise ByoaServiceError(409, "join consent is not indexed yet")
 
+        turn_key = (
+            contest_id.lower(),
+            _address(attacker, "attacker").lower(),
+            msg_hash,
+        )
+        with self._lock:
+            if turn_key in self._delivered_turns:
+                raise ByoaServiceError(409, "this paid turn was already delivered")
+        delivered_check = getattr(self.gateway, "is_message_delivered", None)
+        if callable(delivered_check):
+            try:
+                already_delivered = delivered_check(contest_id, attacker, msg_hash)
+            except Exception:
+                already_delivered = False
+            if already_delivered:
+                raise ByoaServiceError(409, "this paid turn was already delivered")
+
         if key_deadline < self._now():
             raise ByoaServiceError(422, "attacker key signature has expired")
         pubkey = _bytes32_hex(attacker_pubkey, "attacker_pubkey")
@@ -680,6 +701,8 @@ class ByoaService:
             raise ByoaServiceError(
                 502, f"markDelivered failed: {type(exc).__name__}"
             ) from None
+        with self._lock:
+            self._delivered_turns.add(turn_key)
         record.sealed = True
         return {
             "contest_id": contest_id,
