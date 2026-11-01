@@ -3,10 +3,16 @@ import { getAccount } from "wagmi/actions";
 import { injected } from "wagmi/connectors";
 import type { PublicClient } from "viem";
 import { getLang } from "./i18n";
+import {
+  ARENA_CHAIN_ID,
+  diagnoseWalletNetwork,
+  type Eip1193Provider,
+  type WalletNetworkDiagnosis,
+} from "./walletNetwork";
 
 const isBrowser = typeof window !== "undefined";
 
-export const CHAIN_ID = 48850;
+export const CHAIN_ID = ARENA_CHAIN_ID;
 export const CHAIN_ID_HEX = "0xbed2";
 
 export const RPC_URL =
@@ -53,20 +59,16 @@ export function walletRpcUrl(): string {
 
 type ProviderError = Error & { code?: number };
 
-interface InjectedProvider {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-}
-
 interface RpcBlock {
   number: string;
   hash: string;
 }
 
-function isInjectedProvider(value: unknown): value is InjectedProvider {
+function isInjectedProvider(value: unknown): value is Eip1193Provider {
   return (
     typeof value === "object" &&
     value !== null &&
-    typeof (value as InjectedProvider).request === "function"
+    typeof (value as Eip1193Provider).request === "function"
   );
 }
 
@@ -79,7 +81,7 @@ function isInjectedProvider(value: unknown): value is InjectedProvider {
  * provider would report another wallet's chain (for example MetaMask on chain 1
  * while Binance Wallet is on 48850) and block every write with a false alarm.
  */
-async function injectedProvider(): Promise<InjectedProvider | null> {
+async function injectedProvider(): Promise<Eip1193Provider | null> {
   if (!isBrowser) return null;
   const connector = getAccount(wagmiConfig).connector;
   if (connector) {
@@ -87,23 +89,46 @@ async function injectedProvider(): Promise<InjectedProvider | null> {
     return isInjectedProvider(provider) ? provider : null;
   }
   // Disconnected: fall back to the legacy global for pre-connect checks.
-  const candidate = (window as unknown as { ethereum?: InjectedProvider }).ethereum;
+  const candidate = (window as unknown as { ethereum?: Eip1193Provider }).ethereum;
   return candidate ?? null;
+}
+
+/** Name of the connected wallet, for diagnostics in the banner. */
+export function connectedWalletName(): string {
+  if (!isBrowser) return "";
+  try {
+    return getAccount(wagmiConfig).connector?.name ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function normalizeProviderError(error: unknown): ProviderError {
+  if (error instanceof Error) return error as ProviderError;
+  if (typeof error === "object" && error !== null) {
+    const record = error as { message?: unknown; code?: unknown };
+    const normalized = new Error(
+      typeof record.message === "string" ? record.message : "wallet request failed",
+    ) as ProviderError;
+    if (typeof record.code === "number") normalized.code = record.code;
+    return normalized;
+  }
+  return new Error(String(error));
 }
 
 function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(
+    const timer = globalThis.setTimeout(
       () => reject(new Error("Wallet RPC did not respond in time")),
       milliseconds,
     );
     promise.then(
       (value) => {
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         resolve(value);
       },
       (error) => {
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         reject(error);
       },
     );
@@ -111,14 +136,28 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
 }
 
 const PROBE_TIMEOUT_MS = 12_000;
+const APP_PROBE_TIMEOUT_MS = 8_000;
 const PROBE_ATTEMPTS = 2;
+const PROBE_RETRY_DELAY_MS = 350;
 
 /**
- * A slow wallet RPC is not a wrong-chain wallet. Retry a timed-out probe once
- * so a transient stall does not block every write with a mismatch warning.
+ * A slow or briefly unreachable wallet RPC is not a wrong-chain wallet. Retry
+ * network-shaped failures once so a transient stall does not surface as a
+ * fork warning. User rejections and unsupported methods are never retried.
  */
+function isRetryableProbeError(error: unknown): boolean {
+  const normalized = normalizeProviderError(error);
+  if (normalized.code === 4001 || normalized.code === 4100 || normalized.code === 4200) {
+    return false;
+  }
+  if (normalized.code === -32601) return false;
+  return /did not respond in time|failed to fetch|network ?error|networkerror|fetch failed|timeout|timed out|econn|socket hang up|load failed/i.test(
+    normalized.message,
+  );
+}
+
 async function probeProvider<T>(
-  provider: InjectedProvider,
+  provider: Eip1193Provider,
   method: string,
   params?: unknown[],
 ): Promise<T> {
@@ -130,60 +169,133 @@ async function probeProvider<T>(
         PROBE_TIMEOUT_MS,
       )) as T;
     } catch (error) {
-      lastError = error;
-      const timedOut =
-        error instanceof Error && /did not respond in time/.test(error.message);
-      if (!timedOut) throw error;
+      lastError = normalizeProviderError(error);
+      if (!isRetryableProbeError(error) || attempt === PROBE_ATTEMPTS - 1) {
+        throw lastError;
+      }
+      await new Promise((resolve) =>
+        globalThis.setTimeout(resolve, PROBE_RETRY_DELAY_MS),
+      );
     }
   }
   throw lastError;
 }
 
-/**
- * Several local stacks can expose the same chain id (48850) while holding
- * completely different state. Chain-id checks alone therefore cannot prove
- * that the wallet and this page talk to the same chain. Compare a block that
- * both endpoints should already have; different hashes mean a different chain.
- */
-export async function assertWalletUsesAppChain(publicClient: PublicClient): Promise<void> {
+/** Translate the raw wallet/app RPC probes into a user-visible diagnosis. */
+export async function diagnoseWallet(
+  publicClient: PublicClient,
+): Promise<WalletNetworkDiagnosis> {
   const provider = await injectedProvider();
-  if (!provider) throw new Error("未检测到浏览器钱包扩展。");
+  if (!provider) return { kind: "no-wallet" };
+  return diagnoseWalletNetwork({
+    walletChainId: async () => {
+      const raw = await probeProvider<string>(provider, "eth_chainId");
+      const chainId = Number.parseInt(String(raw), 16);
+      if (!Number.isFinite(chainId) || chainId <= 0) {
+        throw new Error("The wallet returned an invalid chain id.");
+      }
+      return chainId;
+    },
+    walletHead: async () =>
+      BigInt(String(await probeProvider<string>(provider, "eth_blockNumber"))),
+    walletBlock: async (height) => {
+      const block = await probeProvider<RpcBlock | null>(
+        provider,
+        "eth_getBlockByNumber",
+        [`0x${height.toString(16)}`, false],
+      );
+      return block && typeof block.hash === "string" ? { hash: block.hash } : null;
+    },
+    // Cap the app-side probes so a dead RPC cannot stall every write for the
+    // transport's 20 s timeout plus retry. A timeout is inconclusive, not a
+    // fork; the guard lets the wallet try.
+    appHead: () =>
+      withTimeout(publicClient.getBlockNumber(), APP_PROBE_TIMEOUT_MS),
+    appBlock: async (height) => ({
+      hash: (
+        await withTimeout(
+          publicClient.getBlock({ blockNumber: height }),
+          APP_PROBE_TIMEOUT_MS,
+        )
+      ).hash,
+    }),
+  });
+}
 
-  const actualChainHex = await probeProvider<string>(provider, "eth_chainId");
-  const actualChainId = Number.parseInt(actualChainHex, 16);
-  if (actualChainId !== CHAIN_ID) {
-    throw new Error(
+export class WalletChainMismatchError extends Error {
+  readonly actualChainId: number;
+
+  constructor(actualChainId: number) {
+    super(
       getLang() === "en"
         ? `Your wallet is on chain ${actualChainId}; switch it to RTM Testnet (${CHAIN_ID}).`
         : `钱包当前在链 ${actualChainId}，请先切换到 RTM Testnet（${CHAIN_ID}）。`,
     );
+    this.name = "WalletChainMismatchError";
+    this.actualChainId = actualChainId;
   }
+}
 
-  const [walletHeadHex, appHead] = await Promise.all([
-    probeProvider<string>(provider, "eth_blockNumber"),
-    publicClient.getBlockNumber(),
-  ]);
-  const walletHead = BigInt(walletHeadHex);
-  // Probe well behind both heads so normal propagation lag cannot cause a
-  // false mismatch, while a different chain diverges at every height.
-  const probeHeight = (walletHead < appHead ? walletHead : appHead) - 12n;
-  if (probeHeight <= 0n) return;
+export class WalletForkError extends Error {
+  constructor() {
+    super(
+      getLang() === "en"
+        ? `This wallet is on a different chain with the same chain ID (${CHAIN_ID}). Open the wallet's RTM Testnet network settings and change its RPC to ${walletRpcUrl()}, or delete the network and add it again.`
+        : `这个钱包连接到了另一条 chain ID 同为 ${CHAIN_ID} 的链。请打开钱包的 RTM Testnet 网络设置，把 RPC 改为 ${walletRpcUrl()}，或删除该网络后重新添加。`,
+    );
+    this.name = "WalletForkError";
+  }
+}
 
-  const [walletBlock, appBlock] = await Promise.all([
-    probeProvider<RpcBlock | null>(provider, "eth_getBlockByNumber", [
-      `0x${probeHeight.toString(16)}`,
-      false,
-    ]),
-    publicClient.getBlock({ blockNumber: probeHeight }),
-  ]);
-
-  if (walletBlock && walletBlock.hash.toLowerCase() !== appBlock.hash.toLowerCase()) {
+/**
+ * Guard called before every write.
+ *
+ * A different chain id, or two successfully read blocks with different hashes,
+ * blocks the write. A wallet that merely cannot read its own RPC is *not*
+ * proof of a fork: blocking there turned a transient wallet-RPC failure into a
+ * permanent "wrong network" alarm. In that case we let the wallet attempt the
+ * transaction and surface its own error, while the banner explains the RPC.
+ */
+export async function assertWalletUsesAppChain(
+  publicClient: PublicClient,
+): Promise<void> {
+  const diagnosis = await diagnoseWallet(publicClient);
+  if (diagnosis.kind === "wallet-chain") {
+    throw new WalletChainMismatchError(diagnosis.actualChainId);
+  }
+  if (diagnosis.kind === "fork") {
+    throw new WalletForkError();
+  }
+  if (diagnosis.kind === "no-wallet") {
     throw new Error(
       getLang() === "en"
-        ? `This wallet is on a different local chain with the same chain ID (${CHAIN_ID}). The faucet still works; for game transactions, switch to the arena network or ask the operator to align the wallet RPC.`
-        : `这个钱包连接到了另一条 chain ID 同为 ${CHAIN_ID} 的本地链。水龙头仍可正常领取；进行游戏交易前请切换到竞技场网络，或联系运营者校准钱包 RPC。`,
+        ? "No browser wallet is available."
+        : "未检测到浏览器钱包扩展。",
     );
   }
+  if (diagnosis.kind !== "ok") {
+    console.warn("[wallet] chain cross-check was inconclusive:", diagnosis);
+  }
+}
+
+function chainParams() {
+  return {
+    chainId: CHAIN_ID_HEX,
+    chainName: besuTestnet.name,
+    nativeCurrency: besuTestnet.nativeCurrency,
+    rpcUrls: [walletRpcUrl()],
+    blockExplorerUrls: EXPLORER_URL ? [EXPLORER_URL] : [],
+  };
+}
+
+function isUnknownChainError(error: unknown): boolean {
+  const normalized = normalizeProviderError(error);
+  return (
+    normalized.code === 4902 ||
+    /unrecognized chain|unknown chain|not added|未添加|不支持.*链/i.test(
+      normalized.message,
+    )
+  );
 }
 
 /**
@@ -199,19 +311,43 @@ export async function ensureChain(): Promise<void> {
       params: [{ chainId: CHAIN_ID_HEX }],
     });
   } catch (error) {
-    const code = (error as ProviderError).code;
-    if (code !== 4902) throw error;
+    if (!isUnknownChainError(error)) throw error;
     await provider.request({
       method: "wallet_addEthereumChain",
-      params: [
-        {
-          chainId: CHAIN_ID_HEX,
-          chainName: besuTestnet.name,
-          nativeCurrency: besuTestnet.nativeCurrency,
-          rpcUrls: [walletRpcUrl()],
-          blockExplorerUrls: EXPLORER_URL ? [EXPLORER_URL] : [],
-        },
-      ],
+      params: [chainParams()],
     });
+  }
+}
+
+/**
+ * Try to repair a wallet entry whose RPC no longer works.
+ *
+ * Wallets have no standard method to *edit* an existing chain. Some wallets
+ * update the entry when `wallet_addEthereumChain` is called again; others
+ * ignore it. Callers must re-probe afterwards and show manual instructions if
+ * the RPC still fails. `wallet_switchEthereumChain` alone never rewrites an
+ * existing entry, which is why the old "Switch network" button could not fix
+ * this case.
+ */
+export async function repairWalletNetwork(): Promise<void> {
+  const provider = await injectedProvider();
+  if (!provider) throw new Error("未检测到浏览器钱包扩展。");
+  let addError: unknown;
+  try {
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [chainParams()],
+    });
+  } catch (error) {
+    addError = error;
+  }
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: CHAIN_ID_HEX }],
+    });
+  } catch (error) {
+    if (addError) throw addError;
+    throw error;
   }
 }

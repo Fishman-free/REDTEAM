@@ -2256,6 +2256,53 @@ a.addr__value:hover {
   font-size: 10px;
 }
 
+.network-banner__message {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.network-banner__detail {
+  color: var(--muted);
+  opacity: 0.82;
+  word-break: break-word;
+}
+
+.network-banner__rpc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.network-banner__rpc code {
+  color: var(--ink);
+  font-size: 10px;
+  word-break: break-all;
+}
+
+.network-banner__note {
+  margin-top: 3px;
+  color: var(--warning);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.network-banner--rpc {
+  flex-wrap: wrap;
+}
+
+.rpc-banner__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
 .offline-banner {
   border-bottom-color: rgba(255, 107, 107, 0.18);
   background: rgba(255, 107, 107, 0.05);
@@ -6926,9 +6973,14 @@ a.addr__value:hover {
     flex: 0 0 auto;
   }
 
-  .network-banner__text span,
+  .network-banner__text > span,
   .offline-banner__text span {
     display: none;
+  }
+
+  .rpc-banner__actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .toast-viewport {
