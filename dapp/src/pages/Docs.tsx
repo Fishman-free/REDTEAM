@@ -18,6 +18,7 @@ import {
 import { Badge } from "../components/ui/Badge";
 import { Panel } from "../components/ui/Panel";
 import { SectionHeader } from "../components/ui/SectionHeader";
+import { EXPLORER_URL, walletRpcUrl } from "../lib/chain";
 import { formatRtm } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { usePlatform } from "../lib/platform";
@@ -241,8 +242,8 @@ export default function Docs() {
               <Step n="02" title={t("Switch the wallet network", "切换钱包网络")}>
                 <p>
                   {t(
-                    "Gameplay transactions use your wallet. Press the in-app network button before staking or sending a paid message. The app compares the wallet chain with the arena chain before every signature and refuses to send a transaction to another local chain.",
-                    "游戏内交易使用你的钱包。质押或发送付费消息前，先点站内的网络切换按钮。应用会在每次签名前比对钱包链和竞技场链，不会把交易发到另一条本地链。",
+                    "Gameplay transactions use your wallet. Press the in-app network button before staking or sending a paid message. The app compares the wallet chain with the arena chain before every signature and refuses to send a transaction to another local chain. If the wallet already shows 48850 but transactions still fail, its saved RPC is stale; follow the per-wallet steps in Troubleshooting → Wallet RPC is unreachable.",
+                    "游戏内交易使用你的钱包。质押或发送付费消息前，先点站内的网络切换按钮。应用会在每次签名前比对钱包链和竞技场链，不会把交易发到另一条本地链。如果钱包已经显示 48850 但交易仍然失败，通常是钱包里保存的 RPC 失效；请按“故障排查 → 钱包 RPC 无法访问”里的分钱包详细步骤修改。",
                   )}
                 </p>
               </Step>
@@ -963,14 +964,295 @@ export default function Docs() {
                 <summary>{t("Wallet RPC is unreachable or points at another chain", "钱包 RPC 无法访问或指向另一条链")}</summary>
                 <p>
                   {t(
-                    "A wallet can report chain 48850 and still fail: the RPC saved inside the wallet may be an old address (for example localhost from an earlier local run) or another chain with the same ID. Switching networks only changes the selected chain; it does not rewrite an existing network entry. Open the wallet's network settings, edit RTM Testnet, and set its RPC to the address shown in the banner (the public site uses https://arena.agenttrust.site/rpc, chain ID 48850, symbol G). If the wallet does not allow editing, delete RTM Testnet and add it again from this site.",
-                    "钱包可以报告链 48850 却仍然失败：钱包里保存的 RPC 可能还是旧地址（例如之前本地运行时填的 localhost），或指向另一条同 ID 的链。切换网络只改变当前选中的链，不会改写已有网络的 RPC。请打开钱包的网络设置，编辑 RTM Testnet，把 RPC 改为横幅里显示的地址（公开站点是 https://arena.agenttrust.site/rpc，chain ID 48850，符号 G）。如果钱包不允许编辑，请删除 RTM Testnet 后在本站重新添加。",
+                    "A wallet can report chain 48850 and still fail: the RPC saved inside the wallet may be an old address (for example localhost from an earlier local run) or another chain with the same ID. Switching networks only changes the selected chain; it does not rewrite an existing network entry, which is why repeatedly switching never fixes this case.",
+                    "钱包可以报告链 48850 却仍然失败：钱包里保存的 RPC 可能还是旧地址（例如之前本地运行时填的 localhost），或指向另一条同 ID 的链。切换网络只改变当前选中的链，不会改写已有网络的 RPC，所以反复切换网络永远不会修好这个问题。",
                   )}
                 </p>
+                <p>
+                  <strong>{t("First identify which case the banner shows", "先看横幅属于哪一种情况")}</strong>
+                </p>
+                <ul>
+                  <li>
+                    {t(
+                      "Wrong wallet network: press Switch network in the banner and approve it in the wallet.",
+                      "钱包网络不正确：点横幅里的“切换网络”，在钱包里确认。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Wallet RPC unreachable: switching does nothing; follow the steps below to edit the RPC.",
+                      "钱包 RPC 无法访问：切换无效，按下面的步骤修改钱包里的 RPC。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Different ledger with the same chain ID: the RPC in the wallet points elsewhere; edit it the same way.",
+                      "同 ID 的另一条链：钱包 RPC 指向了别的账本，同样需要修改 RPC。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "This site's RPC unavailable: not a wallet problem; retry shortly.",
+                      "本站 RPC 暂时不可用：不是钱包问题，稍后重试。",
+                    )}
+                  </li>
+                </ul>
+                <p>
+                  <strong>
+                    {t("Binance Wallet extension (full walkthrough)", "Binance Wallet 插件（详细操作）")}
+                  </strong>
+                </p>
+                <div className="docs-faq__steps">
+                  <ol className="docs-steps">
+                    <Step n="01" title={t("Open the network switcher", "打开网络切换面板")}>
+                      <p>
+                        {t(
+                          "Click the network name at the top right of the wallet (usually RTM Testnet) to open Switch Network.",
+                          "点击插件右上角当前显示的网络名称（通常是 RTM Testnet），打开 Switch Network（切换网络）面板。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="02" title={t("Open the Custom tab", "进入 Custom 标签")}>
+                      <p>
+                        {t(
+                          "Choose the Custom tab. If RTM Testnet is not listed, use the delete-and-re-add procedure below.",
+                          "选择 Custom（自定义网络）标签。如果列表里没有 RTM Testnet，直接看下面的“删除后重新添加”。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="03" title={t("Edit the entry", "打开编辑")}>
+                      <p>
+                        {t(
+                          "Click the ⋯ button on the RTM Testnet row and choose Edit.",
+                          "点 RTM Testnet 这一行右侧的 ⋯（更多）按钮，选择 Edit（编辑）。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="04" title={t("Change the RPC URL", "修改 RPC URL")}>
+                      <p>
+                        {t("Set the RPC URL to ", "把 RPC URL 改成 ")}
+                        <code>{walletRpcUrl()}</code>
+                        {t(
+                          ". Leave the name RTM Testnet and symbol G unchanged. The Chain ID cannot be edited; confirm it shows 48850.",
+                          "。名称保持 RTM Testnet、符号保持 G。Chain ID 不能修改，请确认显示的是 48850。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="05" title={t("Save and confirm", "保存并确认")}>
+                      <p>
+                        {t(
+                          "Press Save. The wallet shows a risk warning again; confirm it to write the new RPC.",
+                          "点 Save（保存）。钱包会再次弹出风险提示，确认后才会写入新的 RPC。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="06" title={t("Verify on this site", "回到本站验证")}>
+                      <p>
+                        {t(
+                          "Return to this page and press Recheck in the banner, or refresh. The banner disappearing means the wallet can read blocks again.",
+                          "回到本页，点横幅里的“重新检查”，或刷新页面。横幅消失就说明钱包已经能读到区块。",
+                        )}
+                      </p>
+                    </Step>
+                  </ol>
+                </div>
+                <Note tone="warn">
+                  {t(
+                    "The Chain ID is fixed on an existing entry. If it is not 48850, this is not the arena network: delete it and add a new custom network instead.",
+                    "已有网络条目的 Chain ID 不能修改。如果显示的不是 48850，说明这条不是本站使用的网络：请删除它，重新添加一个自定义网络。",
+                  )}
+                </Note>
+                <p>
+                  <strong>{t("MetaMask", "MetaMask")}</strong>
+                </p>
+                <div className="docs-faq__steps">
+                  <ol className="docs-steps">
+                    <Step n="01" title={t("Open network settings", "打开网络设置")}>
+                      <p>{t("Go to Settings → Networks.", "打开 设置 → 网络。")}</p>
+                    </Step>
+                    <Step n="02" title={t("Edit RTM Testnet", "编辑 RTM Testnet")}>
+                      <p>
+                        {t(
+                          "Select RTM Testnet and press Edit. If Edit is missing, delete the network and re-add it.",
+                          "选择 RTM Testnet，点“编辑”。如果没有“编辑”，删除该网络后重新添加。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="03" title={t("Replace the RPC and save", "替换 RPC 并保存")}>
+                      <p>
+                        {t("Set the RPC URL to ", "把 RPC URL 改成 ")}
+                        <code>{walletRpcUrl()}</code>
+                        {t(" and save.", "，然后保存。")}
+                      </p>
+                    </Step>
+                    <Step n="04" title={t("Recheck", "重新检查")}>
+                      <p>
+                        {t(
+                          "Return to this page and press Recheck in the banner.",
+                          "回到本页，点横幅里的“重新检查”。",
+                        )}
+                      </p>
+                    </Step>
+                  </ol>
+                </div>
+                <p>
+                  <strong>{t("Rabby", "Rabby")}</strong>
+                </p>
+                <div className="docs-faq__steps">
+                  <ol className="docs-steps">
+                    <Step n="01" title={t("Open custom networks", "打开自定义网络")}>
+                      <p>{t("Go to More → Custom Networks.", "打开 更多 → 自定义网络。")}</p>
+                    </Step>
+                    <Step n="02" title={t("Edit the RPC", "编辑 RPC")}>
+                      <p>
+                        {t(
+                          "Select RTM Testnet and change its RPC URL to the address below.",
+                          "选择 RTM Testnet，把 RPC URL 改成下方地址。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="03" title={t("Recheck", "重新检查")}>
+                      <p>
+                        {t(
+                          "Save, return to this page and press Recheck. If editing is unavailable, delete and re-add the network.",
+                          "保存后回到本页点“重新检查”。如果不能编辑，删除后重新添加。",
+                        )}
+                      </p>
+                    </Step>
+                  </ol>
+                </div>
+                <p>
+                  <strong>
+                    {t(
+                      "TokenPocket, Trust Wallet, imToken and other wallets",
+                      "TokenPocket、Trust Wallet、imToken 及其他钱包",
+                    )}
+                  </strong>
+                </p>
+                <div className="docs-faq__steps">
+                  <ol className="docs-steps">
+                    <Step n="01" title={t("Open network management", "打开网络管理")}>
+                      <p>
+                        {t(
+                          "Find the custom-network or network-management screen in the wallet.",
+                          "在钱包里找到“网络管理 / 自定义网络”入口。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="02" title={t("Edit or re-add RTM Testnet", "编辑或重新添加 RTM Testnet")}>
+                      <p>
+                        {t(
+                          "Edit its RPC URL, or delete the network and add it again with the parameters below.",
+                          "编辑它的 RPC URL；如果界面没有编辑入口，删除后按下面的参数重新添加。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="03" title={t("Recheck", "重新检查")}>
+                      <p>
+                        {t(
+                          "Return to this page and press Recheck in the banner.",
+                          "回到本页，点横幅里的“重新检查”。",
+                        )}
+                      </p>
+                    </Step>
+                  </ol>
+                </div>
+                <p>
+                  <strong>
+                    {t("Delete and re-add (works in every wallet)", "删除后重新添加（所有钱包通用）")}
+                  </strong>
+                </p>
+                <div className="docs-faq__steps">
+                  <ol className="docs-steps">
+                    <Step n="01" title={t("Delete the network entry", "删除旧网络")}>
+                      <p>
+                        {t(
+                          "Remove RTM Testnet from the wallet's network list. This only deletes the network configuration, never the wallet or its assets.",
+                          "在钱包的网络列表里删除 RTM Testnet。这里只删除网络配置，不会删除钱包、助记词或资产。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="02" title={t("Add it again", "重新添加")}>
+                      <p>
+                        {t(
+                          "Press Try to repair network in the banner, or use Add a custom network in the wallet and enter the values below.",
+                          "点横幅里的“尝试修复网络”，或在钱包里选择“添加自定义网络”，按下表逐项填写。",
+                        )}
+                      </p>
+                    </Step>
+                    <Step n="03" title={t("Recheck", "重新检查")}>
+                      <p>
+                        {t(
+                          "After saving, return to this page and press Recheck in the banner.",
+                          "保存后回到本页，点横幅里的“重新检查”。",
+                        )}
+                      </p>
+                    </Step>
+                  </ol>
+                </div>
+                <div className="docs-faq__block">
+                  <div className="docs-rules">
+                    <Rule label={t("Network name", "网络名称")} value="RTM Testnet" />
+                    <Rule label={t("RPC URL", "RPC URL")} value={walletRpcUrl()} />
+                    <Rule label={t("Chain ID", "Chain ID")} value="48850 (0xbed2)" />
+                    <Rule label={t("Currency symbol", "货币符号")} value="G" />
+                    <Rule label={t("Currency name", "货币名称")} value="RTM Gas" />
+                    {EXPLORER_URL && (
+                      <Rule label={t("Block explorer", "区块浏览器")} value={EXPLORER_URL} />
+                    )}
+                  </div>
+                </div>
+                <Note tone="warn">
+                  {t(
+                    "Keep only one custom network with chain ID 48850. If an old entry and a new entry both exist, the wallet may keep using the old RPC when you switch by chain ID. Delete the stale one first.",
+                    "链 ID 48850 的自定义网络只保留一条。如果旧条目和新条目同时存在，钱包按 Chain ID 切换时可能仍然命中旧 RPC。请先删除旧的那条。",
+                  )}
+                </Note>
+                <Note tone="warn">
+                  {t(
+                    "Custom networks are stored per device and browser profile; they do not sync across devices and are lost when the extension is removed or reinstalled.",
+                    "自定义网络只保存在当前设备和浏览器配置中，不会跨设备同步；卸载或重装钱包扩展后需要重新添加。",
+                  )}
+                </Note>
+                <p>
+                  <strong>{t("If it still fails after editing", "修改后仍然失败")}</strong>
+                </p>
+                <ul>
+                  <li>
+                    {t(
+                      "Confirm the RPC in the wallet matches the address exactly: https, the same domain, and a trailing /rpc, with no spaces.",
+                      "确认钱包里的 RPC 与下方地址完全一致：https、域名相同、以 /rpc 结尾，前后没有空格。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Opening the RPC in a browser address bar shows an error; that is expected because JSON-RPC only accepts POST. Judge by the banner's Recheck result instead.",
+                      "把 RPC 复制到浏览器地址栏打开会报错，这是正常的：JSON-RPC 只接受 POST。请以横幅“重新检查”的结果为准。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Disable other wallet extensions (MetaMask, OKX, Trust and similar can all inject window.ethereum), keep only one, then refresh this page.",
+                      "关闭其他钱包扩展（MetaMask、OKX、Trust 等可能同时注入 window.ethereum），只保留当前钱包，然后刷新本页。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Update the wallet to its latest version and restart the browser.",
+                      "把钱包更新到最新版本，然后重启浏览器。",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Open the browser developer console and check the [wallet] network diagnosis line; include it with a screenshot of the wallet's network settings when reporting the problem.",
+                      "打开浏览器开发者工具 Console，找到以 [wallet] network diagnosis 开头的日志；反馈问题时附上它和钱包网络设置截图。",
+                    )}
+                  </li>
+                </ul>
                 <Note tone="info">
                   {t(
-                    "The in-app Try to repair network button asks the wallet to add the network again; some wallets update the RPC, others ignore it. Recheck after the wallet returns. MetaMask: Settings → Networks → RTM Testnet → Edit. Binance Wallet: Settings → Network → Custom networks → RTM Testnet → Edit. The faucet still works because the platform relays the claim.",
-                    "站内的“尝试修复网络”会让钱包再次添加该网络；有的钱包会更新 RPC，有的会忽略。钱包返回后请点“重新检查”。MetaMask：设置 → 网络 → RTM Testnet → 编辑；Binance Wallet：设置 → 网络 → 自定义网络 → RTM Testnet → 编辑。水龙头仍可正常领取，因为由平台代发。",
+                    "The in-app Try to repair network button asks the wallet to add the network again; some wallets update the RPC, others ignore it. The faucet keeps working meanwhile because the platform relays the claim.",
+                    "站内的“尝试修复网络”会让钱包再次添加该网络；有的钱包会更新 RPC，有的会忽略。期间水龙头仍可正常领取，因为由平台代发。",
                   )}
                 </Note>
               </details>

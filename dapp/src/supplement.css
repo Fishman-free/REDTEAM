@@ -605,6 +605,31 @@
   list-style: decimal;
 }
 
+.docs-faq details > ul {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0 0 14px 34px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  list-style: disc;
+}
+
+.docs-faq__steps,
+.docs-faq__block {
+  padding: 0 0 14px 18px;
+}
+
+.docs-faq__steps .docs-steps {
+  margin-top: 10px;
+}
+
+.docs-faq__block .docs-rules {
+  margin-top: 8px;
+}
+
 .docs-faq .docs-code {
   margin: 0 0 14px 18px;
 }

@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import compression from "compression";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { rpcCorsMiddleware } from "./lib/rpcCors.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -220,6 +221,8 @@ const rpcProxy = createProxyMiddleware({
 });
 
 app.use("/api", apiProxy);
+// Must run before the proxy: wallet extensions are cross-origin callers.
+app.use("/rpc", rpcCorsMiddleware);
 app.use("/rpc", rpcProxy);
 app.use(
   "/assets",

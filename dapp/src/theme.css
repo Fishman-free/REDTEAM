@@ -2290,8 +2290,46 @@ a.addr__value:hover {
   line-height: 1.5;
 }
 
+.network-banner__guide {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.network-banner__guide summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.network-banner__guide summary:hover {
+  text-decoration: underline;
+}
+
+.network-banner__guide ol {
+  display: grid;
+  gap: 2px;
+  margin: 5px 0 0;
+  padding-left: 18px;
+}
+
+.network-banner__guide p {
+  margin: 5px 0 0;
+  word-break: break-word;
+}
+
 .network-banner--rpc {
   flex-wrap: wrap;
+}
+
+/* The RPC banner can carry five actions. With flex-basis 0 the narrow text
+   column shrinks to a sliver before the actions wrap; give it a usable basis
+   so the action row moves to its own line instead. */
+.network-banner--rpc .network-banner__text {
+  flex: 1 1 320px;
+  max-width: 100%;
 }
 
 .rpc-banner__actions {

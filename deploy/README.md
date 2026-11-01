@@ -31,6 +31,8 @@ bash deploy/up.sh
 > 水龙头已改为“用户签名、平台代发”：用户不需要发送钱包交易，也不依赖钱包 RPC；游戏内的质押/消息交易仍由钱包广播。
 >
 > 从本地栈切换到公开域名后，钱包里已有的 RTM Testnet 条目仍会保留旧的 `localhost:3000/rpc`。`wallet_switchEthereumChain` 只切换当前链，**不会改写已有条目的 RPC**；用户必须在钱包的网络设置里编辑 RPC，或删除该网络后重新添加。dApp 的“尝试修复网络”会再调用一次 `wallet_addEthereumChain`，但部分钱包对已存在的链会忽略它。
+>
+> Binance Wallet 插件的操作路径：右上角网络名称 → Switch Network → **Custom** 标签 → RTM Testnet 右侧 `⋯` → **Edit** → 修改 **RPC URL** → Save 并确认风险提示（Chain ID 不可编辑，应为 48850）。MetaMask：Settings → Networks → RTM Testnet → Edit。站内 `/docs#troubleshooting` 有分钱包的完整步骤。
 
 停止：
 
