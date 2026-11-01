@@ -16,6 +16,96 @@ import { useWalletChainId } from "../../lib/useWalletChainId";
 import { errorText } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
 
+type WalletKind = "binance" | "metamask" | "rabby" | "other";
+type Translate = (english: string, chinese: string) => string;
+
+function walletKind(name: string): WalletKind {
+  const normalized = name.toLowerCase();
+  if (normalized.includes("binance")) return "binance";
+  if (normalized.includes("metamask")) return "metamask";
+  if (normalized.includes("rabby")) return "rabby";
+  return "other";
+}
+
+/**
+ * Wallets have no API to edit a network entry, so the only repair is the one
+ * the user performs in the wallet UI. The paths differ per wallet; being vague
+ * sends people looking for a "Settings → Networks" screen that Binance Wallet
+ * does not have (its custom networks live behind the network selector).
+ */
+function repairSteps(kind: WalletKind, t: Translate): string[] {
+  if (kind === "binance") {
+    return [
+      t(
+        "Click the network name at the top right of the wallet to open Switch Network.",
+        "点击钱包右上角的网络名称，打开 Switch Network（切换网络）。",
+      ),
+      t(
+        "Open the Custom tab and find RTM Testnet.",
+        "打开 Custom（自定义网络）标签，找到 RTM Testnet。",
+      ),
+      t(
+        "Click ⋯ next to the entry and choose Edit.",
+        "点该网络右侧的 ⋯，选择 Edit（编辑）。",
+      ),
+      t(
+        "Replace the RPC URL with the address below. The Chain ID cannot be changed; confirm it is 48850.",
+        "把 RPC URL 换成下方地址。Chain ID 不能修改，请确认是 48850。",
+      ),
+      t(
+        "Press Save and confirm the risk warning.",
+        "点 Save（保存），并按提示确认风险警告。",
+      ),
+      t("Return to this page and press Recheck.", "回到本页，点“重新检查”。"),
+    ];
+  }
+  if (kind === "metamask") {
+    return [
+      t("Open Settings → Networks.", "打开 设置 → 网络。"),
+      t(
+        "Select RTM Testnet and press Edit.",
+        "选择 RTM Testnet，点“编辑”。",
+      ),
+      t(
+        "Replace the RPC URL with the address below and save.",
+        "把 RPC URL 换成下方地址后保存。",
+      ),
+      t(
+        "Return to this page and press Recheck. If Edit is missing, delete the network and add it again.",
+        "回到本页点“重新检查”。如果没有“编辑”按钮，删除该网络后重新添加。",
+      ),
+    ];
+  }
+  if (kind === "rabby") {
+    return [
+      t("Open More → Custom Networks.", "打开 更多 → 自定义网络。"),
+      t(
+        "Select RTM Testnet and edit its RPC URL to the address below.",
+        "选择 RTM Testnet，把 RPC URL 改成下方地址。",
+      ),
+      t(
+        "Return to this page and press Recheck. If editing is unavailable, delete and re-add the network.",
+        "回到本页点“重新检查”。如果不能编辑，删除后重新添加。",
+      ),
+    ];
+  }
+  return [
+    t(
+      "Open the wallet's network management and edit RTM Testnet.",
+      "打开钱包的网络管理，编辑 RTM Testnet。",
+    ),
+    t(
+      "Set its RPC URL to the address below; keep Chain ID 48850 and symbol G.",
+      "把 RPC URL 改为下方地址，Chain ID 保持 48850，符号为 G。",
+    ),
+    t(
+      "If the wallet cannot edit a network, delete RTM Testnet and add it again with these values.",
+      "如果钱包不能编辑网络，删除 RTM Testnet 后按这些参数重新添加。",
+    ),
+    t("Return to this page and press Recheck.", "回到本页，点“重新检查”。"),
+  ];
+}
+
 /**
  * Explain which side of the wallet/network pair is broken.
  *
@@ -146,6 +236,7 @@ export function RpcBanner() {
   if (dismissed && issue.kind === "wallet-rpc") return null;
 
   const wallet = connectedWalletName() || t("This wallet", "当前钱包");
+  const kind = walletKind(connectedWalletName());
   const canEditRpc = issue.kind === "wallet-rpc" || issue.kind === "fork";
   const shortError = (text: string) => {
     const oneLine = text.replace(/\s+/g, " ").trim();
@@ -209,6 +300,22 @@ export function RpcBanner() {
             <span>{t("Expected RPC", "期望 RPC")}</span>
             <code>{walletRpcUrl()}</code>
           </div>
+        )}
+        {canEditRpc && (
+          <details className="network-banner__guide">
+            <summary>{t("Step-by-step repair", "查看详细修复步骤")}</summary>
+            <ol>
+              {repairSteps(kind, t).map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <p>
+              {t(
+                `Network values: name RTM Testnet, RPC ${walletRpcUrl()}, chain ID 48850 (0xbed2), symbol G.`,
+                `网络参数：名称 RTM Testnet，RPC ${walletRpcUrl()}，Chain ID 48850（0xbed2），符号 G。`,
+              )}
+            </p>
+          </details>
         )}
         {note && <div className="network-banner__note">{note}</div>}
       </div>
