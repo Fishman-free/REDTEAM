@@ -18,7 +18,6 @@ import { Wordmark } from "../ui/Logo";
 import { SyncStatus } from "./SyncStatus";
 import { OfflineBanner } from "./OfflineBanner";
 import { ActivityDrawer } from "./ActivityDrawer";
-import { NetworkBanner } from "../wallet/NetworkBanner";
 import { RpcBanner } from "../wallet/RpcBanner";
 import { ConnectButton } from "../wallet/ConnectButton";
 import { LanguageToggle } from "../ui/LanguageToggle";
@@ -306,7 +305,6 @@ export function AppShell() {
             <ConnectButton size="sm" label={t("Connect", "连接")} />
           </div>
         </header>
-        {!networkFreePage && <NetworkBanner />}
         {!networkFreePage && <RpcBanner />}
         <OfflineBanner />
         <main className="main" id="main">

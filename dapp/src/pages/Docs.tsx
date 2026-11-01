@@ -959,12 +959,27 @@ export default function Docs() {
                   )}
                 </Note>
               </details>
+              <details open>
+                <summary>{t("Wallet RPC is unreachable or points at another chain", "钱包 RPC 无法访问或指向另一条链")}</summary>
+                <p>
+                  {t(
+                    "A wallet can report chain 48850 and still fail: the RPC saved inside the wallet may be an old address (for example localhost from an earlier local run) or another chain with the same ID. Switching networks only changes the selected chain; it does not rewrite an existing network entry. Open the wallet's network settings, edit RTM Testnet, and set its RPC to the address shown in the banner (the public site uses https://arena.agenttrust.site/rpc, chain ID 48850, symbol G). If the wallet does not allow editing, delete RTM Testnet and add it again from this site.",
+                    "钱包可以报告链 48850 却仍然失败：钱包里保存的 RPC 可能还是旧地址（例如之前本地运行时填的 localhost），或指向另一条同 ID 的链。切换网络只改变当前选中的链，不会改写已有网络的 RPC。请打开钱包的网络设置，编辑 RTM Testnet，把 RPC 改为横幅里显示的地址（公开站点是 https://arena.agenttrust.site/rpc，chain ID 48850，符号 G）。如果钱包不允许编辑，请删除 RTM Testnet 后在本站重新添加。",
+                  )}
+                </p>
+                <Note tone="info">
+                  {t(
+                    "The in-app Try to repair network button asks the wallet to add the network again; some wallets update the RPC, others ignore it. Recheck after the wallet returns. MetaMask: Settings → Networks → RTM Testnet → Edit. Binance Wallet: Settings → Network → Custom networks → RTM Testnet → Edit. The faucet still works because the platform relays the claim.",
+                    "站内的“尝试修复网络”会让钱包再次添加该网络；有的钱包会更新 RPC，有的会忽略。钱包返回后请点“重新检查”。MetaMask：设置 → 网络 → RTM Testnet → 编辑；Binance Wallet：设置 → 网络 → 自定义网络 → RTM Testnet → 编辑。水龙头仍可正常领取，因为由平台代发。",
+                  )}
+                </Note>
+              </details>
               <details>
                 <summary>{t("A game transaction never confirms", "游戏交易一直不确认")}</summary>
                 <p>
                   {t(
-                    "Gameplay transactions use your wallet. Use the in-app network button to switch to RTM Testnet before signing. The app checks the wallet chain against the app chain before every write and will not send a transaction to a different local chain.",
-                    "游戏内交易使用你的钱包。签名前用站内网络按钮切换到 RTM Testnet。应用会在每次写入前比对钱包链和本站链，不会把交易发到另一条本地链。",
+                    "Gameplay transactions use your wallet. Use the in-app network button to switch to RTM Testnet before signing. If the wallet already reports 48850 but its RPC is unreachable, switch does nothing; fix the RPC in the wallet's network settings as described above. The app checks the wallet chain against the app chain before every write and will not send a transaction to a different local chain.",
+                    "游戏内交易使用你的钱包。签名前用站内网络按钮切换到 RTM Testnet。如果钱包已经显示 48850、但它的 RPC 无法访问，切换不会起作用；请按上一节在钱包网络设置里修正 RPC。应用会在每次写入前比对钱包链和本站链，不会把交易发到另一条本地链。",
                   )}
                 </p>
                 <p>

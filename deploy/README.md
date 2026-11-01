@@ -29,6 +29,8 @@ bash deploy/up.sh
 > 一键栈会把 `BESU_ALIAS_RPC_PORT`（与主 RPC 端口不同的兼容端口，通常是 `8546`）和 `BESU_RPC_PORT` 同时发布到同一个 Besu 容器，方便旧钱包配置继续连到当前链。不要同时运行其他占用这些端口、且 Chain ID 同为 48850 的旧本地栈。
 >
 > 水龙头已改为“用户签名、平台代发”：用户不需要发送钱包交易，也不依赖钱包 RPC；游戏内的质押/消息交易仍由钱包广播。
+>
+> 从本地栈切换到公开域名后，钱包里已有的 RTM Testnet 条目仍会保留旧的 `localhost:3000/rpc`。`wallet_switchEthereumChain` 只切换当前链，**不会改写已有条目的 RPC**；用户必须在钱包的网络设置里编辑 RPC，或删除该网络后重新添加。dApp 的“尝试修复网络”会再调用一次 `wallet_addEthereumChain`，但部分钱包对已存在的链会忽略它。
 
 停止：
 
