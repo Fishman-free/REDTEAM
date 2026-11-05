@@ -44,6 +44,7 @@ const META = {
     rtm: "0x" + "77".repeat(20),
     faucet: "0x" + "99".repeat(20),
     dataMarket: "0x" + "aa".repeat(20),
+    taskSink: "0x" + "ab".repeat(20),
   },
   fees: {
     attackFeeBps: 50,
@@ -65,7 +66,7 @@ const META = {
     dataMarket: true,
     defenderRegistration: true,
     customModelEndpoints: true,
-    byoa: false,
+    byoa: true,
   },
   indexer: { startBlock: 0 },
 };
@@ -773,6 +774,25 @@ async function main() {
     await waitForText("I cannot change the payee without the owner's confirmation.", 30000);
     if (!miningJoined) throw new Error("joinMining transaction was not observed");
     console.log("PASS: the miner found the join flow and the paid message composer");
+
+    console.log("scenario 8: /byoa exposes the SoftTEE config form and self-hosted warning");
+    await cdp.send("Page.navigate", { url: `http://127.0.0.1:${WEB_PORT}/byoa` }, sessionId);
+    await delay(2500);
+    await connectWallet();
+    await waitForText("Attestation tier");
+    await waitForText("Defender system prompt");
+    await waitForText("Model API key");
+    await waitForText("Open-task ratio");
+    await waitForText("SoftTEE · software isolation");
+    const hasSelfHosted = await evaluate(
+      `[...document.querySelectorAll("option")].some((item) => item.textContent.includes("Self-hosted"))`,
+    );
+    if (!hasSelfHosted) throw new Error("self-hosted tier option missing");
+    const hasHardware = await evaluate(
+      `document.body.textContent.includes("Hardware attestation")`,
+    );
+    if (hasHardware) throw new Error("legacy hardware tier is still shown");
+    console.log("PASS: the BYOA page shows SoftTEE fields and no hardware tier");
 
     console.log("ALL SCENARIOS PASSED");
   } finally {

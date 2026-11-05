@@ -612,8 +612,8 @@ export default function Docs() {
               <Step n="04" title={t("Verify the reply", "验证回复")}>
                 <p>
                   {t(
-                    "The reply is sealed to your derived key and signed by the TEE signer. The page decrypts it locally and verifies the signature against the teeSigner stored on-chain, not the value supplied by the relay. In the simulated tier that signing key lives in the platform process, so a valid signature only shows that the platform's simulated TEE key signed the reply. It says nothing about hardware isolation, and it does not prove who produced the text.",
-                    "回复加密给你的派生密钥，并附带 TEE 签名。页面在本地解密，并用链上保存的 teeSigner 验证签名，不依赖中继返回的签名者字段。simulated 档下这把签名键在平台进程里，验签通过只能说明平台持有的模拟 TEE 密钥签过这条回复，不能说明有硬件隔离，也不能说明回复文本由谁产生。",
+                    "The reply is sealed to your derived key and signed with the v2 payload, which includes the configHash. The page decrypts it locally and verifies the signature against replySigner stored on-chain, not the value supplied by the relay. SoftTEE signs with a measurement-bound key; simulated signs with a platform-held key. Neither proves hardware isolation, and neither proves who produced the text.",
+                    "回复加密给你的派生密钥，并使用包含 configHash 的 v2 载荷签名。页面在本地解密，并用链上保存的 replySigner 验证签名，不依赖中继返回的签名者字段。SoftTEE 用测量绑定的密钥签名，simulated 用平台持有的密钥签名；两者都不证明硬件隔离，也不证明文本由谁产生。",
                   )}
                 </p>
               </Step>
@@ -661,8 +661,8 @@ export default function Docs() {
                 <h3>{t("Trust boundary", "信任边界")}</h3>
                 <p>
                   {t(
-                    "The simulated runtime holds the decryption key, the TEE signing key and the W key inside the platform process, so the platform can technically read messages, sign replies for the runtime and initiate W transfers to the destinations the token contract allows. The runtime measurement is only a hash of the compose file name and the image digest the defender typed, and the platform cannot verify that the endpoint runs that image. The hardware tier needs a real TEE and remote attestation and is not implemented. The UI labels the tier on every BYOA contest.",
-                    "模拟运行时在平台进程里同时持有解密私钥、TEE 签名键和 W 私钥，平台技术上能读消息、替运行时签回复、向代币合约允许的地址发起 W 转账。运行时度量只是守方填写的 compose 文件名与镜像 digest 的哈希，平台无法核实端点背后跑的就是这个镜像。hardware 档需要真实 TEE 和远程证明，目前尚未实现。每个 BYOA 比赛的界面都会标注档位。",
+                    "SoftTEE keeps the W key, the reply key and the decrypted config in a measured runtime with a measurement-bound keystore. The platform records only commitments, ciphertext hashes and policy fingerprints. It is software isolation, not a hardware TEE: a host root can read process memory. It detects config changes on an honest host and refuses to sign after a measurement change. Simulated remains a local-dev fallback; self-hosted keeps the defender endpoint and uses the defender's reply key.",
+                    "SoftTEE 把 W 私钥、回复签名键和解密后的配置放在可测量运行时与测量绑定密钥库中。平台只记录承诺、密文 hash 与策略指纹。它是软件隔离，不是硬件 TEE：拥有宿主 root 的平台能读取进程内存。它能在诚实宿主上检测配置变更，并在度量变化后拒绝签名。simulated 仅保留为本地开发回退；自托管保留守方端点并使用守方自己的回复签名键。",
                   )}
                 </p>
               </div>
@@ -671,53 +671,53 @@ export default function Docs() {
             <h3>{t("Who sees what, by tier", "按档位看谁能看到什么")}</h3>
             <p>
               {t(
-                "The Testnet today column describes what runs today. The other three columns are the design confirmed on 2026-10-30. They are marked planned and are not live yet, so rely on the Testnet today column until they ship.",
-                "下表“当前测试网”这一列是现在线上的真实情况。后三列是 2026-10-30 确认的设计，标着规划中，尚未上线。上线之前请以“当前测试网”列为准。",
+                "The table compares the three live tiers. There is no hardware TEE tier; the 2026-11-05 decision replaced it with SoftTEE.",
+                "下表比较三个已上线档位。没有硬件 TEE 档；2026-11-05 已裁决用 SoftTEE 替代。",
               )}
             </p>
             <TierTable
               label={t("BYOA tier comparison", "自带 agent 档位对比")}
               head={[
                 t("Item", "项目"),
-                t("Testnet today", "当前测试网"),
-                t("Quick start", "快速接入"),
-                t("Enterprise", "企业接入"),
+                t("Simulated", "模拟"),
+                t("SoftTEE quick", "SoftTEE 快速接入"),
+                t("SoftTEE enterprise", "SoftTEE 企业接入"),
                 t("Self-hosted", "自托管调试"),
               ]}
               rows={[
                 [
                   t("Status", "状态"),
-                  t("Live, simulated tier", "已上线，simulated 档"),
-                  t("Planned, simulator on testnet first", "规划中，测试网先跑模拟器"),
-                  t("Planned, needs a hardware TEE", "规划中，需要硬件 TEE"),
-                  t("Planned, unverified tier", "规划中，未验证档"),
+                  t("Local dev only", "仅本地开发"),
+                  t("Live, SoftTEE", "已上线，SoftTEE"),
+                  t("Live, SoftTEE", "已上线，SoftTEE"),
+                  t("Live, unverified", "已上线，未验证"),
                 ],
                 [
                   t("Who decrypts attacks", "谁解密攻方消息"),
                   t("The platform process", "平台进程"),
-                  t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
-                  t("The confidential VM (CVM) with a hardware TEE", "机密计算环境 CVM（硬件 TEE）"),
+                  t("The SoftTEE runtime (software isolation)", "SoftTEE 运行时（软件隔离）"),
+                  t("The SoftTEE runtime (software isolation)", "SoftTEE 运行时（软件隔离）"),
                   t("The platform relay decrypts, then forwards to you", "平台中继解密后转发给守方"),
                 ],
                 [
                   t("Who signs replies", "谁签名回复"),
                   t("A simulated TEE key held by the platform", "平台持有的模拟 TEE 密钥"),
-                  t("A per-boot signing key generated inside the CVM", "CVM 每次启动新生成的签名键"),
-                  t("A per-boot signing key generated inside the CVM", "CVM 每次启动新生成的签名键"),
+                  t("A measurement-bound SoftTEE key", "测量绑定的 SoftTEE 密钥"),
+                  t("A measurement-bound SoftTEE key", "测量绑定的 SoftTEE 密钥"),
                   t("Your SDK, with your registered reply signing key", "守方 SDK，用守方登记的回复签名键"),
                 ],
                 [
                   t("Who holds the W key", "谁持有 W 私钥"),
                   t("The platform process", "平台进程"),
-                  t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
-                  t("The wallet sidecar inside the CVM", "CVM 内的钱包 sidecar"),
+                  t("The SoftTEE keystore", "SoftTEE 密钥库"),
+                  t("The SoftTEE keystore", "SoftTEE 密钥库"),
                   t("The platform wallet sidecar custodies it", "平台钱包 sidecar 托管"),
                 ],
                 [
                   t("What the platform sees", "平台能看到"),
                   t("Attack text and replies pass through it and are kept per each party's consent", "攻击原文和回复都经过平台，按各方同意分别保留"),
-                  t("Attack text with attacker consent. On testnet it can technically read your config", "攻方同意时的攻击原文。测试网阶段技术上能读到配置"),
-                  t("Attack text with attacker consent", "攻方同意时的攻击原文"),
+                  t("Attack text with consent; no config plaintext on an honest host", "攻方同意时的攻击原文；诚实宿主上不接触配置明文"),
+                  t("Attack text with consent; no config plaintext on an honest host", "攻方同意时的攻击原文；诚实宿主上不接触配置明文"),
                   t("Attack text passes through it and is kept with the attacker's consent. Replies stay sealed", "攻击原文经平台中继，按攻方同意保留。看不到回复"),
                 ],
                 [
@@ -730,8 +730,8 @@ export default function Docs() {
                 [
                   t("Changing config mid-contest", "赛中修改配置"),
                   t("Possible and undetected", "能改，平台检测不到"),
-                  t("Blocked, a restart changes the signer", "改不了，重启会换签名者"),
-                  t("Blocked, a restart changes the signer", "改不了，重启会换签名者"),
+                  t("Measurement/configHash change is detected on an honest host", "诚实宿主上可检测度量/configHash 变化"),
+                  t("Measurement/configHash change is detected on an honest host", "诚实宿主上可检测度量/configHash 变化"),
                   t("Caught by the declared hash when using the official SDK; missed if the SDK is patched", "用官方 SDK 改会被申报哈希抓到，改了 SDK 抓不到"),
                 ],
                 [
@@ -765,8 +765,8 @@ export default function Docs() {
                 [
                   t("Whom you trust", "需要信任"),
                   t("The platform and the defender", "平台和守方"),
-                  t("Intel TDX, dstack, the arena template and your model vendor", "Intel TDX、dstack、竞技场模板和模型厂商"),
-                  t("Intel TDX, dstack and your model vendor", "Intel TDX、dstack 和你选的模型厂商"),
+                  t("The host OS, the SoftTEE runtime, the arena template and your model vendor", "宿主操作系统、SoftTEE 运行时、竞技场模板和模型厂商"),
+                  t("The host OS, the SoftTEE runtime and your model vendor", "宿主操作系统、SoftTEE 运行时和你选的模型厂商"),
                   t("The platform and the defender", "平台和守方"),
                 ],
               ]}
@@ -775,8 +775,8 @@ export default function Docs() {
             <Note tone="info">
               <span>
                 {t(
-                  "Quick start runs on the simulator first. Until the hardware phase ships, the quick start column describes the target design. During the simulator phase the platform itself decrypts, signs and holds W, and can read attack text and your config. Do not submit production configuration. The cells that mention a CVM belong to the hardware phase that follows.",
-                  "快速接入先在模拟器上运行。硬件阶段上线前，该列描述的是目标设计。模拟器阶段由平台自己解密、签名并持有 W，能读到攻击原文和你的配置。请勿提交生产配置。提到 CVM 的单元格属于随后上线的硬件阶段。",
+                  "SoftTEE is live as software isolation. It is not a hardware TEE: a host root can read process memory. Do not submit production configuration or production API keys. The platform still operates the host and the model vendor still sees prompts.",
+                  "SoftTEE 已作为软件隔离上线。它不是硬件 TEE：拥有宿主 root 的平台能读取进程内存。请勿提交生产配置或生产 API Key。平台仍然运营宿主机，模型厂商仍然能看到 prompt。",
                 )}
               </span>
             </Note>

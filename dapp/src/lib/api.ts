@@ -178,14 +178,19 @@ export interface ByoaBundleResult {
   bundle_id: string;
   defender: string;
   commitment: string;
-  attestation_tier: "simulated" | "hardware";
+  config_hash: string;
+  attestation_tier: "simulated" | "softtee" | "self-hosted";
   runtime_measurement: string;
   tee_pubkey: string;
   tee_signer: string;
+  reply_signer: string;
   wallet: string;
   byoa_nonce: number;
   defender_data_consent: boolean;
   policy_fingerprint: string;
+  open_ratio: number;
+  difficulty: "easy" | "standard";
+  tpm_rooted: boolean;
   manifest: Record<string, unknown>;
   egress: { models: string[]; oracles: Record<string, unknown>[] };
 }
@@ -196,7 +201,9 @@ export interface ByoaContestResult {
   wallet: string;
   defender: string;
   tee_signer: string;
+  reply_signer?: string;
   config_commitment: string;
+  config_hash?: string;
   runtime_measurement: string;
   attestation_tier: string;
   end: number;
@@ -211,6 +218,8 @@ export interface ByoaTurnResult {
   reply_envelope?: Record<string, unknown>;
   reply_hash?: string;
   reply_signature?: string;
+  config_hash?: string;
+  reply_signer?: string;
   tee_signer?: string;
   reply?: string;
   completed_tasks: string[];
@@ -224,8 +233,27 @@ export interface ByoaState {
   tee_signer: string;
   tee_pubkey: string;
   config_commitment: string;
+  config_hash: string;
   runtime_measurement: string;
   attestation_tier: string;
+  reply_signer: string;
+  open_ratio: number;
+  difficulty: string;
+  timeouts: number;
+  config_mismatch_evidence: Record<string, unknown> | null;
+  attestation: {
+    tier: string;
+    measurement: string;
+    configCommitment: string;
+    teeSigner: string;
+    teePubKey: string;
+    rootOfTrust: string;
+    tpmRooted: boolean;
+    tpmQuote: string | null;
+    issuedAt: number;
+    runtime: Record<string, unknown>;
+    quote: string;
+  };
   policy_fingerprint: string;
   defender_data_consent: boolean;
   manifest: Record<string, unknown>;
