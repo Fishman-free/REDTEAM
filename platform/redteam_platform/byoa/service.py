@@ -847,6 +847,7 @@ class ByoaService:
             raise ByoaServiceError(422, "ciphertext envelope is malformed") from None
         if not hmac.compare_digest(paid_hash, msg_hash):
             raise ByoaServiceError(422, "ciphertext does not match the paid msgHash")
+        self._assert_softtee_integrity(record, attacker, msg_hash)
 
         membership = self.indexer.contest_attackers(contest_id).get(
             _address(attacker, "attacker")
@@ -1207,6 +1208,30 @@ class ByoaService:
             handle.write(
                 json.dumps(dict(record), ensure_ascii=False, sort_keys=True) + "\n"
             )
+
+    def _assert_softtee_integrity(
+        self, record: _ContestRecord, attacker: str, msg_hash: str
+    ) -> None:
+        """Re-check the runtime files and config commitment before every turn."""
+
+        if record.manifest.attestation_tier != SOFTTEE:
+            return
+        try:
+            current, _files = softtee_measurement()
+        except Exception:
+            current = ""
+        if current != record.manifest.runtime_measurement:
+            self._handle_timeout(record, attacker, msg_hash)
+            raise ByoaServiceError(
+                409, "SoftTEE runtime measurement changed during the contest"
+            ) from None
+        if record.bundle.config_bundle is not None:
+            current_config = config_commitment(dict(record.bundle.config_bundle))
+            if current_config.lower() != record.config_commitment.lower():
+                self._handle_timeout(record, attacker, msg_hash)
+                raise ByoaServiceError(
+                    409, "SoftTEE config commitment changed during the contest"
+                ) from None
 
     def _handle_timeout(
         self, record: _ContestRecord, attacker: str, msg_hash: str

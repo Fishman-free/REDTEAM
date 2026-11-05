@@ -20,10 +20,14 @@ REDTEAM 平台后端的配置、加密托管、链绑定、BYOK 模型客户端�
 - `redteam_platform.byoa`：BYOA 密封运行时（L3 钱包策略、四种 DefenderPort、出网白名单、
   E2E 信封、任务结算、证明档位）；`byoa.sdk` 提供守方参考 agent 与四传输端点。
 - BYOA API：`POST /byoa/bundles`、`POST /byoa/contests`、`POST /byoa/contests/{id}/tasks[/generate]`、
-  `POST /byoa/contests/{id}/turns`、`POST /byoa/contests/{id}/finalize`、`GET /byoa/contests/{id}`；
-  钱包 MCP 在本地挂在 `/byoa/wallet/mcp`，按会话 bearer token 鉴权。
+  `POST /byoa/contests/{id}/turns`、`POST /byoa/contests/{id}/finalize`、`GET /byoa/contests/{id}`、
+  `GET /byoa/softtee/pubkey`；钱包 MCP 在本地挂在 `/byoa/wallet/mcp`，按会话 bearer token 鉴权。
 - `PLATFORM_BYOA_WALLET_URL`：注入给守方容器的钱包 MCP URL（默认
-  `http://127.0.0.1:8000/byoa/wallet`）。模拟器档位不提供硬件保密，UI 必须显示 `simulated`。
+  `http://127.0.0.1:8080/byoa/wallet`）。
+- BYOA 档位：`simulated` / `softtee` / `self-hosted`（链上 `attestationTier=0/1/2`）。
+  SoftTEE 使用可测量运行时与测量绑定密钥库；配置承诺、v2 回复签名、120 秒超时/3 次弃权、
+  闭合+开放任务、`payeeCommit`/`armTask` 已实现。SoftTEE 是软件隔离，不是硬件 TEE；
+  当前与 API 同进程（P5 容器化目标）。完整说明见 [`../docs/TEE.md`](../docs/TEE.md)。
 
 > 包名是 **`redteam_platform`**，不是 `platform`：Python 标准库自带 `platform`
 > 模块，使用同名顶层包会在 `import platform` 时冲突。目录名 `platform/` 仅作为
@@ -68,6 +72,8 @@ pip install -e ".[dev]"
 | `FAUCET_CAPTCHA_REQUIRED` | `false` | `true` 时必须给 `build_app(captcha_verifier=...)`，否则启动失败 |
 | `MODEL_ALLOWLIST_JSON` | `{}` | 模型白名单 JSON object；构造 `ByokClient` 时读取（见下） |
 | `PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS` | `false` | 允许守方注册和攻方 Agent 使用自定义 `base_url`/`model`/A2A 端点；测试网部署可设为 true |
+| `PLATFORM_SOFTTEE_HOST_SECRET` | 无 | SoftTEE 密钥库根；≥32 字符；只放 `deploy/.env.stack`，不打印；轮换会使旧密钥库打不开 |
+| `PLATFORM_SOFTTEE_STATE_DIR` | `<data_dir>/softtee` | 加密密钥库目录；Docker 中为 `/data/softtee` |
 | `PLATFORM_INDEXER_ENABLED` | `true` | 是否随 API 启动后台事件索引器 |
 | `PLATFORM_INDEXER_INTERVAL` | `1.5` | 索引器轮询间隔秒数 |
 | `PLATFORM_INDEXER_START_BLOCK` | `0` | 显式起始块；0 时优先 addresses.json 的 `deployBlock` |
@@ -175,6 +181,104 @@ except ModelError as exc:
         pass  # 守方基础设施故障：上层按弃权/罚没策略处理
     else:
         pass  # 模型输出/协议错误：不等于基础设施故障
+```
+
+## BYOA / SoftTEE
+
+相关模块：
+
+| 文件 | 作用 |
+|---|---|
+| `byoa/sealed.py` | `SoftteeSealedRuntime`、测量绑定密钥库、attestation、v2 回复载荷 |
+| `byoa/tasks.py` | 闭合/开放任务、随机 payee、开放占比 |
+| `byoa/runtime.py` | 任务账本、`payeeCommit`、回合与转账核对 |
+| `byoa/service.py` | Bundle/比赛/任务/密封回合、超时退费、数据市场 |
+| `byoa/model_agent.py` | SoftTEE 快速接入的 OpenAI 兼容模型 + 工具循环 |
+| `byoa/wallet_mcp.py` | `transfer_rtm`、`vendor_directory`、`contact_vendor` |
+| `byoa/sdk/self_hosted.py` | 自托管回复加密 + v2 签名（`SignedReplyAgent`） |
+
+### 注册与承诺
+
+```text
+POST /byoa/bundles
+{
+  "attestation_tier": "softtee",
+  "config_bundle": {
+    "prompt": "...", "tools": ["transfer_rtm"],
+    "model": "...", "base_url": "https://...", "api_key": "...",
+    "open_ratio": 0.3, "difficulty": "standard"
+  },
+  "config_commitment": "0x...",   # 可选；由平台复算校验
+  "reply_signer": null,            # 仅 self-hosted
+  ...
+}
+```
+
+- `configCommitment = keccak256(canonical_json(config_bundle))`；链上写入 `defenseHash` 槽位。
+- SoftTEE 注册返回 `config_hash`、`tee_signer`、`reply_signer`、`wallet`、`runtime_measurement`。
+- `ByoaMandate` 必须包含 `replySigner`；`createByoaContest` 校验档位：
+  - SoftTEE/simulated：`replySigner == teeSigner`；
+  - self-hosted：`replySigner != teeSigner` 且 `stake >= 100e18`。
+
+### 测量与密钥库
+
+```text
+key  = HKDF-SHA256(PLATFORM_SOFTTEE_HOST_SECRET, salt=measurement,
+                   info="RTM BYOA SOFTTEE KEYSTORE v2")
+file = AES-256-GCM(key, nonce, {walletKey, teeKey, x25519Key})
+```
+
+- 运行文件清单见 `SOFTTEE_RUNTIME_FILES`；改文件 → 测量变化 → 密钥库打不开。
+- `attestation` 是 `teeSigner` 签的 canonical JSON；`rootOfTrust=software`、`tpmRooted=false`
+  是当前正常值（未接 TPM）。有 TPM 时才允许 `tpmRooted=true` 并带 `tpmQuote`。
+- 每个 BYOA 回合前重算运行文件测量与配置承诺；变化时退该条手续费并计一次违约，
+  累计 3 次判弃权。
+
+### 回复 v2
+
+```text
+RTM BYOA reply v2
+contest: <cid>
+attacker: <checksum>
+msgHash: <0x..>
+replyHash: <0x..>
+seq: <n>
+configHash: <0x..>
+```
+
+- SoftTEE 由运行时签名；自托管由守方 SDK 签名。
+- 缺签名/签名无效/configHash 不符：退费 + 计次；3 次结束比赛并分发质押。
+- 自托管 SDK：
+
+```python
+from redteam_platform.byoa.sdk.self_hosted import SignedReplyAgent
+
+agent = SignedReplyAgent(
+    my_agent.handle,
+    reply_signer_key=REPLY_KEY,
+    config_hash=CONFIG_HASH,
+)
+```
+
+### 任务
+
+- `issueTask` 带 `payeeCommit = keccak256(abi.encode(taskHash, payee, salt))`。
+- agent 决定付款后，钱包 `prepare` 调用 `armTask` 揭示 payee；`RTMToken` 只在
+  `to == locked payee` 且金额精确匹配时把资金转入 TaskSink。
+- 每批 `open_ratio >= 0.30` 保证至少 1 个开放任务；`vendor_directory` / `contact_vendor`
+  用于核实供应商账户。
+
+### 测试
+
+```bash
+.venv/Scripts/python -m pytest tests/test_byoa.py tests/test_byoa_softtee.py \
+  tests/test_tasks.py tests/test_sdk.py -q
+```
+
+本地真实链路（需已迁移合约）：
+
+```bash
+.venv/Scripts/python ../scripts/softtee_e2e.py
 ```
 
 ## Runner（任务 12）

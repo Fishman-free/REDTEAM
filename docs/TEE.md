@@ -1,8 +1,11 @@
 # SoftTEE：BYOA 守方软件隔离、配置承诺与接入手册
 
-> **状态**：v2，2026-11-05。取代 v1 的硬件 TEE 路线。
+> **状态**：v2，2026-11-06。取代 v1 的硬件 TEE 路线。
 > **当前代码事实**：`simulated`、`softtee`、`self-hosted` 三档；**没有硬件 TEE 档**。
 > **先读**：§0、§2、§4、§6。读完再改代码。
+>
+> 相关文档：产品级说明书 [`MANUAL.md`](MANUAL.md) · 企业接入
+> [`byoa/SOFTTEE.md`](byoa/SOFTTEE.md) · 部署 [`../deploy/README.md`](../deploy/README.md)。
 
 ---
 
@@ -11,8 +14,9 @@
 1. **不许把 SoftTEE 说成硬件 TEE。** 它是软件隔离 + 可测量启动 + 测量绑定密钥库；
    拥有宿主 root 的平台可以读进程内存、改内核或伪造测量。
 2. **不许把 `simulated` 说成保密保证。** 它只用于本地开发与回归测试。
-3. **不许让平台 API 进程拿到 W 私钥、回复签名私钥或配置明文。**
-   当前 SoftTEE 运行时以独立模块运行；平台只保存密文/承诺。P5 会把运行时拆成独立容器。
+3. **不许让平台持久化 W 私钥、回复签名私钥或配置明文。**
+   当前 SoftTEE 运行时以独立模块运行，配置只在运行时内存中使用；平台不落盘明文。
+   P2 与 API 同进程，平台进程权限仍可访问；P5 会把运行时拆成独立容器，届时 API 进程不接触明文。
 4. **所有检查 fail closed。** 度量不符、配置承诺不符、签名无效、v2 载荷缺 `configHash`，
    一律拒绝；不许用重试、降级或默认值“修好”。
 5. **密钥与 API Key 不进仓库、不进日志、不贴聊天。** `SOFTTEE_HOST_SECRET` 只写入
@@ -42,7 +46,7 @@
 |---|---|---|
 | 守方赛中改 prompt/工具/模型 | 检测到 configHash 变化，拒绝签名/判违约 | 官方 SDK 会申报变化；改 SDK 后仍可撒谎 |
 | 守方换运行文件 | 测量变化，密钥库打不开 | 不适用 |
-| 平台 API 意外读配置 | API 不持有密钥；只保存密文 | 配置从不提交 |
+| 平台 API 意外读配置 | API 不持久化明文；P2 同进程，P5 拆容器后才完全隔离 | 配置从不提交 |
 | 攻方伪造回复 | v2 签名 + 链上 replySigner 验签 | 同左 |
 | 平台 root 读内存 | **挡不住**，必须在 UI/文档披露 | **挡不住** |
 | 模型厂商看 prompt | 挡不住；出网声明里公开 | 挡不住 |
@@ -56,7 +60,7 @@
 
 ```text
 browser ──HTTPS──> api
-   │                 │ 只保存密文配置包、承诺、密文回合
+   │                 │ 不持久化明文；保存承诺与密文回合
    │                 ▼
    │        SoftTEE runtime (measured module / P5 container)
    │           ├─ keystore: W / reply key / X25519 (AES-256-GCM, measurement-bound)
@@ -93,6 +97,8 @@ file = AES-256-GCM(key, nonce, json({walletKey, teeKey, x25519Key}))
 - `host_secret` 由 `deploy/up.sh` 生成，只出现在 `deploy/.env.stack`，不打印。
 - measurement 改变 → GCM 解密失败 → `AttestationError("softtee keystore cannot be opened ...")`。
 - 同一 measurement 重启 → 同一 W/签名者/X25519，比赛可恢复。
+- 比赛进行中，每个回合都会重算运行文件测量与配置承诺；变化时该条退费并计违约
+  （3 次判弃权）。运行中的 Python 已加载代码不会被热替换，但文件/配置变化会被发现。
 
 ### 3.3 Attestation
 

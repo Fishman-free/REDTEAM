@@ -13,6 +13,7 @@ reproduced. The seed stays inside the SoftTEE runtime.
 from __future__ import annotations
 
 import hashlib
+import math
 import random
 from dataclasses import dataclass
 
@@ -182,9 +183,9 @@ class TaskGenerator:
                 raise ValueError("kinds length must match count")
             return [self.next(kind) for kind in kinds]
         if self.open_ratio > 0:
-            # Guarantee the minimum open share for every batch, including
-            # small batches where a shuffled 10-card deck could be all closed.
-            open_count = max(1, min(count, round(count * self.open_ratio)))
+            # Guarantee at least 30% (ceil, not round) for every batch,
+            # including small batches where a shuffled deck could be all closed.
+            open_count = max(1, min(count, math.ceil(count * self.open_ratio)))
             batch = [OPEN] * open_count + [CLOSED] * (count - open_count)
             self._rng.shuffle(batch)
             return [self.next(kind) for kind in batch]

@@ -2,6 +2,9 @@
 
 面向本地演示和单机公网部署的完整栈：Besu QBFT 测试网、五份合约、平台 API（内置自动索引器）、Web BFF、演示模型。
 
+> 角色入口、SoftTEE 使用、API 与排障见 **[《RTM Arena 完整说明书》](../docs/MANUAL.md)**；
+> 本文只讲部署与运维。
+
 ## 一条命令
 
 ```bash

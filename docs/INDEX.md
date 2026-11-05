@@ -1,5 +1,13 @@
 # 资料索引
 
+## 当前运行手册（2026-11-06）
+
+- **[RTM Arena 完整说明书](MANUAL.md)**：角色入口、普通赛、挖矿、SoftTEE BYOA、API、部署、测试、排障、安全边界。**第一次使用先读这一份。**
+- **[SoftTEE 技术手册](TEE.md)**：测量、密钥库、attestation、v2 回复、自托管 SDK。
+- **[SoftTEE 企业接入指南](byoa/SOFTTEE.md)**：配置包 schema、接入步骤、检查清单。
+- **[部署与迁移](../deploy/README.md)**：本机一键栈、服务器、SoftTEE 合约迁移。
+- **[应用内文档](../dapp/src/pages/Docs.tsx)**：站点 `/docs` 的中英文操作说明。
+
 **当前产品说明优先阅读 [商业计划 Markdown](business/redteam-business-plan.md) 与 [REDTEAM Flower 协议](FLOWER_RECOGNITION.md)。** 企业安全服务是商业主线；Flower 是独立、可选、待审查的本地 NFT 原型；RTM 已重构为攻守竞技场与红队挖矿，在测试网运行，主网兑换属计划 B、受法律审查门控，不属于当前商业主线。现存 PDF 未重新生成：商业 PDF 是 Flower 更新前快照，产品说明已由当前 Markdown 替代；论文 PDF/Markdown 保留历史研究，不作为当前结果。
 
 当前 PayAssist 主线设计与判断在[研究方案](RESEARCH_PLAN.md)，运行从[PayAssist 指南](../rsi4safety/payment_agents/README.md)进入。2026-10-05 live.v3 验收通过仍有12开放发现，不是生产安全证书。
@@ -14,10 +22,13 @@
 | [区块链攻击悬赏与持续评估总构想](references/research/RSI攻击悬赏与持续评估机制_研究构想.md) | 原始研究目标，保留 |
 | [RTM 悬赏预算与合约设计](references/research/RTM_BOUNTY_DESIGN.md) | 旧减半/BountyVault 设计已归档；RTM 已重构为攻守博弈与红队挖矿，测试网运行中，主网兑换计划 B 受法律门控 |
 | [攻守博弈与红队挖矿规格](superpowers/specs/2026-10-27-rtm-redteam-game-design.md) | 2026-10-27 当前机制：普通层零和攻防、挖矿固定 1 RTM、RSI、数据同意 |
-| [BYOA 守方自带 agent 规格](superpowers/specs/2026-10-29-byoa-defender-design.md) | 2026-10-29 设计 + 实现（S1–S6，模拟器档位）：TEE 封闭运行时、三方保密、四种接入、委托任务 + 效用义务；硬件档未验收 |
-| [TEE 可信执行环境手册](TEE.md) | 2026-10-31：TEE 概念、项目必要性、当前 simulated 基线、P0–P4 接入路线、试点操作与验收证据矩阵；硬件档未实现 |
+| [BYOA 守方自带 agent 规格](superpowers/specs/2026-10-29-byoa-defender-design.md) | 2026-10-29 基础设计（S1–S6）；硬件 TEE 部分已被 2026-11-05 的 SoftTEE 修订取代 |
+| [BYOA 完整性与 SoftTEE 设计](superpowers/specs/2026-10-30-byoa-integrity-design.md) | 2026-11-05 修订：三档、SoftTEE、开放任务、payeeCommit/armTask、v2 回复、超时罚则、数据市场 |
+| [SoftTEE 技术手册](TEE.md) | 2026-11-06：软件隔离、测量绑定密钥库、attestation、v2、自托管 SDK、运维与验证清单；无硬件 TEE |
+| [SoftTEE 企业接入指南](byoa/SOFTTEE.md) | 2026-11-06：配置包 schema、快速/企业/自托管接入、检查清单 |
+| [RTM Arena 完整说明书](MANUAL.md) | 2026-11-06：所有角色入口、规则、API、部署、测试、排障与边界 |
 | [实施计划](superpowers/plans/2026-10-27-rtm-redteam-game-plan-a.md)、[工作交接](superpowers/HANDOFF-2026-10-29.md) | 任务 0–19 已收束；当前栈、签名代发水龙头、双 RPC、i18n/文档、测试与 CI 状态 |
-| [平台后端](../platform/README.md)、[dApp](../dapp/README.md)、[地址登记结构](../contracts/deploy/addresses.example.json) | runner/indexer/Faucet/数据服务/FastAPI；7 页 dApp；运行中地址只认 `/api/meta`（`rtm-registry` 卷），仓库不再提交地址文件 |
+| [平台后端](../platform/README.md)、[dApp](../dapp/README.md)、[地址登记结构](../contracts/deploy/addresses.example.json) | runner/indexer/Faucet/数据服务/FastAPI；多页面 dApp（含 `/attack`、`/byoa`）；运行中地址只认 `/api/meta`（`rtm-registry` 卷），仓库不再提交地址文件 |
 | [外部攻击接口设计](references/ATTACK_INTERFACE_DESIGN.md)、[旧 Arena 会话原型](../rsi4safety/execution/src/rsi4safety/arena/interface/)、[BountyRound（已归档）](../archieve/contracts-2026-10/BountyRound.sol) | 独立 HTTP/commit–reveal 原型；当前 PayAssist 无公共提交到链上判奖端到端接线 |
 | [证据与奖励协议 v1](EVIDENCE_REWARD_PROTOCOL.md)、[RTM 桥（已归档）](../archieve/contracts-2026-10/rtm-reward-bridge.js) | 旧 Arena claim 与本地 BountyVault 桥；不是当前 PayAssist 奖励实现 |
 | [历史研究论文 Markdown](paper/payment-agent-security-rsi.md)、[历史论文 PDF](paper/payment-agent-security-rsi.pdf) | 历史确定性研究稿；20%→100%受未见族分母缩小影响，逐点成功项始终2，不能证明跨族泛化；不含当前 live.v3 结果，PDF未更新 |

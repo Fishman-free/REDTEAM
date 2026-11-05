@@ -134,6 +134,29 @@ export default function Docs() {
         actions={<Badge tone="warning">{t("TESTNET · NO REAL VALUE", "测试网 · 无真实价值")}</Badge>}
       />
 
+      <p className="page-note">
+        {t(
+          "Need the full printable manual (roles, SoftTEE guarantees, API, deployment and troubleshooting)? Read ",
+          "需要完整的可打印说明书（角色、SoftTEE 保证、API、部署与排障）？请读 ",
+        )}
+        <a
+          href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/MANUAL.md"
+          target="_blank"
+          rel="noreferrer"
+        >
+          docs/MANUAL.md
+        </a>
+        {t(" and the SoftTEE technical manual ", " 与 SoftTEE 技术手册 ")}
+        <a
+          href="https://github.com/Fishman-free/REDTEAM/blob/main/docs/TEE.md"
+          target="_blank"
+          rel="noreferrer"
+        >
+          docs/TEE.md
+        </a>
+        .
+      </p>
+
       <div className="docs-layout">
         <nav className="docs-toc" aria-label={t("On this page", "本页目录")}>
           <p className="docs-toc__title mono">{t("ON THIS PAGE", "本页目录")}</p>
@@ -280,7 +303,7 @@ export default function Docs() {
                 ["/attack", t("Attack console", "进攻控制台"), t("The attacker entrance. Pick a target, join, then attack manually or let a model/A2A agent write the messages while your wallet pays.", "攻方入口。选择目标、加入，然后手动进攻，或让模型/A2A agent 出招、你的钱包付款。")],
                 ["/arena", t("Arena", "竞技场"), t("Browse all standard contests and battle details. The Enter button opens the attack console for that contest.", "浏览全部普通赛与战况。进入按钮会打开该场的进攻控制台。")],
                 ["/defend", t("Defend", "守方"), t("Enter the model API key, base URL and model (or an approved provider), pass the 1 wei qualification, stake and create one contest.", "填写模型 API Key、Base URL 和 Model（或平台已审核 provider），通过 1 wei 资格测试，质押并创建一场比赛。")],
-                ["/byoa", t("BYOA", "自带 agent"), t("Keep the agent on your side. Register a sealed bundle, create a stake-backed contest and attack over an encrypted channel.", "把 agent 留在守方一侧。注册密封 bundle，创建带质押的比赛，通过加密信道进攻。")],
+                ["/byoa", t("BYOA", "自带 agent"), t("Choose SoftTEE (measured software runtime) or self-hosted, register the config/endpoint, create a stake-backed contest and attack over an encrypted channel.", "选择 SoftTEE（可测量软件运行时）或自托管，注册配置/端点，创建带质押的比赛，通过加密信道进攻。")],
                 ["/mine", t("Mining center", "挖矿中心"), t("Attack the platform-owned agent without stake, at 0.005 tRTM per message.", "无质押攻击平台自持 agent，每条消息 0.005 tRTM。")],
                 ["/leaderboard", t("Ranks", "排行榜"), t("Attacker, defender and miner rankings derived from on-chain events.", "根据链上事件生成的攻方、守方和矿工榜单。")],
                 ["/market", t("Dataset market", "数据市场"), t("After a standard contest ends, its defender can buy opt-in transcripts. One purchase per address.", "普通赛结束后，该场守方可购买经攻方同意的对话数据，每个地址限购一次。")],

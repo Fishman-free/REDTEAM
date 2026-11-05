@@ -3,8 +3,9 @@
 React 19 + TypeScript + Vite 7 + wagmi/viem 的 RTM 红队竞技场前端。
 
 视觉方向是「战情室档案」：暖黑底、羊皮纸色文字、朱红与信号绿、衬线展示标题 +
-等宽数据标签。页面包含总览、竞技场、战场详情/付费对话、守方计划、挖矿中心、
-排行榜、数据市场、水龙头、应用内使用文档 `/docs`，以及独立的管理控制台 `/ops`。
+等宽数据标签。页面包含总览、独立攻方控制台 `/attack`、竞技场、战场详情/付费对话、
+守方计划 `/defend`、BYOA `/byoa`（SoftTEE / 自托管）、挖矿中心、排行榜、数据市场、
+水龙头、应用内使用文档 `/docs`，以及独立的管理控制台 `/ops`。
 
 界面支持中英文切换，**默认英文**，语言选择保存在浏览器 localStorage。
 
@@ -28,7 +29,12 @@ Vite dev proxy 会把 `/api` 转发到平台 API，并在**服务端**读取
 ```bash
 npm run build      # tsc --noEmit && vite build
 npm run preview    # 仅预览静态构建，不含 /api 代理
+npm test           # 单元测试
+npm run test:browser  # headless Edge 三角色入口验收（需真实 BFF/构建）
 ```
+
+浏览器验收覆盖：攻方手动、模型 Agent、A2A；守方 API Key/URL/Model；矿工加入与
+付费对话；BYOA SoftTEE 表单与档位（不出现旧 hardware 档）。
 
 ## 生产运行（同源 BFF）
 
@@ -70,8 +76,17 @@ bash deploy/up.sh
   与本站 RPC 的区块哈希，避免把交易发到另一个同 Chain ID 的本地链；顶部账户菜单
   展示 tRTM / gas 余额、复制地址、切链和断开。
 - **入门序列**：总览页四步检查（连接钱包 → 切测试网 → 领 tRTM → 选角色）。
+- **攻方入口**：`/attack` 独立选目标、加入、手动付费对话；Agent 模式可填模型
+  Base URL / Model / API Key 或 A2A endpoint，平台代写攻击、钱包逐笔签名；守方钱包
+  自攻会被拦截并给出攻方链接。
 - **竞技场**：状态筛选、搜索、排序、倒计时；战场详情包含加入/质押、数据同意确认、
   付费对话、到期 `expire`、攻方 `withdrawStake`、守方 `collectPenalties`。
+- **守方**：`/defend` 支持平台 provider 或自定义 OpenAI 兼容端点（API Key / Base URL /
+  Model）；注册后显示只读配置卡。
+- **BYOA / SoftTEE**：`/byoa` 支持 `SoftTEE · 软件隔离`、`Self-hosted · 未验证`、
+  `Simulated` 三档；快速接入填 prompt / 模型 / Key / 工具 / 开放任务占比 / 难度，
+  显示 `config_hash`、`reply_signer`、measurement 与超时计次。SoftTEE 不是硬件 TEE，
+  页面与文档都明确标注。
 - **付费对话**：一次授权最多 5 条消息费用；每条消息生成唯一 `msgHash`，
   approve → attack → 等索引 → `POST /messages`；上链但未送达的消息会在
   localStorage 保留，可「继续送达」或丢弃，避免重复付费。

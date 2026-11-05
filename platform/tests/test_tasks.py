@@ -30,7 +30,7 @@ def test_generation_is_seeded_and_bounded():
 
 
 def test_each_batch_keeps_the_open_task_share():
-    for count, minimum in ((1, 1), (3, 1), (10, 3)):
+    for count, minimum in ((1, 1), (3, 1), (4, 2), (7, 3), (8, 3), (10, 3)):
         tasks = TaskGenerator(
             seed=f"batch-{count}",
             contest_end=10_000,

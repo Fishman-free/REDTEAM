@@ -2,9 +2,11 @@
 
 **研究 AI 在“替人办事、提出付款请求”时，如何守住用户授权，并把发现的问题变成可验证的修复。**
 
-[在线体验 RTM Arena](https://arena.agenttrust.site/) · [查看完整项目网站](https://fishman-free.github.io/REDTEAM/) · [当前研究方案](docs/RESEARCH_PLAN.md) · [运行指南](rsi4safety/payment_agents/README.md)
+[在线体验 RTM Arena](https://arena.agenttrust.site/) · [完整说明书](docs/MANUAL.md) · [查看完整项目网站](https://fishman-free.github.io/REDTEAM/) · [当前研究方案](docs/RESEARCH_PLAN.md) · [运行指南](rsi4safety/payment_agents/README.md)
 
 > **当前进度（2026-10-10）**：攻防实验原型、真实模型的限定验证、单页展示网站和 Flower 本地 NFT 原型均已完成对应实现。项目仍处于研究与产品验证阶段，**不是已交付的企业安全平台，也不是公众支付或代币交易平台**。
+>
+> **RTM Arena 测试网（2026-11-06）**：新增独立攻方控制台 `/attack`（手动 / 模型 Agent / A2A）、守方自定义模型端点（API Key / Base URL / Model）、矿工入口验收，以及 BYOA `SoftTEE` 三档（simulated / softtee / self-hosted）。SoftTEE 是软件隔离，不是硬件 TEE；完整说明见 [`docs/MANUAL.md`](docs/MANUAL.md)。
 >
 > **RTM Arena 测试网（2026-10-28）**：`dapp/` 已重做为面向公开演示的完整产品界面，包含守方/攻方/矿工完整链路、独立 `/ops` 管理页、同源 BFF（浏览器不持有平台 token）和自动索引器。`bash deploy/up.sh` 可一键启动 Besu + 合约部署 + vault + API + Web + 演示模型；详见 [`deploy/README.md`](deploy/README.md) 与 [`dapp/README.md`](dapp/README.md)。测试网资产无价值；演示模型不是真实安全结论。
 >
@@ -200,7 +202,9 @@ python -m unittest discover -s tests -p test_site_build.py -v
 
 ## 八、RTM Arena 测试网：启动与使用指南
 
-> 这一节面向所有体验者、参赛者和部署者，不需要 Solidity、Node.js 或 Python 经验。当前是**本地单验证者测试网**，不是公链，也没有部署到任何公共网络；tRTM、积分和链上记录都没有真实价值；演示模型故意可被攻破，不能作为真实安全结论。
+> 这一节是快速上手。**完整、最新的角色入口、SoftTEE、API、部署、测试与排障见 [《RTM Arena 完整说明书》](docs/MANUAL.md)。**
+>
+> 面向所有体验者、参赛者和部署者，不需要 Solidity、Node.js 或 Python 经验。当前是**本地单验证者测试网**，不是公链，也没有部署到任何公共网络；tRTM、积分和链上记录都没有真实价值；演示模型故意可被攻破，不能作为真实安全结论。
 
 先选择你的场景：
 
@@ -243,6 +247,7 @@ python -m unittest discover -s tests -p test_site_build.py -v
 | 竞技场 | `/arena` | 浏览、搜索、筛选普通攻防赛；进入按钮打开进攻控制台 |
 | 战场详情 | `/arena/:contestId` | 查看战况、结算、领取剩余质押；守方钱包不能在此进攻自己的比赛 |
 | 守方 | `/defend` | 填写模型 API Key / Base URL / Model、资格测试、质押建赛、罚款与结算 |
+| BYOA | `/byoa` | SoftTEE / 自托管守方接入、配置承诺、任务、E2E 回合、数据同意 |
 | 挖矿 | `/mine` | 加入平台挖矿赛，固定奖励模式 |
 | 排行榜 | `/leaderboard` | 攻方、守方、矿工榜单 |
 | 数据市场 | `/market` | 赛后数据集浏览、购买与下载 |
@@ -380,8 +385,8 @@ arena.example.com {
 
 守方需要自带一个模型提供方（BYOK），通过资格测试后质押建赛。
 
-1. 打开 `/defend`，选择 provider。演示环境使用 `local-mock`，它是故意可攻破的演示模型；生产环境需要运营者先在部署配置中接入真实 provider。
-2. 填入 BYOK API Key（至少 8 个字符）。**演示环境不要填写真实的 OpenAI 或其他生产密钥。**
+1. 打开 `/defend`，选择模型接入方式：平台 allowlist provider，或“自定义 OpenAI 兼容端点”。
+2. 填 BYOK API Key（至少 8 个字符）；自定义端点还要填 Base URL 与 Model。**演示环境不要填写真实的 OpenAI 或其他生产密钥。**
 3. 点击“运行资格测试并注册”。平台会做一次 1 wei 的真实转账测试；通过后你才有开赛资格。
 4. 资格通过后创建比赛：
    - 守方质押 `S`；
@@ -392,6 +397,36 @@ arena.example.com {
 6. 比赛期间可以在“我的比赛”查看战况、拉取累计罚款；罚款按时间衰减累计，可以重复拉取差额。比赛到期后任何地址都可以结算，守方也可以发起结算。
 
 守方的对话内容不会展示给攻方。比赛结束后，数据市场只允许该场守方购买自己的数据集；运营者发布数据集后才会出现购买入口。
+
+### 8.5.1 BYOA（SoftTEE 守方自带 agent）
+
+BYOA 让守方提交自己的支付 agent 配置，由平台在可测量运行时中执行，或用守方自己的端点执行。入口是 `/byoa`。
+
+**三个档位：**
+
+| 档位 | 谁执行 | 适用 |
+|---|---|---|
+| `SoftTEE · 软件隔离` | 平台可测量运行时 | 普通玩家、企业快速接入 |
+| `Self-hosted · 未验证` | 守方自己的 endpoint | 开发者联调 |
+| `Simulated` | 平台进程 | 仅本地测试 |
+
+**SoftTEE 快速接入：**
+
+1. 打开 `/byoa`，选择 `SoftTEE · 软件隔离`。
+2. 填写 system prompt、模型 Base URL / Model / API Key、工具、开放任务占比（≥30%）、发票难度。
+3. 签署所有权证明并注册 Bundle；平台返回 `config_hash`、`tee_signer`、`reply_signer`、`wallet`。
+4. 签名 `ByoaMandate`（含 `replySigner`、`configCommitment`）并创建比赛。
+5. 平台下发闭合/开放任务；agent 通过 `vendor_directory` / `contact_vendor` 核实发票后付款。
+6. 攻方在 `/byoa` 输入比赛 id，发送 E2E 密文；回复带 v2 签名和 `configHash`。
+
+**关键机制：**
+
+- 每个任务有随机、无私钥的收款地址；链上只存 `payeeCommit`，agent 决定付款后才 `armTask` 揭示并锁定，正常发票能付、欺诈地址付不出去。
+- 开放任务占比 ≥30%；写死“拒绝对手方”的 agent 会漏做开放任务，效用不达标。
+- 回复超过 120 秒未送达：退该条手续费；累计 3 次判弃权。
+- SoftTEE 是软件隔离，不是硬件 TEE；当前运行时与 API 同进程（P5 才拆容器）。不要提交生产配置或生产 Key。
+
+完整说明见 [《RTM Arena 完整说明书》 §6](docs/MANUAL.md) 和 [`docs/TEE.md`](docs/TEE.md)。
 
 ### 8.6 玩法三：矿工（挖矿赛）
 
