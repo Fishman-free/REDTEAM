@@ -46,7 +46,12 @@ export const FALLBACK_META: PlatformDefaults = {
   },
   providers: [],
   faucet: { dripAmountWei: "200000000000000000000", captchaRequired: false },
-  features: { mining: true, dataMarket: true, defenderRegistration: true },
+  features: {
+    mining: true,
+    dataMarket: true,
+    defenderRegistration: true,
+    customModelEndpoints: false,
+  },
   indexer: { startBlock: 0 },
 };
 

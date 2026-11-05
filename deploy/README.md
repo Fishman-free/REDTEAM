@@ -80,6 +80,16 @@ PLATFORM_MODEL_PROVIDER: your-provider
 
 并在 `deploy/.env.stack` 设置 `PLATFORM_MODEL_KEY=...`，重新运行 `bash deploy/up.sh`（vault 会更新 `platform-model`）。允许的 `base_url` 必须是 HTTPS（loopback 的 HTTP 例外）。
 
+守方也可以在前端 `/defend` 直接填写自己的 OpenAI 兼容 Base URL、Model 和 API Key；攻方在 `/attack` 的 Agent 模式可以填写同样的模型信息，或填写一个 A2A `message/send` 端点。两者都需要在 API 服务中启用：
+
+```yaml
+PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS: "true"
+```
+
+`docker-compose.yml` 的测试网默认已启用。HTTPS 端点直接可用；HTTP 只允许 loopback。平台不会持久化攻方 Agent 的 API Key，守方的 Key 仍进入加密 custody。
+
+> 安全边界：允许自定义端点意味着平台会按用户提供的 URL 发起请求；这是测试网演示开关，不要在没有出站策略的生产环境直接开启。生产部署请使用 `MODEL_ALLOWLIST_JSON` 固定 provider。
+
 ## 公网部署
 
 默认只把 **Web 端口绑到 127.0.0.1**，API、RPC、mock model 都不直接暴露。推荐在前面放 Caddy/Nginx：

@@ -8,6 +8,9 @@
 
 export interface DefenderRegistration {
   wallet: string;
+  provider?: string;
+  baseUrl?: string;
+  model?: string;
   version?: string;
   digest?: string;
   contestId?: string;
@@ -18,6 +21,9 @@ export interface DefenderStatus {
   registered: boolean;
   defender: string;
   wallet: string;
+  provider?: string;
+  base_url?: string | null;
+  model?: string | null;
   version: string;
   digest: string;
   contests: string[];
@@ -34,8 +40,14 @@ export function registrationFromStatus(
   // The server appends contests in creation order; one BYOK registration can
   // create at most one standard contest.
   const contestId = status.contests[0] ?? current?.contestId;
+  const provider = status.provider ?? current?.provider;
+  const baseUrl = status.base_url ?? current?.baseUrl;
+  const model = status.model ?? current?.model;
   return {
     wallet: status.wallet,
+    ...(provider ? { provider } : {}),
+    ...(baseUrl ? { baseUrl } : {}),
+    ...(model ? { model } : {}),
     version: status.version,
     digest: status.digest,
     ...(contestId ? { contestId } : {}),

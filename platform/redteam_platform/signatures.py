@@ -171,10 +171,27 @@ def recover_typed_signer(
         raise ValueError("invalid signature") from None
 
 
-def config_hash(provider: str, defense_prompt: str, mandate: str) -> str:
-    """Commit to the BYOK package without revealing it in the signature UI."""
+def config_hash(
+    provider: str,
+    defense_prompt: str,
+    mandate: str,
+    *,
+    base_url: str = "",
+    model: str = "",
+) -> str:
+    """Commit to the BYOK package without revealing it in the signature UI.
 
-    payload = f"{provider}\x00{defense_prompt}\x00{mandate}".encode("utf-8")
+    A custom endpoint extends the v1 preimage with ``base_url`` and ``model``.
+    The v1 layout is kept when both are empty so existing registrations and
+    clients keep verifying.
+    """
+
+    if base_url or model:
+        payload = (
+            f"{provider}\x00{base_url}\x00{model}\x00{defense_prompt}\x00{mandate}"
+        ).encode("utf-8")
+    else:
+        payload = f"{provider}\x00{defense_prompt}\x00{mandate}".encode("utf-8")
     digest = Web3.keccak(payload).hex()
     return digest if digest.startswith("0x") else "0x" + digest
 

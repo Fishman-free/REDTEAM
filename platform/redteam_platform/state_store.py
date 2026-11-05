@@ -32,6 +32,8 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS defenders (
     defender TEXT PRIMARY KEY,
     provider TEXT NOT NULL,
+    base_url TEXT,
+    model TEXT,
     defense_prompt TEXT NOT NULL,
     mandate TEXT NOT NULL,
     wallet TEXT NOT NULL,
@@ -58,6 +60,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     wallet_entry TEXT NOT NULL,
     api_key_entry TEXT NOT NULL,
     provider TEXT NOT NULL,
+    base_url TEXT,
+    model TEXT,
+    defense_prompt TEXT,
     mandate TEXT NOT NULL,
     is_mining INTEGER NOT NULL,
     created_at REAL NOT NULL,
@@ -84,9 +89,34 @@ class PlatformStateStore:
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
             self._db.executescript(_SCHEMA)
+            self._migrate()
             self._db.commit()
         except (OSError, sqlite3.Error) as exc:
             raise StateStoreError(f"cannot open platform state: {exc}") from exc
+
+    def _migrate(self) -> None:
+        """Add columns introduced after the first deployment.
+
+        ``CREATE TABLE IF NOT EXISTS`` does not change an existing table, so a
+        deployed SQLite file needs explicit additive migrations.
+        """
+
+        migrations = (
+            ("defenders", "base_url", "TEXT"),
+            ("defenders", "model", "TEXT"),
+            ("sessions", "base_url", "TEXT"),
+            ("sessions", "model", "TEXT"),
+            ("sessions", "defense_prompt", "TEXT"),
+        )
+        for table, column, declaration in migrations:
+            columns = {
+                row["name"]
+                for row in self._db.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if column not in columns:
+                self._db.execute(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {declaration}"
+                )
 
     def close(self) -> None:
         with self._lock:
@@ -103,12 +133,14 @@ class PlatformStateStore:
                 self._db.execute(
                     """
                     INSERT INTO defenders (
-                        defender, provider, defense_prompt, mandate, wallet,
-                        wallet_entry, api_key_entry, version_name, version_digest,
-                        contests, registered_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        defender, provider, base_url, model, defense_prompt, mandate,
+                        wallet, wallet_entry, api_key_entry, version_name,
+                        version_digest, contests, registered_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(defender) DO UPDATE SET
                         provider=excluded.provider,
+                        base_url=excluded.base_url,
+                        model=excluded.model,
                         defense_prompt=excluded.defense_prompt,
                         mandate=excluded.mandate,
                         wallet=excluded.wallet,
@@ -121,6 +153,8 @@ class PlatformStateStore:
                     (
                         record["defender"],
                         record["provider"],
+                        record.get("base_url"),
+                        record.get("model"),
                         record["defense_prompt"],
                         record["mandate"],
                         record["wallet"],
@@ -152,6 +186,8 @@ class PlatformStateStore:
                 {
                     "defender": row["defender"],
                     "provider": row["provider"],
+                    "base_url": row["base_url"],
+                    "model": row["model"],
                     "defense_prompt": row["defense_prompt"],
                     "mandate": row["mandate"],
                     "wallet": row["wallet"],
@@ -164,6 +200,13 @@ class PlatformStateStore:
                 }
             )
         return records
+
+    def load_defender(self, defender: str) -> dict[str, Any] | None:
+        wanted = defender.lower()
+        for item in self.load_defenders():
+            if item["defender"].lower() == wanted:
+                return item
+        return None
 
     # -- processed transactions ----------------------------------------
 
@@ -210,8 +253,9 @@ class PlatformStateStore:
                     INSERT INTO sessions (
                         contest_id, defender, version_name, version_digest,
                         wallet_address, wallet_entry, api_key_entry, provider,
-                        mandate, is_mining, created_at, state
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        base_url, model, defense_prompt, mandate, is_mining,
+                        created_at, state
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(contest_id) DO UPDATE SET
                         state=excluded.state
                     """,
@@ -224,6 +268,9 @@ class PlatformStateStore:
                         record["wallet_entry"],
                         record["api_key_entry"],
                         record["provider"],
+                        record.get("base_url"),
+                        record.get("model"),
+                        record.get("defense_prompt"),
                         record["mandate"],
                         1 if record["is_mining"] else 0,
                         float(record.get("created_at") or self._clock()),
@@ -270,6 +317,9 @@ class PlatformStateStore:
                     "wallet_entry": row["wallet_entry"],
                     "api_key_entry": row["api_key_entry"],
                     "provider": row["provider"],
+                    "base_url": row["base_url"],
+                    "model": row["model"],
+                    "defense_prompt": row["defense_prompt"],
                     "mandate": row["mandate"],
                     "is_mining": bool(row["is_mining"]),
                     "created_at": row["created_at"],

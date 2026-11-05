@@ -44,6 +44,7 @@ const GROUPS: NavGroup[] = [
     label: "OPERATIONS",
     items: [
       { to: "/", en: "Overview", zh: "总览", icon: <LayoutDashboard size={16} /> },
+      { to: "/attack", en: "Attack", zh: "进攻", icon: <Crosshair size={16} /> },
       { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={16} /> },
       { to: "/defend", en: "Defend", zh: "守方", icon: <Shield size={16} /> },
       { to: "/byoa", en: "BYOA", zh: "自带 agent", icon: <Cpu size={16} /> },
@@ -68,13 +69,14 @@ const GROUPS: NavGroup[] = [
 
 const MOBILE_PRIMARY: NavItem[] = [
   { to: "/", en: "Home", zh: "总览", icon: <LayoutDashboard size={18} /> },
-  { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={18} /> },
+  { to: "/attack", en: "Attack", zh: "进攻", icon: <Crosshair size={18} /> },
   { to: "/defend", en: "Defend", zh: "守方", icon: <Shield size={18} /> },
-  { to: "/byoa", en: "BYOA", zh: "自带 agent", icon: <Cpu size={18} /> },
   { to: "/mine", en: "Mine", zh: "挖矿", icon: <Pickaxe size={18} /> },
 ];
 
 const MOBILE_MORE: NavItem[] = [
+  { to: "/arena", en: "Arena", zh: "竞技场", icon: <Swords size={17} /> },
+  { to: "/byoa", en: "BYOA", zh: "自带 agent", icon: <Cpu size={17} /> },
   { to: "/leaderboard", en: "Ranks", zh: "排行榜", icon: <Trophy size={17} /> },
   { to: "/market", en: "Market", zh: "数据市场", icon: <Database size={17} /> },
   { to: "/faucet", en: "Faucet", zh: "测试水龙头", icon: <Droplets size={17} /> },
@@ -83,6 +85,7 @@ const MOBILE_MORE: NavItem[] = [
 
 function pageTitle(pathname: string): { en: string; zh: string } {
   if (pathname === "/") return { en: "Overview", zh: "作战总览" };
+  if (pathname === "/attack") return { en: "Attack console", zh: "进攻控制台" };
   if (pathname.startsWith("/arena/")) return { en: "Contest", zh: "战场详情" };
   if (pathname === "/arena") return { en: "Arena", zh: "竞技场" };
   if (pathname === "/defend") return { en: "Defend", zh: "守方计划" };

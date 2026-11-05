@@ -67,6 +67,7 @@ pip install -e ".[dev]"
 | `PLATFORM_API_TOKEN` | 无（API 必需） | 24–256 个可见非空格 ASCII；bearer token；不进 repr/日志 |
 | `FAUCET_CAPTCHA_REQUIRED` | `false` | `true` 时必须给 `build_app(captcha_verifier=...)`，否则启动失败 |
 | `MODEL_ALLOWLIST_JSON` | `{}` | 模型白名单 JSON object；构造 `ByokClient` 时读取（见下） |
+| `PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS` | `false` | 允许守方注册和攻方 Agent 使用自定义 `base_url`/`model`/A2A 端点；测试网部署可设为 true |
 | `PLATFORM_INDEXER_ENABLED` | `true` | 是否随 API 启动后台事件索引器 |
 | `PLATFORM_INDEXER_INTERVAL` | `1.5` | 索引器轮询间隔秒数 |
 | `PLATFORM_INDEXER_START_BLOCK` | `0` | 显式起始块；0 时优先 addresses.json 的 `deployBlock` |
@@ -120,10 +121,13 @@ custody = Custody(settings.vault_path)   # 从 PLATFORM_MASTER_KEY 读取主密�
 
 ## BYOK 模型客户端
 
-`ByokClient(provider, api_key)` 只接受 provider 与 API key；`base_url` 与 `model`
-必须来自 `MODEL_ALLOWLIST_JSON`，构造器不接受覆盖。allowlist 在**构造时**读取，
+默认情况下 `ByokClient(provider, api_key)` 的 `base_url` 与 `model` 来自
+`MODEL_ALLOWLIST_JSON`。设置 `PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS=true` 后，
+守方注册可以同时提交 `base_url` 与 `model`，由 `ByokClient(..., base_url=...,
+model=...)` 使用；两条路径都复用同一套 URL/模型校验。allowlist 在**构造时**读取，
 因此不存在 import 时缓存；API key 由调用方从 Custody 取出，只保留在实例内，
-不写入 URL/请求体/磁盘，也不会出现在 repr 或错误消息中。
+不写入 URL/请求体/磁盘，也不会出现在 repr 或错误消息中。攻方 Agent 的
+`POST /agent/chat` 只做单次代理调用，不持久化 Key。
 
 ```bash
 export MODEL_ALLOWLIST_JSON='{
@@ -461,9 +465,11 @@ defender/buyer/attacker 身份仍由链上事件与服务层校验。
 | 路由 | 说明 |
 |---|---|
 | `GET /health` | 无鉴权，仅进程存活 |
-| `GET /meta` | 鉴权；公开链/费用/限额/provider/功能开关，供 dApp 运行时读取 |
+| `GET /meta` | 鉴权；公开链/费用/限额/provider/功能开关（含 `customModelEndpoints`），供 dApp 运行时读取 |
 | `GET /status` | 鉴权；API + 自动索引器状态（last/latest block、lag、事件数） |
-| `POST /defenders/register` | `{defender, provider, api_key, defense_prompt, mandate, nonce, deadline, signature}`；`signature` 是守方对 `DefenderRegistration(defender,configHash,nonce,deadline)` 的 EIP-712 签名，防止冒用他人地址；BYOK/W 入审计托管、W 预置 1 wei、资格测试；失败回滚托管条目 |
+| `POST /defenders/register` | `{defender, provider, api_key, defense_prompt, mandate, nonce, deadline, signature}`，可选 `{base_url, model}`；`signature` 是守方对 `DefenderRegistration(defender,configHash,nonce,deadline)` 的 EIP-712 签名，防止冒用他人地址；自定义端点需部署开关；BYOK/W 入审计托管、W 预置 1 wei、资格测试；失败回滚托管条目 |
+| `POST /agent/chat` | 攻方 Agent 单轮模型代理 `{base_url, model, api_key, messages, max_tokens?}`；不持久化 Key，要求 `PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS=true` |
+| `POST /agent/a2a` | 攻方 A2A 单轮中继 `{endpoint, text}`；向外部 agent 发送 A2A `message/send` 并返回文本，要求同一开关 |
 | `POST /contests` | `{stake, duration_h, stake_bps}`（可选 `?defender=`；只有一个 defender 时自动选用）；守方先 approve，operator `createContest`；返回 contest_id/tx |
 | `POST /contests/{id}/join-intent` | `{max_stake, data_consent}`；返回 `join(id,maxStake,dataConsent)` 参数与 approve 提示 |
 | `POST /contests/{id}/messages` | `{tx_hash, content}`；要求 indexer 已看到 `AttackPaid`、身份/同意匹配、未处理过该 tx；`markDelivered` → `attacker_turn` → 回复 |

@@ -29,6 +29,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -44,7 +45,7 @@ from benchmark.interface import VERSIONS_DIR, AgentVersion, load_version
 
 from ._jsonl import ensure_directory
 from .agent_tools import WalletTools
-from .byok import ByokClient
+from .byok import ByokClient, normalize_endpoint, normalize_external_endpoint
 from .chain import ChainClient, load_addresses
 from .chain_gateway import GatewayError, Web3ChainGateway
 from .custody import Custody
@@ -60,6 +61,7 @@ from .rsi_export import RsiExporter
 from .runner import AgentSession, RunnerStopped
 from .signatures import config_hash, recover_defender_registration
 from .state_store import PlatformStateStore
+from .byoa.adapters import HttpJsonClient, _a2a_texts
 from .byoa.egress import EgressError, load_declaration
 from .byoa.models import ContentKind
 from .byoa.policy import PolicyError, WalletPolicy
@@ -151,6 +153,10 @@ class RegisterDefender(BaseModel):
     model_config = ConfigDict(extra="forbid")
     defender: str = Field(min_length=1, max_length=64)
     provider: str = Field(min_length=1, max_length=64)
+    # Optional custom OpenAI-compatible endpoint.  Both fields must be sent
+    # together; the deployment must explicitly allow custom endpoints.
+    base_url: str | None = Field(default=None, max_length=2048)
+    model: str | None = Field(default=None, max_length=200)
     api_key: str = Field(min_length=8, max_length=512)
     defense_prompt: str = Field(min_length=100, max_length=16000)
     mandate: str = Field(min_length=1, max_length=4000)
@@ -179,6 +185,27 @@ class MessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tx_hash: str = Field(pattern=_TX_RE)
     content: str = Field(min_length=1, max_length=1000)
+
+
+class AgentChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: str = Field(pattern=r"^(system|user|assistant)$")
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class AgentChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    base_url: str = Field(min_length=1, max_length=2048)
+    model: str = Field(min_length=1, max_length=200)
+    api_key: str = Field(min_length=8, max_length=512)
+    messages: list[AgentChatMessage] = Field(min_length=1, max_length=40)
+    max_tokens: int = Field(default=320, ge=32, le=1200)
+
+
+class AgentA2aRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    endpoint: str = Field(min_length=1, max_length=2048)
+    text: str = Field(min_length=1, max_length=8000)
 
 
 class FaucetTicketRequest(BaseModel):
@@ -312,6 +339,8 @@ class DefenderRecord:
     wallet_entry: str
     api_key_entry: str
     version: AgentVersion
+    base_url: str | None = None
+    model: str | None = None
     contests: list[str] = field(default_factory=list)
     registered_at: int | None = None
 
@@ -330,6 +359,9 @@ class ApiDeps:
     data_service: Any | None = None
     version_loader: Callable[[str], AgentVersion] | None = None
     platform_client_factory: Callable[[], Any] | None = None
+    # (provider, api_key, base_url, model) -> OpenAI-compatible client.
+    custom_model_factory: Callable[[str, str, str, str], Any] | None = None
+    allow_custom_model_endpoints: bool = False
     state_store: Any | None = None
     clock: Callable[[], float] = time.time
     mining_reward: int = MINING_REWARD
@@ -378,14 +410,14 @@ class PlatformService:
 
         if self._state is None:
             return
-        loader = self.deps.version_loader
         for item in self._state.load_defenders():
             try:
-                if loader is None:
-                    raise ValueError("version loader is not configured")
-                version = loader(item["version_name"])
-                if version.digest != item["version_digest"]:
-                    raise ValueError("pinned version digest changed")
+                version = self._resolve_version(
+                    item["version_name"],
+                    item["version_digest"],
+                    defense_prompt=item.get("defense_prompt"),
+                    mandate=item.get("mandate"),
+                )
                 record = DefenderRecord(
                     defender=item["defender"],
                     provider=item["provider"],
@@ -395,6 +427,8 @@ class PlatformService:
                     wallet_entry=item["wallet_entry"],
                     api_key_entry=item["api_key_entry"],
                     version=version,
+                    base_url=item.get("base_url"),
+                    model=item.get("model"),
                     contests=list(item["contests"]),
                     registered_at=(
                         int(item["registered_at"])
@@ -422,6 +456,8 @@ class PlatformService:
                 {
                     "defender": record.defender,
                     "provider": record.provider,
+                    "base_url": record.base_url,
+                    "model": record.model,
                     "defense_prompt": record.defense_prompt,
                     "mandate": record.mandate,
                     "wallet": record.wallet,
@@ -479,6 +515,86 @@ class PlatformService:
         except Exception:
             self.state_warnings.append(f"session {contest_id} state not updated")
 
+    def _resolve_version(
+        self,
+        name: str,
+        digest: str,
+        *,
+        defense_prompt: str | None = None,
+        mandate: str | None = None,
+    ) -> AgentVersion:
+        """Resolve a pinned version, rebuilding in-memory BYOK versions.
+
+        Version files on disk are the only versions ``version_loader`` knows.
+        BYOK packages are constructed at registration time and would otherwise
+        disappear on restart, making every hosted defender unusable until it
+        re-registers.  Their package is persisted, so it can be rebuilt and
+        verified against the pinned digest.
+        """
+
+        loader = self.deps.version_loader
+        try:
+            if loader is None:
+                raise ValueError("version loader is not configured")
+            version = loader(name)
+        except Exception:
+            if (
+                not (isinstance(name, str) and name.startswith("defender-"))
+                or not defense_prompt
+                or not mandate
+            ):
+                raise
+            version = self._version(defense_prompt, mandate)
+            if version.name != name:
+                raise ValueError("pinned BYOK version does not match its package")
+        if version.digest != digest:
+            raise ValueError("pinned version digest changed")
+        return version
+
+    def _defense_prompt(self, meta: dict[str, Any]) -> str | None:
+        record = self._defenders.get(meta.get("defender", ""))
+        if record is not None:
+            return record.defense_prompt
+        if self._state is None:
+            return None
+        try:
+            item = self._state.load_defender(meta.get("defender", ""))
+        except Exception:
+            return None
+        return item["defense_prompt"] if item else None
+
+    def _model_client(
+        self,
+        provider: str,
+        api_key: str,
+        base_url: str | None,
+        model: str | None,
+    ) -> Any:
+        if base_url or model:
+            if not (base_url and model):
+                raise ApiError(422, "base_url and model must be provided together")
+            if not self.deps.allow_custom_model_endpoints:
+                raise ApiError(
+                    422,
+                    "custom model endpoints are disabled on this deployment",
+                )
+            factory = self.deps.custom_model_factory
+            if factory is None:
+                raise ApiError(503, "custom model endpoints are not configured")
+            try:
+                normalized_url, normalized_model = normalize_endpoint(
+                    provider, base_url, model
+                )
+                return factory(provider, api_key, normalized_url, normalized_model)
+            except Exception:
+                raise ApiError(
+                    422, "model provider/key/endpoint was rejected"
+                ) from None
+        try:
+            return self.deps.model_factory(provider, api_key)
+        except Exception:
+            raise ApiError(422, "model provider/key was rejected") from None
+
     def _ensure_session(self, contest_id: str) -> Any:
         """Return the live session, rebuilding it from durable state if needed."""
 
@@ -489,13 +605,13 @@ class PlatformService:
         meta = self._session_meta.get(contest_id)
         if meta is None:
             raise ApiError(503, "runner is not available for this contest")
-        loader = self.deps.version_loader
         try:
-            if loader is None:
-                raise ValueError("version loader is not configured")
-            version = loader(meta["version_name"])
-            if version.digest != meta["version_digest"]:
-                raise ValueError("agent version changed since the contest started")
+            version = self._resolve_version(
+                meta["version_name"],
+                meta["version_digest"],
+                defense_prompt=meta.get("defense_prompt") or self._defense_prompt(meta),
+                mandate=meta.get("mandate"),
+            )
             if not meta.get("api_key_entry"):
                 # Mining contests use the platform's own model key.
                 if self.deps.platform_client_factory is None:
@@ -509,7 +625,9 @@ class PlatformService:
                         "wallet_address": meta["wallet_address"],
                     },
                 )
-                client = self.deps.model_factory(meta["provider"], key)
+                client = self._model_client(
+                    meta["provider"], key, meta.get("base_url"), meta.get("model")
+                )
             session = self.deps.runner_factory(
                 version=version,
                 client=client,
@@ -624,7 +742,15 @@ class PlatformService:
     ) -> dict[str, Any]:
         if payload.deadline < int(self.deps.clock()):
             raise ApiError(422, "defender registration signature has expired")
-        commitment = config_hash(provider, payload.defense_prompt, payload.mandate)
+        if bool(payload.base_url) != bool(payload.model):
+            raise ApiError(422, "base_url and model must be provided together")
+        commitment = config_hash(
+            provider,
+            payload.defense_prompt,
+            payload.mandate,
+            base_url=payload.base_url or "",
+            model=payload.model or "",
+        )
         try:
             signer = recover_defender_registration(
                 payload.signature,
@@ -640,10 +766,9 @@ class PlatformService:
         if signer.lower() != defender.lower():
             raise ApiError(403, "defender signature does not match defender")
         version = self._version(payload.defense_prompt, payload.mandate)
-        try:
-            client = self.deps.model_factory(provider, payload.api_key)
-        except Exception:
-            raise ApiError(422, "model provider/key was rejected") from None
+        client = self._model_client(
+            provider, payload.api_key, payload.base_url, payload.model
+        )
 
         wallet, private_key = self.deps.wallet_factory()
         wallet = _address(wallet, "wallet")
@@ -702,6 +827,8 @@ class PlatformService:
             wallet_entry=wallet_entry,
             api_key_entry=byok_entry,
             version=version,
+            base_url=payload.base_url.strip() if payload.base_url else None,
+            model=payload.model.strip() if payload.model else None,
             registered_at=int(self.deps.clock()),
         )
         with self._lock:
@@ -732,11 +859,82 @@ class PlatformService:
                 "registered": True,
                 "defender": record.defender,
                 "wallet": record.wallet,
+                "provider": record.provider,
+                "base_url": record.base_url,
+                "model": record.model,
                 "version": record.version.name,
                 "digest": record.version.digest,
                 "contests": list(record.contests),
                 "registered_at": record.registered_at,
             }
+
+    def attacker_chat(self, payload: AgentChatRequest) -> dict[str, str]:
+        """Run one attacker-agent completion without persisting the key.
+
+        The browser sends its own endpoint/key for each round; the platform
+        proxies the call so providers without CORS can still be used.  The
+        key is held in memory for the request only.
+        """
+
+        if not self.deps.allow_custom_model_endpoints:
+            raise ApiError(422, "custom model endpoints are disabled on this deployment")
+        factory = self.deps.custom_model_factory
+        if factory is None:
+            raise ApiError(503, "custom model endpoints are not configured")
+        try:
+            base_url, model = normalize_endpoint(
+                "attacker-agent", payload.base_url, payload.model
+            )
+            client = factory("attacker-agent", payload.api_key, base_url, model)
+            text = client.complete_text(
+                [message.model_dump() for message in payload.messages],
+                max_tokens=payload.max_tokens,
+            )
+        except ApiError:
+            raise
+        except Exception:
+            raise ApiError(502, "attacker model call failed") from None
+        if not isinstance(text, str) or not text.strip():
+            raise ApiError(502, "attacker model returned no text")
+        return {"content": text.strip()}
+
+    def attacker_a2a(self, payload: AgentA2aRequest) -> dict[str, str]:
+        """Relay one turn to an external A2A attacker agent."""
+
+        if not self.deps.allow_custom_model_endpoints:
+            raise ApiError(422, "custom agent endpoints are disabled on this deployment")
+        try:
+            endpoint = normalize_external_endpoint("a2a-agent", payload.endpoint)
+        except Exception:
+            raise ApiError(422, "a2a endpoint was rejected") from None
+        request_id = uuid.uuid4().hex
+        body = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "user",
+                    "messageId": uuid.uuid4().hex,
+                    "parts": [{"kind": "text", "text": payload.text}],
+                    "metadata": {"channel": "counterparty", "kind": "dialogue"},
+                }
+            },
+        }
+        try:
+            response = HttpJsonClient(timeout=60.0).post(endpoint, body)
+        except Exception:
+            raise ApiError(502, "a2a agent call failed") from None
+        if not isinstance(response, dict) or response.get("error") is not None:
+            raise ApiError(502, "a2a agent returned an error")
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise ApiError(502, "a2a response is missing a result")
+        texts = _a2a_texts(result)
+        content = "\n".join(texts).strip()
+        if not content:
+            raise ApiError(502, "a2a agent returned no text")
+        return {"content": content}
 
     # -- normal contests ------------------------------------------------
 
@@ -774,7 +972,9 @@ class PlatformService:
                     "wallet_address": record.wallet,
                 },
             )
-            client = self.deps.model_factory(record.provider, key)
+            client = self._model_client(
+                record.provider, key, record.base_url, record.model
+            )
         except ApiError:
             raise
         except Exception:
@@ -820,6 +1020,9 @@ class PlatformService:
                 "wallet_entry": record.wallet_entry,
                 "api_key_entry": record.api_key_entry,
                 "provider": record.provider,
+                "base_url": record.base_url,
+                "model": record.model,
+                "defense_prompt": record.defense_prompt,
                 "mandate": record.mandate,
                 "is_mining": False,
                 "created_at": self.deps.clock(),
@@ -1467,6 +1670,14 @@ def create_app(
     def post_message(contest_id: str, payload: MessageRequest) -> dict[str, Any]:
         return service.post_message(contest_id, payload)
 
+    @app.post("/agent/chat", dependencies=[Depends(require_auth)])
+    def agent_chat(payload: AgentChatRequest) -> dict[str, str]:
+        return service.attacker_chat(payload)
+
+    @app.post("/agent/a2a", dependencies=[Depends(require_auth)])
+    def agent_a2a(payload: AgentA2aRequest) -> dict[str, str]:
+        return service.attacker_a2a(payload)
+
     @app.get("/leaderboards", dependencies=[Depends(require_auth)])
     def leaderboards() -> dict[str, Any]:
         return service.leaderboards()
@@ -1907,7 +2118,10 @@ def build_app(
         "features": {
             "mining": bool(settings.platform_model_provider),
             "dataMarket": True,
-            "defenderRegistration": bool(settings.model_allowlist),
+            "defenderRegistration": bool(
+                settings.model_allowlist or settings.allow_custom_model_endpoints
+            ),
+            "customModelEndpoints": settings.allow_custom_model_endpoints,
             "byoa": bool(addresses.get("taskSink")),
         },
         "byoa": {
@@ -1973,6 +2187,10 @@ def build_app(
             indexer=indexer,
             custody=audited,
             model_factory=lambda provider, key: ByokClient(provider, key),
+            custom_model_factory=lambda provider, key, base_url, model: ByokClient(
+                provider, key, base_url=base_url, model=model
+            ),
+            allow_custom_model_endpoints=settings.allow_custom_model_endpoints,
             runner_factory=runner_factory,
             wallet_factory=wallet_factory,
             faucet_signer=faucet_signer,

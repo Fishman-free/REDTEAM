@@ -6,6 +6,7 @@ import Overview from "./pages/Overview";
 // 首屏只保留总览；其余页面按路由懒加载，避免把钱包、图表和文档全部塞进
 // 同一个近 1 MB 的 bundle（移动端首屏尤其明显）。
 const Arena = lazy(() => import("./pages/Arena"));
+const Attack = lazy(() => import("./pages/Attack"));
 const ContestDetail = lazy(() => import("./pages/ContestDetail"));
 const Defend = lazy(() => import("./pages/Defend"));
 const Byoa = lazy(() => import("./pages/Byoa"));
@@ -44,6 +45,7 @@ export default function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<Overview />} />
+        <Route path="attack" element={page(<Attack />)} />
         <Route path="arena" element={page(<Arena />)} />
         <Route path="arena/:contestId" element={page(<ContestDetail mode="arena" />)} />
         <Route path="defend" element={page(<Defend />)} />

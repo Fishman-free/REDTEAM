@@ -19,6 +19,13 @@ build/
 
 # Claude Code spec-workflow plugin state
 .spec-workflow/
+# Local agent-tool state and generated test caches; never commit.
+.agents/
+.claude/
+.serena/
+.ppt-work/
+platform/.pytest_run/
+/附件9-*.pptx
 
 # Machine-local agent-tool state (scanner ledgers, plugin caches) -- never commit
 .mimosa/

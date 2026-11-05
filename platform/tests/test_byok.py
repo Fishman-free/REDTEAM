@@ -387,11 +387,28 @@ def test_base_url_trailing_slash_is_removed(monkeypatch):
     assert ByokClient("glm", SECRET).base_url == BASE_URL
 
 
-def test_constructor_does_not_accept_base_url_or_model():
-    with pytest.raises(TypeError):
-        ByokClient("glm", SECRET, allowlist=ALLOW, base_url="https://evil.example/v1")
-    with pytest.raises(TypeError):
-        ByokClient("glm", SECRET, allowlist=ALLOW, model="evil-model")
+def test_custom_endpoint_requires_both_fields_and_valid_url():
+    with pytest.raises(AllowlistError):
+        ByokClient("glm", SECRET, base_url="https://custom.example/v1")
+    with pytest.raises(AllowlistError):
+        ByokClient("glm", SECRET, model="custom-model")
+    with pytest.raises(AllowlistError):
+        ByokClient(
+            "glm",
+            SECRET,
+            base_url="http://custom.example/v1",
+            model="custom-model",
+        )
+
+    client = ByokClient(
+        "custom",
+        SECRET,
+        base_url="https://custom.example/v1/",
+        model="custom-model",
+    )
+    assert client.base_url == "https://custom.example/v1"
+    assert client.model == "custom-model"
+    assert SECRET not in repr(client)
 
 
 def test_constructor_rejects_invalid_allowlist_entries():
@@ -519,6 +536,39 @@ def test_complete_success_sends_fixed_allowlisted_request(monkeypatch):
     assert SECRET not in request.full_url
     assert SECRET not in request.data.decode("utf-8")
     assert SECRET not in json.dumps(result)
+
+
+def test_complete_text_sends_no_tools_and_accepts_a_gateway_model(monkeypatch):
+    recorder = install(
+        monkeypatch,
+        payload={
+            "model": "gateway/rewritten-alias",
+            "choices": [
+                {"message": {"role": "assistant", "content": "try a refund request"}}
+            ],
+        },
+    )
+    client = make_client()
+
+    text = client.complete_text(MESSAGES, max_tokens=123, timeout=4.5)
+
+    assert text == "try a refund request"
+    body = json.loads(recorder.requests[0].data.decode("utf-8"))
+    assert "tools" not in body
+    assert "parallel_tool_calls" not in body
+    assert body["temperature"] == 0.7
+    assert body["max_tokens"] == 123
+    assert recorder.timeouts == [4.5]
+    assert SECRET not in json.dumps(body)
+
+
+def test_complete_text_rejects_an_empty_message(monkeypatch):
+    install(
+        monkeypatch,
+        payload={"choices": [{"message": {"role": "assistant", "content": "  "}}]},
+    )
+    with pytest.raises(ModelUnavailable):
+        make_client().complete_text(MESSAGES)
 
 
 def test_complete_uses_constructor_timeout_and_default_max_tokens(monkeypatch):

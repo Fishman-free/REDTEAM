@@ -613,6 +613,15 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
                   "攻方对话内容不会展示给守方。你可以拉取已累计的罚款；比赛到期后任何地址都可以结算。赛后可以在数据市场发布并购买数据。",
                 )}
               </p>
+              <p className="muted small">
+                {t(
+                  "This wallet is the defender, so it cannot send paid attack messages here. Open the attack console with another wallet.",
+                  "当前钱包是本场守方，不能在这里发送付费攻击消息。请用另一个钱包打开进攻控制台。",
+                )}
+              </p>
+              <Link className="btn btn--ghost btn--sm" to={`/attack?contest=${contest.id}`}>
+                {t("Open attack console", "打开进攻控制台")}
+              </Link>
             </Panel>
           )}
         </div>
@@ -620,10 +629,37 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
         <aside className="detail-side">
           <Panel
             eyebrow={t("Your position", "你的位置")}
-            title={joined ? t("You are in the contest", "已在战场中") : t("Join this contest", "加入这场战斗")}
+            title={
+              isDefender
+                ? t("You are the defender", "你是本场守方")
+                : joined
+                  ? t("You are in the contest", "已在战场中")
+                  : t("Join this contest", "加入这场战斗")
+            }
             bracket
           >
-            {!isConnected ? (
+            {isDefender ? (
+              <Alert
+                tone="error"
+                title={t("You cannot attack your own contest", "你不能攻击自己的比赛")}
+              >
+                <p>
+                  {t(
+                    "The defender wallet cannot join or attack its own contest. Copy this link and open it in a different attacker wallet.",
+                    "守方钱包不能加入或攻击自己的比赛。请复制下面的链接，用另一个攻方钱包打开。",
+                  )}
+                </p>
+                <div className="row-actions" style={{ marginTop: 10 }}>
+                  <CopyButton
+                    value={`${window.location.origin}/attack?contest=${contest.id}`}
+                    label={t("Copy attacker link", "复制攻方链接")}
+                  />
+                  <Link className="btn btn--ghost btn--sm" to={`/attack?contest=${contest.id}`}>
+                    {t("Open attack console", "打开进攻控制台")}
+                  </Link>
+                </div>
+              </Alert>
+            ) : !isConnected ? (
               <ConnectPrompt title={t("Connect wallet to join", "连接钱包以加入")} compact />
             ) : !correctChain ? (
               <ConnectPrompt title={t("Switch network first", "先切换网络")} compact />
@@ -1086,7 +1122,7 @@ export default function ContestDetail({ mode }: ContestDetailProps) {
               disabled={!termsAccepted}
               onClick={() => void confirmMiningJoin()}
             >
-              joinMining(id, true)
+              {t("Join mining contest", "加入挖矿赛")}
             </Button>
           </div>
         }

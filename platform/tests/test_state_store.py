@@ -249,6 +249,59 @@ def test_service_hydrates_defender_and_restores_session(tmp_path):
     assert session.imported["turns"] == {ATTACKER: 1}
 
 
+def test_service_restores_byok_package_after_restart(tmp_path):
+    """BYOK versions live only in memory; restart must rebuild them.
+
+    ``version_loader`` only knows versions on disk.  A BYOK package is
+    reconstructed from the persisted prompt and mandate, so a hosted defender
+    keeps working across a platform restart.
+    """
+
+    store = PlatformStateStore(tmp_path / "state.sqlite3")
+    prompt = "你是守方支付智能体。" + "只执行主人授权的付款。" * 12
+    version = PlatformService._version(prompt, MANDATE)
+    store.save_defender(
+        {
+            "defender": DEFENDER,
+            "provider": "local-mock",
+            "defense_prompt": prompt,
+            "mandate": MANDATE,
+            "wallet": WALLET,
+            "wallet_entry": "wallet:test",
+            "api_key_entry": "byok:test",
+            "version_name": version.name,
+            "version_digest": version.digest,
+            "contests": [CONTEST],
+            "registered_at": 1.0,
+        }
+    )
+    store.save_session(
+        {
+            "contest_id": CONTEST,
+            "defender": DEFENDER,
+            "version_name": version.name,
+            "version_digest": version.digest,
+            "wallet_address": WALLET,
+            "wallet_entry": "wallet:test",
+            "api_key_entry": "byok:test",
+            "provider": "local-mock",
+            "defense_prompt": prompt,
+            "mandate": MANDATE,
+            "is_mining": False,
+            "created_at": 1.0,
+        },
+        {"state_version": 1, "turns": {ATTACKER: 1}, "consents": {ATTACKER: True}, "threads": {}},
+    )
+
+    service = PlatformService(_deps(tmp_path, store))
+    assert DEFENDER in service._defenders
+    assert not any("not restored" in warning for warning in service.state_warnings)
+    session = service._ensure_session(CONTEST)
+    assert isinstance(session, FakeSession)
+    assert session.imported is not None
+    assert session.imported["turns"] == {ATTACKER: 1}
+
+
 def test_service_skips_defender_whose_version_changed(tmp_path):
     store = PlatformStateStore(tmp_path / "state.sqlite3")
     store.save_defender(

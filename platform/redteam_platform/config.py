@@ -32,6 +32,7 @@ ENV_CHAIN_RPC = "CHAIN_RPC"
 ENV_CHAIN_ID = "CHAIN_ID"
 ENV_CHAIN_TIMEOUT = "CHAIN_TIMEOUT"
 ENV_MODEL_ALLOWLIST = "MODEL_ALLOWLIST_JSON"
+ENV_ALLOW_CUSTOM_MODEL_ENDPOINTS = "PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS"
 ENV_OPERATOR_KEY_ENTRY = "OPERATOR_KEY_ENTRY"
 ENV_FAUCET_SIGNER_ENTRY = "FAUCET_SIGNER_ENTRY"
 ENV_TREASURY_OWNER_ENTRY = "TREASURY_OWNER_KEY_ENTRY"
@@ -59,6 +60,7 @@ class Settings:
     vault_path: Path
     data_dir: Path = REPO_ROOT / "platform" / "data"
     model_allowlist: dict[str, dict[str, Any]] = field(default_factory=dict)
+    allow_custom_model_endpoints: bool = False
     operator_key_entry: str = DEFAULT_OPERATOR_KEY_ENTRY
     faucet_signer_entry: str = DEFAULT_FAUCET_SIGNER_ENTRY
     treasury_owner_entry: str = DEFAULT_TREASURY_OWNER_ENTRY
@@ -261,6 +263,9 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     chain_id = _resolve_chain_id(env_map, addresses)
     request_timeout = _resolve_timeout(env_map)
     model_allowlist = _resolve_allowlist(env_map)
+    allow_custom_model_endpoints = _resolve_bool(
+        env_map, ENV_ALLOW_CUSTOM_MODEL_ENDPOINTS, False
+    )
     operator_key_entry = _resolve_entry_name(
         env_map, ENV_OPERATOR_KEY_ENTRY, DEFAULT_OPERATOR_KEY_ENTRY
     )
@@ -307,6 +312,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         vault_path=vault_path,
         data_dir=data_dir,
         model_allowlist=model_allowlist,
+        allow_custom_model_endpoints=allow_custom_model_endpoints,
         operator_key_entry=operator_key_entry,
         faucet_signer_entry=faucet_signer_entry,
         treasury_owner_entry=treasury_owner_entry,

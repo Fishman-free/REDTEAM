@@ -100,9 +100,14 @@ export default function Arena() {
           "选择一场进行中的普通赛，质押加入，然后为每条消息付费。攻破守方 agent 后，W 余额会按合约规则结算。",
         )}
         actions={
-          <Link to="/faucet" className="btn btn--ghost btn--sm">
-            {t("Need tRTM?", "需要 tRTM？")}
-          </Link>
+          <div className="row-actions">
+            <Link to="/attack" className="btn btn--primary btn--sm">
+              {t("Attack console", "进攻控制台")}
+            </Link>
+            <Link to="/faucet" className="btn btn--ghost btn--sm">
+              {t("Need tRTM?", "需要 tRTM？")}
+            </Link>
+          </div>
         }
       />
 

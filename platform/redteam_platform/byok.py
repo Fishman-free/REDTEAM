@@ -155,6 +155,38 @@ def _validate_base_url(base_url: str, provider: str) -> None:
         raise _provider_error(provider, "base_url must use https unless the host is loopback")
 
 
+def normalize_endpoint(
+    provider: str, base_url: str, model: str
+) -> tuple[str, str]:
+    """Validate a user-supplied OpenAI-compatible endpoint.
+
+    Returns the stripped ``(base_url, model)`` pair.  The same URL rules as
+    ``MODEL_ALLOWLIST_JSON`` apply; a caller must gate this behind the
+    deployment's custom-endpoint switch before constructing a client.
+    """
+
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise _provider_error(provider, "base_url must be a non-empty string")
+    if not isinstance(model, str) or not model.strip():
+        raise _provider_error(provider, "model must be a non-empty string")
+    model = model.strip()
+    if len(model) > 200 or any(not 0x21 <= ord(character) <= 0x7E for character in model):
+        raise _provider_error(
+            provider, "model must be 1-200 visible non-space ASCII characters"
+        )
+    _validate_base_url(base_url, provider)
+    return base_url.strip().rstrip("/"), model
+
+
+def normalize_external_endpoint(provider: str, url: str) -> str:
+    """Validate an A2A/HTTP agent endpoint using the model URL rules."""
+
+    if not isinstance(url, str) or not url.strip():
+        raise _provider_error(provider, "endpoint must be a non-empty string")
+    _validate_base_url(url, provider)
+    return url.strip().rstrip("/")
+
+
 def _validated_allowlist(data: Mapping[str, Any]) -> dict[str, dict[str, str]]:
     if not isinstance(data, Mapping):
         raise AllowlistError("model allowlist must be a mapping")
@@ -225,11 +257,13 @@ def _validate_timeout(value: Any) -> float:
 
 
 class ByokClient:
-    """OpenAI-compatible client bound to one allowlisted provider.
+    """OpenAI-compatible client bound to one provider.
 
-    ``base_url`` and ``model`` cannot be supplied by callers; they are taken
-    from the allowlist entry for ``provider``.  The API key is held only on
-    this instance and is never exposed by ``repr``.
+    Normally ``base_url`` and ``model`` come from the allowlist entry for
+    ``provider``.  A caller that has explicitly opted into custom endpoints
+    may instead pass both values; they are validated by
+    :func:`normalize_endpoint`.  The API key is held only on this instance and
+    is never exposed by ``repr``.
     """
 
     def __init__(
@@ -238,19 +272,28 @@ class ByokClient:
         api_key: str,
         *,
         allowlist: Mapping[str, Any] | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         if not isinstance(provider, str) or not provider.strip():
             raise AllowlistError("provider must be a non-empty string")
 
-        if allowlist is None:
-            allowlist = load_allowlist()
-        providers = _validated_allowlist(allowlist)
-        entry = providers.get(provider)
-        if entry is None:
-            raise AllowlistError(
-                f"provider {provider!r} is not in the model allowlist"
-            )
+        if base_url is not None or model is not None:
+            if not isinstance(base_url, str) or not isinstance(model, str):
+                raise AllowlistError("base_url and model must be provided together")
+            base_url, model = normalize_endpoint(provider, base_url, model)
+        else:
+            if allowlist is None:
+                allowlist = load_allowlist()
+            providers = _validated_allowlist(allowlist)
+            entry = providers.get(provider)
+            if entry is None:
+                raise AllowlistError(
+                    f"provider {provider!r} is not in the model allowlist"
+                )
+            base_url = entry["base_url"]
+            model = entry["model"]
 
         if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("api_key must be a non-empty string")
@@ -258,8 +301,8 @@ class ByokClient:
             raise ValueError("api_key must contain only visible ASCII characters")
 
         self.provider = provider
-        self._base_url = entry["base_url"].rstrip("/")
-        self._model = entry["model"]
+        self._base_url = base_url.rstrip("/")
+        self._model = model
         self.timeout = _validate_timeout(timeout)
         self._api_key = api_key
         # An empty ProxyHandler keeps HTTP_PROXY/HTTPS_PROXY from receiving
@@ -289,15 +332,17 @@ class ByokClient:
 
         return self._opener.open(request, timeout=timeout)
 
-    def complete(
+    def _completion(
         self,
         messages: list,
-        tools: list,
         *,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
-        timeout: float | None = None,
+        tools: list | None,
+        max_tokens: int,
+        temperature: float,
+        timeout: float | None,
+        require_model: bool,
     ) -> dict[str, Any]:
-        """Call ``/chat/completions`` once and return the assistant message."""
+        """Run one ``/chat/completions`` request and return the message."""
 
         if (
             isinstance(max_tokens, bool)
@@ -309,19 +354,18 @@ class ByokClient:
             self.timeout if timeout is None else _validate_timeout(timeout)
         )
 
-        body = json.dumps(
-            {
-                "model": self.model,
-                "messages": messages,
-                "tools": tools,
-                "parallel_tool_calls": False,
-                "temperature": 0,
-                "max_tokens": max_tokens,
-            }
-        ).encode("utf-8")
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if tools is not None:
+            body["tools"] = tools
+            body["parallel_tool_calls"] = False
         request = urllib.request.Request(
             self.base_url + "/chat/completions",
-            data=body,
+            data=json.dumps(body).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self._api_key}",
@@ -374,7 +418,7 @@ class ByokClient:
             raise ModelUnavailable("invalid json", kind=AGENT_PROTOCOL) from None
         if not isinstance(data, dict):
             raise ModelUnavailable("invalid response", kind=AGENT_PROTOCOL)
-        if data.get("model") != self.model:
+        if require_model and data.get("model") != self.model:
             raise ModelUnavailable("model mismatch", kind=AGENT_PROTOCOL)
 
         choices = data.get("choices")
@@ -391,3 +435,59 @@ class ByokClient:
         if not isinstance(usage, dict):
             usage = {}
         return {"message": message, "usage": usage}
+
+    def complete(
+        self,
+        messages: list,
+        tools: list,
+        *,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        """Call ``/chat/completions`` once and return the assistant message."""
+
+        return self._completion(
+            messages,
+            tools=tools,
+            max_tokens=max_tokens,
+            temperature=0,
+            timeout=timeout,
+            require_model=True,
+        )
+
+    def complete_text(
+        self,
+        messages: list,
+        *,
+        max_tokens: int = 320,
+        timeout: float | None = None,
+    ) -> str:
+        """Plain-text completion used by the attacker agent.
+
+        No tool surface is sent and the provider is allowed to return its own
+        concrete model id (many gateways rewrite the alias).
+        """
+
+        data = self._completion(
+            messages,
+            tools=None,
+            max_tokens=max_tokens,
+            temperature=0.7,
+            timeout=timeout,
+            require_model=False,
+        )
+        content = data["message"].get("content")
+        if isinstance(content, list):
+            text = "".join(
+                part.get("text", "")
+                for part in content
+                if isinstance(part, dict)
+            )
+        elif isinstance(content, str):
+            text = content
+        else:
+            raise ModelUnavailable("missing text", kind=AGENT_PROTOCOL)
+        text = text.strip()
+        if not text:
+            raise ModelUnavailable("empty text", kind=AGENT_PROTOCOL)
+        return text[:4000]

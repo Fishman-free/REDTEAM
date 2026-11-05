@@ -16,7 +16,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { useAccount, useSignTypedData } from "wagmi";
-import { keccak256, stringToBytes, type Address } from "viem";
+import type { Address } from "viem";
+import { defenderConfigHash } from "../lib/defenderConfig";
 import { api, ApiClientError, type DefenderEntry } from "../lib/api";
 import { arenaAbi, rtmAbi } from "../lib/contracts";
 import {
@@ -158,6 +159,20 @@ function DefenderRecordCard({
             </dd>
           </div>
           <div>
+            <dt>{t("Model provider", "模型服务")}</dt>
+            <dd className="mono">{registration.provider ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>{t("API base URL", "API Base URL")}</dt>
+            <dd className="mono">
+              {registration.baseUrl ? registration.baseUrl : t("platform allowlist", "平台白名单")}
+            </dd>
+          </div>
+          <div>
+            <dt>{t("Model", "模型")}</dt>
+            <dd className="mono">{registration.model ?? t("allowlist default", "白名单默认")}</dd>
+          </div>
+          <div>
             <dt>{t("Version", "版本")}</dt>
             <dd className="mono">{registration.version ?? "—"}</dd>
           </div>
@@ -170,6 +185,12 @@ function DefenderRecordCard({
             <dd>{formatDateTime(registration.registeredAt)}</dd>
           </div>
         </dl>
+        <p className="position__hint">
+          {t(
+            "The model endpoint and prompt are committed at registration and cannot be edited. To change the model, register again with a new defender wallet.",
+            "模型端点与提示词在注册时已承诺，注册后不可修改。如需更换模型，请使用新的守方钱包重新注册。",
+          )}
+        </p>
       </div>
     </div>
   );
@@ -256,7 +277,12 @@ export default function Defend() {
     defenderStorageKey(address),
     null,
   );
-  const [provider, setProvider] = useState(meta.providers[0] ?? "glm");
+  const [provider, setProvider] = useState(meta.providers[0] ?? "custom");
+  const [modelMode, setModelMode] = useState<"allowlist" | "custom">(() =>
+    meta.providers.length > 0 ? "allowlist" : "custom",
+  );
+  const [baseUrl, setBaseUrl] = useState("");
+  const [modelName, setModelName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [mandate, setMandate] = useState(() => t(DEFAULT_MANDATE_EN, DEFAULT_MANDATE_ZH));
@@ -276,7 +302,13 @@ export default function Defend() {
     if (meta.providers.length > 0 && !meta.providers.includes(provider)) {
       setProvider(meta.providers[0]);
     }
+    if (meta.providers.length === 0) {
+      setModelMode("custom");
+      setProvider((current) => (current === "glm" ? "custom" : current));
+    }
   }, [meta.providers, provider]);
+
+  const customEndpointEnabled = meta.features.customModelEndpoints === true;
 
   // The platform is authoritative: if the POST response was lost, the server
   // still holds the registration while this browser has no local record. Pull
@@ -472,6 +504,38 @@ export default function Defend() {
       setRegisterError(t("Select or enter a provider.", "请选择或填写 provider。"));
       return;
     }
+    if (modelMode === "custom") {
+      if (!customEndpointEnabled) {
+        setRegisterError(
+          t(
+            "This deployment has not enabled custom model endpoints. Choose an approved provider instead.",
+            "本次部署未启用自定义模型端点，请改用平台允许的 provider。",
+          ),
+        );
+        return;
+      }
+      if (!baseUrl.trim() || !modelName.trim()) {
+        setRegisterError(
+          t(
+            "Custom endpoints need both a base URL and a model name.",
+            "自定义端点必须同时填写 Base URL 和 Model。",
+          ),
+        );
+        return;
+      }
+      if (
+        !/^https:\/\/\S+$/i.test(baseUrl.trim()) &&
+        !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/i.test(baseUrl.trim())
+      ) {
+        setRegisterError(
+          t(
+            "The base URL must use HTTPS, or HTTP only for localhost/127.0.0.1.",
+            "Base URL 必须是 HTTPS；只有 localhost/127.0.0.1 可以使用 HTTP。",
+          ),
+        );
+        return;
+      }
+    }
     const arena = addresses?.arena;
     if (!arena) {
       setRegisterError(
@@ -488,9 +552,16 @@ export default function Defend() {
       const providerName = provider.trim();
       const defensePrompt = prompt.trim();
       const mandateText = mandate.trim();
-      // Matches redteam_platform.signatures.config_hash: provider\0prompt\0mandate.
-      const configHash = keccak256(
-        stringToBytes(`${providerName}\u0000${defensePrompt}\u0000${mandateText}`),
+      const endpointUrl = modelMode === "custom" ? baseUrl.trim() : "";
+      const endpointModel = modelMode === "custom" ? modelName.trim() : "";
+      // Matches redteam_platform.signatures.config_hash. A custom endpoint
+      // extends the v1 preimage with base_url and model.
+      const configHash = defenderConfigHash(
+        providerName,
+        defensePrompt,
+        mandateText,
+        endpointUrl,
+        endpointModel,
       );
       const nonce = Date.now();
       const deadline = Math.floor(Date.now() / 1000) + 900;
@@ -521,6 +592,8 @@ export default function Defend() {
       const result = await api.registerDefender({
         defender: address,
         provider: providerName,
+        base_url: endpointUrl || null,
+        model: endpointModel || null,
         api_key: apiKey.trim(),
         defense_prompt: defensePrompt,
         mandate: mandateText,
@@ -530,6 +603,9 @@ export default function Defend() {
       });
       setRegistration({
         wallet: result.wallet,
+        provider: providerName,
+        baseUrl: endpointUrl || undefined,
+        model: endpointModel || undefined,
         version: result.version,
         digest: result.digest,
         registeredAt: Math.floor(Date.now() / 1000),
@@ -1059,42 +1135,107 @@ export default function Defend() {
             )}
             bracket
           >
-            {meta.providers.length > 0 ? (
-              <SelectField
-                label={
-                  <>
-                    Provider
-                    <InfoTip label="provider">{providerHelp}</InfoTip>
-                  </>
-                }
-                value={provider}
-                onChange={(event) => setProvider(event.target.value)}
-                options={meta.providers.map((name) => ({ value: name, label: name }))}
-                hint={
-                  meta.providers.includes("local-mock")
-                    ? t(
-                        "local-mock is a demo model (deliberately breakable); configure a real provider for production",
-                        "local-mock 是演示模型（故意可被攻破）；生产请配置真实 provider",
-                      )
-                    : t("From the platform MODEL_ALLOWLIST_JSON", "来自平台 MODEL_ALLOWLIST_JSON")
-                }
-              />
+            <SelectField
+              label={t("Model integration", "模型接入")}
+              value={modelMode}
+              onChange={(event) =>
+                setModelMode(event.target.value as "allowlist" | "custom")
+              }
+              options={[
+                ...(meta.providers.length > 0
+                  ? [
+                      {
+                        value: "allowlist",
+                        label: t("Approved provider", "平台已审核 provider"),
+                      },
+                    ]
+                  : []),
+                ...(customEndpointEnabled
+                  ? [
+                      {
+                        value: "custom",
+                        label: t(
+                          "Custom OpenAI-compatible endpoint",
+                          "自定义 OpenAI 兼容端点",
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+              hint={
+                customEndpointEnabled
+                  ? t(
+                      "Use an endpoint reachable from the platform. HTTPS is required; HTTP is allowed only for localhost.",
+                      "使用平台可访问的端点。必须是 HTTPS；只有 localhost 允许 HTTP。",
+                    )
+                  : t(
+                      "This deployment is allowlist-only. Set PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS=true to add your own URL/model.",
+                      "本次部署只允许平台白名单。设置 PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS=true 才能填写自己的 URL/Model。",
+                    )
+              }
+            />
+            {modelMode === "allowlist" ? (
+              meta.providers.length > 0 ? (
+                <SelectField
+                  label={
+                    <>
+                      Provider
+                      <InfoTip label="provider">{providerHelp}</InfoTip>
+                    </>
+                  }
+                  value={provider}
+                  onChange={(event) => setProvider(event.target.value)}
+                  options={meta.providers.map((name) => ({ value: name, label: name }))}
+                  hint={
+                    meta.providers.includes("local-mock")
+                      ? t(
+                          "local-mock is a demo model (deliberately breakable); configure a real provider for production",
+                          "local-mock 是演示模型（故意可被攻破）；生产请配置真实 provider",
+                        )
+                      : t("From the platform MODEL_ALLOWLIST_JSON", "来自平台 MODEL_ALLOWLIST_JSON")
+                  }
+                />
+              ) : (
+                <Alert tone="warning">
+                  {t(
+                    "This deployment returned no approved provider. Switch to a custom endpoint or ask the operator to configure MODEL_ALLOWLIST_JSON.",
+                    "本次部署没有返回可用的 provider。请切换到自定义端点，或让运营方配置 MODEL_ALLOWLIST_JSON。",
+                  )}
+                </Alert>
+              )
             ) : (
-              <TextField
-                label={
-                  <>
-                    Provider
-                    <InfoTip label="provider">{providerHelp}</InfoTip>
-                  </>
-                }
-                value={provider}
-                onChange={(event) => setProvider(event.target.value)}
-                hint={t(
-                  "The platform returned no allowlist; enter the provider name you actually configured",
-                  "平台未返回 allowlist；填写实际配置的 provider 名称",
-                )}
-                placeholder="glm / openai / ..."
-              />
+              <>
+                <TextField
+                  label={t("Provider label", "Provider 名称")}
+                  value={provider}
+                  onChange={(event) => setProvider(event.target.value)}
+                  placeholder="deepseek / qwen / openai"
+                  hint={t(
+                    "Only a label for your records; the endpoint and model below identify the model.",
+                    "仅用于记录；真正决定模型的是下面的 Base URL 与 Model。",
+                  )}
+                />
+                <TextField
+                  label={t("API Base URL", "API Base URL")}
+                  value={baseUrl}
+                  onChange={(event) => setBaseUrl(event.target.value)}
+                  placeholder="https://api.deepseek.com/v1"
+                  hint={t(
+                    "OpenAI-compatible base URL, usually ending in /v1. The model must support tool/function calling.",
+                    "OpenAI 兼容的 Base URL，通常以 /v1 结尾。模型必须支持 tool/function calling。",
+                  )}
+                />
+                <TextField
+                  label={t("Model name", "Model 名称")}
+                  value={modelName}
+                  onChange={(event) => setModelName(event.target.value)}
+                  placeholder="deepseek-chat / qwen-plus / gpt-4.1-mini"
+                  hint={t(
+                    "The exact model id sent to /chat/completions.",
+                    "发送到 /chat/completions 的准确模型 ID。",
+                  )}
+                />
+              </>
             )}
             <TextField
               label={

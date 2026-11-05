@@ -103,6 +103,7 @@ export interface PlatformMeta {
     mining: boolean;
     dataMarket: boolean;
     defenderRegistration: boolean;
+    customModelEndpoints?: boolean;
     byoa?: boolean;
   };
   byoa?: {
@@ -460,6 +461,8 @@ export const api = {
   registerDefender(payload: {
     defender: string;
     provider: string;
+    base_url?: string | null;
+    model?: string | null;
     api_key: string;
     defense_prompt: string;
     mandate: string;
@@ -562,6 +565,28 @@ export const api = {
       `/contests/${contestId}/messages`,
       { method: "POST", body: JSON.stringify(payload) },
       { timeoutMs: 180_000 },
+    );
+  },
+
+  agentChat(payload: {
+    base_url: string;
+    model: string;
+    api_key: string;
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    max_tokens?: number;
+  }) {
+    return request<{ content: string }>(
+      "/agent/chat",
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 90_000 },
+    );
+  },
+
+  agentA2a(payload: { endpoint: string; text: string }) {
+    return request<{ content: string }>(
+      "/agent/a2a",
+      { method: "POST", body: JSON.stringify(payload) },
+      { timeoutMs: 90_000 },
     );
   },
 

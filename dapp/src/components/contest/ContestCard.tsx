@@ -26,7 +26,9 @@ export function ContestCard({
   const fee = attackFeeWei(contest, meta);
   const stake = requiredStakeWei(contest);
   const progress = contestProgress(contest, now);
-  const target = href ?? (contest.is_mining ? `/mine/${contest.id}` : `/arena/${contest.id}`);
+  const target =
+    href ??
+    (contest.is_mining ? `/mine/${contest.id}` : `/attack?contest=${contest.id}`);
 
   return (
     <article className={`contest-card ${contest.is_mining ? "contest-card--mining" : ""}`.trim()}>
@@ -105,7 +107,7 @@ export function ContestCard({
       )}
 
       <Link to={target} className="contest-card__cta">
-        {t("Enter contest", "进入战场")}
+        {contest.is_mining ? t("Enter contest", "进入战场") : t("Open attack console", "打开进攻控制台")}
         <ArrowUpRight size={14} />
       </Link>
     </article>
