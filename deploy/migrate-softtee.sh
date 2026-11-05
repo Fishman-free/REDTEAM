@@ -84,17 +84,22 @@ while [ "$SECONDS" -lt "$deadline" ]; do
 done
 # /api/meta is the public BFF route; it injects the platform API token and
 # may need a few seconds after the web container restarts.
+META_FILE="$(pwd)/.rtm-meta-softtee.json"
+trap 'rm -f "$META_FILE"' EXIT
 deadline=$((SECONDS + 90))
 while [ "$SECONDS" -lt "$deadline" ]; do
-  if curl -fsS "http://127.0.0.1:${WEB_PORT}/api/meta" > /tmp/rtm-meta-softtee.json 2>/dev/null; then
+  if curl -fsS "http://127.0.0.1:${WEB_PORT}/api/meta" > "$META_FILE" 2>/dev/null; then
     break
   fi
   sleep 2
 done
-[ -s /tmp/rtm-meta-softtee.json ] || die "could not read /api/meta from the web BFF"
-python3 - <<'PY' || die "metadata verification failed"
+[ -s "$META_FILE" ] || die "could not read /api/meta from the web BFF"
+PYTHON_BIN=python3
+command -v python3 >/dev/null 2>&1 || PYTHON_BIN=python
+META_FILE="$META_FILE" "$PYTHON_BIN" - <<'PY' || die "metadata verification failed"
 import json
-meta = json.load(open("/tmp/rtm-meta-softtee.json", encoding="utf-8"))
+import os
+meta = json.load(open(os.environ["META_FILE"], encoding="utf-8"))
 addr = meta.get("addresses", {})
 tiers = meta.get("byoa", {}).get("attestationTiers", [])
 print("arena", addr.get("arena"))

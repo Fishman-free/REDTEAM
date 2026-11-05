@@ -25,6 +25,7 @@ build/
 .serena/
 .ppt-work/
 platform/.pytest_run/
+/.rtm-meta-softtee.json
 /附件9-*.pptx
 
 # Machine-local agent-tool state (scanner ledgers, plugin caches) -- never commit
