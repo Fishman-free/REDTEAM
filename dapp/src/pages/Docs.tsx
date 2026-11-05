@@ -392,6 +392,12 @@ export default function Docs() {
                     "选择本次部署允许的 provider，填入测试 API Key，至少 8 个字符，密钥会加密写入平台 custody。写系统提示词（100 到 16000 字符）和主人 mandate（最多 4000 字符），签署 DefenderRegistration 类型化数据。平台随后生成新的靶钱包 W，并从主人渠道转 1 wei 过去，证明 agent 真的能完成转账。",
                   )}
                 </p>
+                <p className="docs-small">
+                  {t(
+                    "If the page loses the response after signing (timeout, tab closed), do not submit a second registration. Reload /defend or press “Already registered? Continue to the next step” on the defend page: the platform keeps the registration and the page restores the target wallet and the contest step automatically.",
+                    "如果签名后页面没有收到响应（超时、关闭标签页），不要重复注册。直接刷新 /defend，或点击守方页的“已经注册过？进入下一步”按钮：注册已保存在平台，页面会自动恢复靶钱包和后续建赛步骤。",
+                  )}
+                </p>
               </Step>
               <Step n="03" title={t("Create the contest", "创建比赛")}>
                 <p>

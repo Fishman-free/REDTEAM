@@ -1,3 +1,5 @@
+import type { DefenderStatus } from "./defenderSync";
+
 const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
 
 export class ApiClientError extends Error {
@@ -469,6 +471,14 @@ export const api = {
       "/defenders/register",
       { method: "POST", body: JSON.stringify(payload) },
       { timeoutMs: 180_000 },
+    );
+  },
+
+  defenderStatus(defender: string) {
+    return request<DefenderStatus>(
+      `/defenders/${encodeURIComponent(defender)}`,
+      {},
+      { timeoutMs: 15_000 },
     );
   },
 

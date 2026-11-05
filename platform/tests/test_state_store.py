@@ -241,6 +241,7 @@ def test_service_hydrates_defender_and_restores_session(tmp_path):
 
     service = PlatformService(_deps(tmp_path, store))
     assert DEFENDER in service._defenders
+    assert service._defenders[DEFENDER].registered_at == 1
 
     session = service._ensure_session(CONTEST)
     assert isinstance(session, FakeSession)
