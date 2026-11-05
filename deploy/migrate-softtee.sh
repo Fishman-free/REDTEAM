@@ -82,8 +82,16 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   fi
   sleep 2
 done
-# /api/meta is the public BFF route; it injects the platform API token.
-curl -fsS "http://127.0.0.1:${WEB_PORT}/api/meta" > /tmp/rtm-meta-softtee.json
+# /api/meta is the public BFF route; it injects the platform API token and
+# may need a few seconds after the web container restarts.
+deadline=$((SECONDS + 90))
+while [ "$SECONDS" -lt "$deadline" ]; do
+  if curl -fsS "http://127.0.0.1:${WEB_PORT}/api/meta" > /tmp/rtm-meta-softtee.json 2>/dev/null; then
+    break
+  fi
+  sleep 2
+done
+[ -s /tmp/rtm-meta-softtee.json ] || die "could not read /api/meta from the web BFF"
 python3 - <<'PY' || die "metadata verification failed"
 import json
 meta = json.load(open("/tmp/rtm-meta-softtee.json", encoding="utf-8"))
