@@ -1,6 +1,7 @@
 """FastAPI route tests with FakeChain/FakeRunner; no network or real keys."""
 
 import json
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -480,6 +481,67 @@ def test_register_qualification_and_contest(api_bundle):
         json={"stake": "50", "duration_h": 24, "stake_bps": 1000},
     )
     assert second.status_code == 409
+
+    status = client.get(f"/defenders/{DEFENDER}", headers=auth())
+    assert status.status_code == 200
+    assert status.json()["contests"] == [CONTEST]
+
+
+def test_defender_status_recovers_a_lost_registration_response(api_bundle):
+    client = api_bundle.client
+    assert client.get(f"/defenders/{DEFENDER}").status_code == 401
+    missing = client.get(f"/defenders/{DEFENDER}", headers=auth())
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == "defender is not registered"
+
+    assert register(client).status_code == 201
+
+    status = client.get(f"/defenders/{DEFENDER}", headers=auth())
+    assert status.status_code == 200
+    body = status.json()
+    assert body["registered"] is True
+    assert body["defender"] == DEFENDER
+    assert body["wallet"] == WALLET
+    assert body["version"].startswith("defender-")
+    assert len(body["digest"]) == 64
+    assert body["contests"] == []
+    assert body["registered_at"] == 1000
+    # Only on-chain-visible metadata leaves the service.
+    assert "sk-test-123456" not in status.text
+    assert WALLET_KEY not in status.text
+
+    duplicate = register(client)
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "defender is already registered"
+
+
+def test_register_rejects_a_second_in_flight_request(api_bundle):
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_model_factory(provider, api_key):
+        started.set()
+        assert release.wait(5)
+        return SimpleNamespace(provider=provider)
+
+    api_bundle.service.deps.model_factory = blocking_model_factory
+    first: dict[str, object] = {}
+
+    def run_first():
+        first["response"] = register(api_bundle.client)
+
+    worker = threading.Thread(target=run_first)
+    worker.start()
+    try:
+        assert started.wait(5)
+        second = register(api_bundle.client)
+        assert second.status_code == 409
+        assert second.json()["detail"] == "defender registration is already in progress"
+    finally:
+        release.set()
+        worker.join(5)
+    assert not worker.is_alive()
+    assert first["response"].status_code == 201
 
 
 def test_register_rejects_forged_or_expired_signatures(api_bundle):

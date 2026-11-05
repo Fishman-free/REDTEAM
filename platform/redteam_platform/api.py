@@ -313,6 +313,7 @@ class DefenderRecord:
     api_key_entry: str
     version: AgentVersion
     contests: list[str] = field(default_factory=list)
+    registered_at: int | None = None
 
 
 @dataclass
@@ -355,6 +356,7 @@ class PlatformService:
         self.faucet_drip = int(deps.faucet_drip)
         self.data_service = deps.data_service
         self._defenders: dict[str, DefenderRecord] = {}
+        self._registering: set[str] = set()
         self._sessions: dict[str, Any] = {}
         self._contest_defenders: dict[str, str] = {}
         self._seen_txs: set[str] = set()
@@ -394,6 +396,11 @@ class PlatformService:
                     api_key_entry=item["api_key_entry"],
                     version=version,
                     contests=list(item["contests"]),
+                    registered_at=(
+                        int(item["registered_at"])
+                        if item.get("registered_at") is not None
+                        else None
+                    ),
                 )
             except Exception as exc:
                 # Fail closed: a defender whose pinned version no longer loads
@@ -423,7 +430,11 @@ class PlatformService:
                     "version_name": record.version.name,
                     "version_digest": record.version.digest,
                     "contests": list(record.contests),
-                    "registered_at": self.deps.clock(),
+                    "registered_at": (
+                        record.registered_at
+                        if record.registered_at is not None
+                        else self.deps.clock()
+                    ),
                 }
             )
         except Exception as exc:
@@ -596,6 +607,21 @@ class PlatformService:
         with self._lock:
             if defender in self._defenders:
                 raise ApiError(409, "defender is already registered")
+            # Reject overlap instead of funding a second target wallet: both
+            # attempts would write wallet:<defender>, so the loser's private key
+            # would be overwritten after its qualification wallet was funded.
+            if defender in self._registering:
+                raise ApiError(409, "defender registration is already in progress")
+            self._registering.add(defender)
+        try:
+            return self._register_defender(payload, defender, provider)
+        finally:
+            with self._lock:
+                self._registering.discard(defender)
+
+    def _register_defender(
+        self, payload: RegisterDefender, defender: str, provider: str
+    ) -> dict[str, Any]:
         if payload.deadline < int(self.deps.clock()):
             raise ApiError(422, "defender registration signature has expired")
         commitment = config_hash(provider, payload.defense_prompt, payload.mandate)
@@ -676,6 +702,7 @@ class PlatformService:
             wallet_entry=wallet_entry,
             api_key_entry=byok_entry,
             version=version,
+            registered_at=int(self.deps.clock()),
         )
         with self._lock:
             self._defenders[defender] = record
@@ -687,6 +714,29 @@ class PlatformService:
             "version": version.name,
             "digest": version.digest,
         }
+
+    def defender_status(self, defender: str) -> dict[str, Any]:
+        """Public registration record, used to recover a lost POST response.
+
+        The BYOK key and the target wallet's private key stay in custody; only
+        values that are already visible on-chain (or in the contest list) leave
+        the service.
+        """
+
+        address = _address(defender, "defender")
+        with self._lock:
+            record = self._defenders.get(address)
+            if record is None:
+                raise ApiError(404, "defender is not registered")
+            return {
+                "registered": True,
+                "defender": record.defender,
+                "wallet": record.wallet,
+                "version": record.version.name,
+                "digest": record.version.digest,
+                "contests": list(record.contests),
+                "registered_at": record.registered_at,
+            }
 
     # -- normal contests ------------------------------------------------
 
@@ -1397,6 +1447,10 @@ def create_app(
     @app.post("/defenders/register", status_code=201, dependencies=[Depends(require_auth)])
     def register(payload: RegisterDefender) -> dict[str, Any]:
         return service.register_defender(payload)
+
+    @app.get("/defenders/{defender}", dependencies=[Depends(require_auth)])
+    def defender_status(defender: str) -> dict[str, Any]:
+        return service.defender_status(defender)
 
     @app.post("/contests", status_code=201, dependencies=[Depends(require_auth)])
     def create_contest(

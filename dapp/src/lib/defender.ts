@@ -1,12 +1,7 @@
 import { readStorage, writeStorage } from "./hooks";
+import type { DefenderRegistration } from "./defenderSync";
 
-export interface DefenderRegistration {
-  wallet: string;
-  version?: string;
-  digest?: string;
-  contestId?: string;
-  registeredAt: number;
-}
+export type { DefenderRegistration } from "./defenderSync";
 
 export function defenderStorageKey(address?: string | null): string {
   return `rtm.defender.registration.v1:${(address ?? "guest").toLowerCase()}`;
