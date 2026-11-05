@@ -124,6 +124,25 @@ docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml logs -f
 docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml up -d --build web
 ```
 
+### SoftTEE 合约迁移（不重置链）
+
+2026-11-05 的 BYOA 合约改动需要一次重新部署。运行：
+
+```bash
+bash deploy/migrate-softtee.sh
+```
+
+脚本会：
+
+1. 生成/追加 `PLATFORM_SOFTTEE_HOST_SECRET`（不打印）；
+2. 备份当前 registry 为 `addresses.pre-softtee.json`；
+3. 在**同一条** Besu 链上部署新的 Treasury / Arena / RTM / Faucet / DataMarket / TaskSink；
+4. 切换 registry，重建 api / web / mock-model；
+5. 校验 `/api/meta` 含 `taskSink` 和 `softtee` 档位。
+
+旧比赛仍留在旧合约上，不会被迁移；链本身、旧区块和 vault 都保留。迁移前请备份
+`rtm-arena_rtm-platform-data` 卷。不要用 `down -v` 代替这个脚本。
+
 ### 重置
 
 **会删除链、合约地址、vault、索引与下载数据。**确认后再执行：
