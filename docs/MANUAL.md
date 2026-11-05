@@ -435,6 +435,9 @@ docker compose --env-file deploy/.env.stack -f deploy/docker-compose.yml up -d -
 docker compose ... up -d --force-recreate api mock-model
 ```
 
+> **SoftTEE 比赛期间不要升级 API 镜像或运行时文件。** 运行文件变化会改变
+> `runtimeMeasurement`，下一回合会被判违约。先让比赛结束/退役，再升级。
+
 ---
 
 ## 10. 测试与验收

@@ -99,6 +99,8 @@ file = AES-256-GCM(key, nonce, json({walletKey, teeKey, x25519Key}))
 - 同一 measurement 重启 → 同一 W/签名者/X25519，比赛可恢复。
 - 比赛进行中，每个回合都会重算运行文件测量与配置承诺；变化时该条退费并计违约
   （3 次判弃权）。运行中的 Python 已加载代码不会被热替换，但文件/配置变化会被发现。
+- **不要在 SoftTEE 比赛进行中升级 API 镜像/运行文件**：这会改变 measurement，
+  下一回合直接触发违约；先退役或等比赛结束。
 
 ### 3.3 Attestation
 

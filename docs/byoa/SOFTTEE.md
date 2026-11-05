@@ -131,7 +131,7 @@ SoftTEE 把守方的 W 私钥、回复签名键、X25519 解密键和解密后�
 
 - [ ] `PLATFORM_SOFTTEE_HOST_SECRET` 只存在 `deploy/.env.stack`，未打印/提交；
 - [ ] `/data/softtee` 在备份卷内；
-- [ ] 改运行文件后旧密钥库打不开，比赛需重开；
+- [ ] 改运行文件后旧密钥库打不开，比赛需重开；比赛期间不要升级 API/运行时；
 - [ ] 轮换 host secret 前先退役/重开所有 SoftTEE 比赛；
 - [ ] 每条回复有 v2 签名与 `configHash`；
 - [ ] 3 次超时会退费并判弃权；
