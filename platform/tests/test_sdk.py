@@ -30,7 +30,14 @@ from redteam_platform.byoa.sdk.servers import (
     create_pull_app,
     create_webhook_app,
 )
-from redteam_platform.byoa.sealed import compute_measurement
+from redteam_platform.byoa.envelope import (
+    derive_identity_key,
+    open_envelope,
+    public_key,
+    reply_context,
+)
+from redteam_platform.byoa.sealed import compute_measurement, verify_reply_signature_v2
+from redteam_platform.byoa.sdk.self_hosted import sign_reply
 from redteam_platform.byoa.wallet import WalletRegistry, WalletSession
 from redteam_platform.byoa.wallet_mcp import create_wallet_mcp_app
 
@@ -331,6 +338,47 @@ def test_pull_reference_client_answers_driver():
     finally:
         _stop(pull_server, pull_thread)
         _stop(wallet_server, wallet_thread)
+
+
+def test_self_hosted_reply_is_sealed_and_signed():
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    attacker = Account.create()
+    identity_sig = Account.sign_message(
+        encode_defunct(text="RTM BYOA identity v1"), private_key=attacker.key
+    ).signature.to_0x_hex()
+    private = derive_identity_key(identity_sig)
+    pub = public_key(private)
+    config_hash = "0x" + "12" * 32
+    msg_hash = "0x" + "34" * 32
+    reply_key = Account.create()
+    signed = sign_reply(
+        text="verified and paid",
+        contest_id=CONTEST,
+        attacker=attacker.address,
+        msg_hash=msg_hash,
+        seq=2,
+        attacker_pubkey="0x" + pub.hex(),
+        config_hash=config_hash,
+        reply_signer_key=reply_key.key.to_0x_hex(),
+    )
+    assert verify_reply_signature_v2(
+        signed["reply_signature"],
+        reply_signer=reply_key.address,
+        contest_id=CONTEST,
+        attacker=attacker.address,
+        msg_hash=msg_hash,
+        reply_hash=signed["reply_hash"],
+        seq=2,
+        config_hash=config_hash,
+    )
+    plaintext = open_envelope(
+        private,
+        signed["reply_envelope"],
+        context=reply_context(CONTEST, attacker.address, msg_hash, 2),
+    )
+    assert plaintext == b"verified and paid"
 
 
 def test_conformance_report_and_measurement_stability():

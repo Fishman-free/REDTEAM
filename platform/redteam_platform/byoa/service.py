@@ -905,11 +905,18 @@ class ByoaService:
             )
         except (EnvelopeError, AttestationError):
             raise ByoaServiceError(422, "attack ciphertext cannot be decrypted") from None
+        turn_metadata = dict(metadata or {})
+        turn_metadata["reply_context"] = {
+            "attacker": _address(attacker, "attacker"),
+            "attacker_pubkey": pubkey,
+            "msg_hash": msg_hash,
+            "config_hash": record.config_commitment,
+        }
         try:
             result = record.session.counterparty_turn(
                 plaintext,
                 kind=kind,
-                metadata=dict(metadata or {}),
+                metadata=turn_metadata,
                 attacker_consent=consent,
             )
         except DefenderUnavailable:
@@ -958,19 +965,34 @@ class ByoaService:
             config_hash_value = record.config_commitment
             reply_signature = ""
 
-        try:
-            reply_envelope = runtime.seal_reply(
-                pubkey,
-                result.reply.text,
-                contest_id=contest_id,
-                attacker=attacker,
-                msg_hash=msg_hash,
-                seq=result.seq,
-            )
-        except EnvelopeError:
-            raise ByoaServiceError(500, "reply encryption failed") from None
-        reply_hash = envelope_hash(reply_envelope)
-        if not is_self_hosted:
+        if is_self_hosted:
+            supplied = reply_meta.get("reply_envelope")
+            if not isinstance(supplied, Mapping):
+                self._handle_timeout(record, attacker, msg_hash)
+                raise ByoaServiceError(
+                    504, "self-hosted reply is missing its sealed envelope"
+                ) from None
+            reply_envelope = dict(supplied)
+            reply_hash = envelope_hash(reply_envelope)
+            claimed_hash = str(reply_meta.get("reply_hash") or "").lower()
+            if claimed_hash and claimed_hash != reply_hash.lower():
+                self._handle_timeout(record, attacker, msg_hash)
+                raise ByoaServiceError(
+                    502, "self-hosted reply hash does not match the envelope"
+                ) from None
+        else:
+            try:
+                reply_envelope = runtime.seal_reply(
+                    pubkey,
+                    result.reply.text,
+                    contest_id=contest_id,
+                    attacker=attacker,
+                    msg_hash=msg_hash,
+                    seq=result.seq,
+                )
+            except EnvelopeError:
+                raise ByoaServiceError(500, "reply encryption failed") from None
+            reply_hash = envelope_hash(reply_envelope)
             reply_signature = runtime.sign_reply(
                 contest_id=contest_id,
                 attacker=attacker,
