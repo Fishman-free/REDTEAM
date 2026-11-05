@@ -10,11 +10,14 @@ interface IRTMArena {
     function isRegisteredAttacker(bytes32 contestId, address who) external view returns (bool);
 }
 
-/// @notice BYOA 委托任务存根：靶钱包向 TaskSink 的精确金额转账在此消费任务。
+/// @notice BYOA 委托任务存根：靶钱包向已锁定收款地址或 TaskSink 的精确金额转账在此消费任务。
 interface ITaskSink {
-    function consume(bytes32 contestId, address from, uint256 value)
-        external
-        returns (bool);
+    function consume(
+        bytes32 contestId,
+        address from,
+        address to,
+        uint256 value
+    ) external returns (bool);
 }
 
 /// @title RTMToken —— 靶钱包转账策略 + Arena 独占铸币
@@ -152,14 +155,14 @@ contract RTMToken is ERC20, Ownable {
             if (value == 0) revert TargetTransferRestricted(from, to);
             // Arena 地址永远不是合法收款方：即使被误登记为该场攻方也拒绝。
             if (to == minter) revert TargetTransferRestricted(from, to);
-            // BYOA 委托任务：只有金额与开放任务精确匹配时才允许进入 TaskSink。
+            // BYOA 委托任务：收款地址必须是已锁定 payee（或旧式 TaskSink 直付），
+            // 且金额精确匹配。命中时资金记入 TaskSink，不进入收款地址。
             address sink = taskSink;
-            if (sink != address(0) && to == sink) {
-                if (!ITaskSink(sink).consume(contestId, from, value)) {
-                    revert TargetTransferRestricted(from, to);
+            if (sink != address(0)) {
+                if (ITaskSink(sink).consume(contestId, from, to, value)) {
+                    super._update(from, sink, value);
+                    return;
                 }
-                super._update(from, to, value);
-                return;
             }
             if (arena.isRegisteredAttacker(contestId, to)) {
                 delete targetContest[from];

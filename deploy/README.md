@@ -50,8 +50,11 @@ browser ──> web:3000 (SPA + /api + /rpc BFF)
 ```
 
 - 浏览器永远拿不到 `PLATFORM_API_TOKEN`；BFF 在服务端注入。
-- BYOA 模板在 `deploy/byoa/`（compose、出网允许列表、示例 bundle、runbook）；模拟器档位
-  不代表硬件 TEE 保密。
+- BYOA 模板在 `deploy/byoa/`（compose、出网允许列表、示例 bundle、runbook）。
+  SoftTEE 档使用可测量运行时与测量绑定密钥库（`/data/softtee`），它是软件隔离，
+  **不是硬件 TEE**；宿主 root 理论上能读取进程内存。`deploy/byoa/tee-pilot/` 是废弃的硬件试点。
+- `PLATFORM_SOFTTEE_HOST_SECRET` 由 `deploy/up.sh` 生成到 `deploy/.env.stack`，不打印；
+  轮换它会使旧 SoftTEE 密钥库无法解密。
 - `/api/mining/contests` 与 `/api/data/:id/publish` 需要 `X-Admin-Key`。
   运营台的 RSI 修复闭环（`/api/rsi/export`、`/api/rsi/candidates`、
   `/verify`、`/promote`）同样需要该密钥。

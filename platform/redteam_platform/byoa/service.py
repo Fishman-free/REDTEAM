@@ -9,11 +9,13 @@ real hardware this object is replaced by the CVM driver.
 from __future__ import annotations
 
 import hmac
+import json
 import secrets
 import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from web3 import Web3
@@ -25,6 +27,7 @@ from .envelope import (
     ciphertext_hash,
     envelope_hash,
 )
+from .model_agent import ModelAgentPort
 from .models import ContentKind
 from .policy import PolicyError, WalletPolicy, validate_byoa_floor
 from .ports import DefenderUnavailable
@@ -33,11 +36,16 @@ from .sealed import (
     Attestation,
     AttestationError,
     BundleManifest,
-    HARDWARE,
+    SELF_HOSTED,
     SIMULATED,
+    SOFTTEE,
     SimulatedSealedRuntime,
+    SoftteeSealedRuntime,
     compute_measurement,
+    config_commitment,
+    softtee_measurement,
     verify_attestation,
+    verify_reply_signature_v2,
 )
 from .wallet import WalletRegistry, WalletSession
 from ..indexer import normalize_contest_id
@@ -70,6 +78,11 @@ class BundleRequest:
     nonce: int = 0
     deadline: int = 0
     signature: str = ""
+    config_bundle: Mapping[str, Any] | None = None
+    config_commitment_hex: str | None = None
+    reply_signer: str | None = None
+    open_ratio: float = 0.30
+    difficulty: str = "standard"
 
 
 @dataclass(frozen=True)
@@ -110,6 +123,9 @@ class _ContestRecord:
     sealed: bool = False
     task_seed: bytes | None = None
     pull_token: str | None = None
+    reply_signer: str = ""
+    config_commitment: str = ""
+    timeouts: int = 0
 
 
 @dataclass
@@ -127,6 +143,12 @@ class _BundleRecord:
     defender_data_consent: bool
     created_at: int
     contest_id: str | None = None
+    config_bundle: Mapping[str, Any] | None = None
+    config_hash: str = ""
+    reply_signer: str = ""
+    open_ratio: float = 0.30
+    difficulty: str = "standard"
+    config_mismatch_evidence: dict[str, Any] | None = None
 
 
 class ByoaService:
@@ -141,6 +163,9 @@ class ByoaService:
         registry: WalletRegistry | None = None,
         hardware_verifier: Callable[[Attestation], bool] | None = None,
         indexer: Any | None = None,
+        softtee_host_secret: str | None = None,
+        softtee_state_dir: str | Path | None = None,
+        transcript_root: str | Path | None = None,
     ) -> None:
         if gateway is None or custody is None:
             raise ValueError("gateway and custody are required")
@@ -154,6 +179,12 @@ class ByoaService:
         self.wallet_registry = registry or WalletRegistry()
         self.hardware_verifier = hardware_verifier
         self.indexer = indexer
+        self.softtee_host_secret = softtee_host_secret
+        self.softtee_state_dir = Path(softtee_state_dir or ".softtee")
+        self.transcript_root = (
+            Path(transcript_root) if transcript_root is not None else None
+        )
+        self._softtee_runtimes: dict[str, SoftteeSealedRuntime] = {}
         self._bundles: dict[str, _BundleRecord] = {}
         self._contests: dict[str, _ContestRecord] = {}
         # A paid BYOA turn can be replayed with the same tx hash.  The on-chain
@@ -168,11 +199,16 @@ class ByoaService:
         defender = _address(request.defender, "defender")
         if request.transport_kind not in TRANSPORT_KINDS:
             raise ByoaServiceError(422, "unsupported transport kind")
-        if request.attestation_tier != SIMULATED:
+        if request.attestation_tier not in (SIMULATED, SOFTTEE, SELF_HOSTED):
             raise ByoaServiceError(
-                422,
-                "hardware attestation is not configured; use the simulated tier",
+                422, "attestation_tier must be simulated, softtee or self-hosted"
             )
+        if request.difficulty not in {"easy", "standard"}:
+            raise ByoaServiceError(422, "difficulty must be easy or standard")
+        if request.attestation_tier == SOFTTEE and not (
+            0.30 <= float(request.open_ratio) <= 1.0
+        ):
+            raise ByoaServiceError(422, "SoftTEE open_ratio must be at least 30%")
         if request.deadline < self._now():
             raise ByoaServiceError(422, "ownership signature has expired")
         if not request.signature:
@@ -195,21 +231,99 @@ class ByoaService:
         except PolicyError as exc:
             raise ByoaServiceError(422, str(exc)) from None
 
-        measurement = compute_measurement(dict(request.compose_files))
-        runtime = self._runtime_factory()
-        attestation = runtime.attest(measurement=measurement, issued_at=self._now())
+        tier = request.attestation_tier
+        if tier == SOFTTEE:
+            if request.config_bundle is None:
+                raise ByoaServiceError(422, "SoftTEE requires a config bundle")
+            if not self.softtee_host_secret:
+                raise ByoaServiceError(503, "SoftTEE host secret is not configured")
+            for field in ("prompt", "base_url", "model", "api_key"):
+                value = request.config_bundle.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise ByoaServiceError(
+                        422, f"SoftTEE config bundle requires {field}"
+                    )
+            config_hash_value = config_commitment(dict(request.config_bundle))
+            if request.config_commitment_hex is not None:
+                supplied = _bytes32_hex(
+                    request.config_commitment_hex, "config_commitment_hex"
+                )
+                if supplied.lower() != config_hash_value.lower():
+                    raise ByoaServiceError(
+                        422, "config commitment does not match the bundle"
+                    )
+            measurement, file_count = softtee_measurement()
+            state_name = f"{defender.lower()}.json"
+            runtime = self._softtee_runtimes.get(state_name)
+            if runtime is None:
+                try:
+                    runtime = SoftteeSealedRuntime(
+                        host_secret=self.softtee_host_secret,
+                        state_path=self.softtee_state_dir / state_name,
+                        measurement=measurement,
+                    )
+                except (ValueError, AttestationError) as exc:
+                    raise ByoaServiceError(422, str(exc)) from None
+                self._softtee_runtimes[state_name] = runtime
+            attestation = runtime.attest(
+                measurement=measurement,
+                issued_at=self._now(),
+                config_commitment_hex=config_hash_value,
+                runtime={"driver": "1", "files": file_count},
+            )
+            try:
+                verified = verify_attestation(
+                    attestation,
+                    expected_measurement=measurement,
+                    expected_config_commitment=config_hash_value,
+                    hardware_verifier=self.hardware_verifier,
+                )
+            except AttestationError as exc:
+                raise ByoaServiceError(422, str(exc)) from None
+            if verified != SOFTTEE:
+                raise ByoaServiceError(422, "attestation tier mismatch")
+            reply_signer = runtime.tee_signer
+        elif tier == SELF_HOSTED:
+            if not request.reply_signer:
+                raise ByoaServiceError(422, "self-hosted requires reply_signer")
+            if request.config_commitment_hex is None:
+                raise ByoaServiceError(
+                    422, "self-hosted requires config_commitment_hex"
+                )
+            config_hash_value = _bytes32_hex(
+                request.config_commitment_hex, "config_commitment_hex"
+            )
+            measurement = compute_measurement(dict(request.compose_files))
+            runtime = self._runtime_factory()
+            reply_signer = _address(request.reply_signer, "reply_signer")
+            if reply_signer.lower() == runtime.tee_signer.lower():
+                raise ByoaServiceError(
+                    422, "self-hosted reply_signer must differ from tee_signer"
+                )
+            attestation = runtime.attest(
+                measurement=measurement, issued_at=self._now()
+            )
+        else:
+            config_hash_value = config_commitment(dict(request.compose_files))
+            measurement = compute_measurement(dict(request.compose_files))
+            runtime = self._runtime_factory()
+            attestation = runtime.attest(
+                measurement=measurement, issued_at=self._now()
+            )
+            try:
+                verified = verify_attestation(
+                    attestation,
+                    expected_measurement=measurement,
+                    hardware_verifier=self.hardware_verifier,
+                )
+            except AttestationError as exc:
+                raise ByoaServiceError(422, str(exc)) from None
+            if verified != SIMULATED:
+                raise ByoaServiceError(422, "attestation tier mismatch")
+            reply_signer = runtime.tee_signer
+
         if attestation.tee_pubkey != runtime.tee_pubkey:
             raise ByoaServiceError(422, "attestation key does not match the runtime")
-        try:
-            tier = verify_attestation(
-                attestation,
-                expected_measurement=measurement,
-                hardware_verifier=self.hardware_verifier,
-            )
-        except AttestationError as exc:
-            raise ByoaServiceError(422, str(exc)) from None
-        if tier != request.attestation_tier:
-            raise ByoaServiceError(422, "attestation tier mismatch")
         manifest = BundleManifest(
             defender=defender,
             image_digest=request.image_digest,
@@ -220,6 +334,7 @@ class ByoaService:
             attestation_tier=tier,
             runtime_measurement=measurement,
             tee_pubkey=runtime.tee_pubkey,
+            config_hash=config_hash_value,
         )
         bundle_id = manifest.commitment()
         record = _BundleRecord(
@@ -235,6 +350,15 @@ class ByoaService:
             max_task_amount=request.max_task_amount,
             defender_data_consent=request.defender_data_consent,
             created_at=self._now(),
+            config_bundle=(
+                dict(request.config_bundle)
+                if request.config_bundle is not None
+                else None
+            ),
+            config_hash=config_hash_value,
+            reply_signer=reply_signer,
+            open_ratio=float(request.open_ratio),
+            difficulty=request.difficulty,
         )
         if request.transport_secret is not None:
             try:
@@ -259,14 +383,48 @@ class ByoaService:
             "commitment": bundle_id,
             "attestation_tier": tier,
             "runtime_measurement": measurement,
+            "config_hash": config_hash_value,
             "tee_pubkey": runtime.tee_pubkey,
             "tee_signer": runtime.tee_signer,
+            "reply_signer": reply_signer,
             "wallet": runtime.wallet_address,
             "byoa_nonce": byoa_nonce,
             "defender_data_consent": request.defender_data_consent,
             "policy_fingerprint": request.policy.fingerprint(),
             "manifest": manifest.public_dict(),
             "egress": request.egress.as_public_dict(),
+            "open_ratio": record.open_ratio,
+            "difficulty": record.difficulty,
+            "tpm_rooted": bool(getattr(attestation, "tpm_rooted", False)),
+        }
+
+    def softtee_public_key(self, defender: str) -> dict[str, Any]:
+        """Return the stable SoftTEE public identity before a bundle exists."""
+
+        defender = _address(defender, "defender")
+        if not self.softtee_host_secret:
+            raise ByoaServiceError(503, "SoftTEE host secret is not configured")
+        measurement, file_count = softtee_measurement()
+        state_name = f"{defender.lower()}.json"
+        runtime = self._softtee_runtimes.get(state_name)
+        if runtime is None:
+            try:
+                runtime = SoftteeSealedRuntime(
+                    host_secret=self.softtee_host_secret,
+                    state_path=self.softtee_state_dir / state_name,
+                    measurement=measurement,
+                )
+            except (ValueError, AttestationError) as exc:
+                raise ByoaServiceError(422, str(exc)) from None
+            self._softtee_runtimes[state_name] = runtime
+        return {
+            "defender": defender,
+            "tee_pubkey": runtime.tee_pubkey,
+            "tee_signer": runtime.tee_signer,
+            "wallet": runtime.wallet_address,
+            "runtime_measurement": measurement,
+            "runtime_files": file_count,
+            "attestation_tier": SOFTTEE,
         }
 
     # -- contests -------------------------------------------------------
@@ -283,6 +441,15 @@ class ByoaService:
             raise ByoaServiceError(422, "duration must be positive")
         if request.stake <= 0:
             raise ByoaServiceError(422, "stake must be positive")
+        if bundle.manifest.attestation_tier == SELF_HOSTED:
+            if request.stake < 100 * 10**18:
+                raise ByoaServiceError(
+                    422, "self-hosted stake must be at least 100 tRTM"
+                )
+            if bundle.reply_signer.lower() == bundle.runtime.tee_signer.lower():
+                raise ByoaServiceError(
+                    422, "self-hosted reply signer must differ from tee signer"
+                )
         if not 0 <= request.miss_threshold <= 64:
             raise ByoaServiceError(422, "miss_threshold must be between 0 and 64")
         if not 0 <= request.penalty_bps <= 5000:
@@ -309,17 +476,25 @@ class ByoaService:
         )
         if deadline < self._now() or deadline > self._now() + 3600:
             raise ByoaServiceError(422, "mandate deadline must be within the next hour")
+        tier_value = {
+            SIMULATED: 0,
+            SOFTTEE: 1,
+            SELF_HOSTED: 2,
+        }.get(bundle.manifest.attestation_tier)
+        if tier_value is None:
+            raise ByoaServiceError(422, "unknown attestation tier")
         message = {
             "defender": bundle.defender,
             "wallet": bundle.runtime.wallet_address,
             "teeSigner": bundle.runtime.tee_signer,
+            "replySigner": bundle.reply_signer,
             "stake": request.stake,
             "duration": duration,
             "stakeBps": request.stake_bps,
-            "configCommitment": bundle.manifest.commitment(),
+            "configCommitment": bundle.config_hash,
             "runtimeMeasurement": bundle.manifest.runtime_measurement,
             "teePubKey": bundle.manifest.tee_pubkey,
-            "attestationTier": 1 if bundle.manifest.attestation_tier == HARDWARE else 0,
+            "attestationTier": tier_value,
             "defenderDataConsent": bundle.defender_data_consent,
             "utilityMissThreshold": request.miss_threshold,
             "utilityPenaltyBps": request.penalty_bps,
@@ -341,7 +516,7 @@ class ByoaService:
         binding = {
             "defender": bundle.defender,
             "wallet": bundle.runtime.wallet_address,
-            "configCommitment": bundle.manifest.commitment(),
+            "configCommitment": bundle.config_hash,
             "runtimeMeasurement": bundle.manifest.runtime_measurement,
             "teePubKey": bundle.manifest.tee_pubkey,
             "nonce": nonce,
@@ -385,27 +560,57 @@ class ByoaService:
         except Exception:
             raise ByoaServiceError(500, "wallet sidecar initialization failed") from None
         ledger = MemoryTaskLedger(contest_id=contest_id, task_sink=task_sink)
+        armed_tasks: set[str] = set()
+
+        def prepare_payment(to: str, amount: int) -> None:
+            task = ledger.open_task_for(amount, self._now(), to)
+            if task is None or task.payee is None or task.salt is None:
+                return
+            if task.task_id in armed_tasks:
+                return
+            self.gateway.arm_task(
+                contest_id, task.task_id, task.payee, task.salt
+            )
+            armed_tasks.add(task.task_id)
+
         wallet = WalletSession(
             wallet_address=bundle.runtime.wallet_address,
             executor=tools,
             policy=bundle.policy,
             contest_id=contest_id,
             now=self._now,
-            confirmer=lambda to, amount: (
-                Web3.to_checksum_address(to) == Web3.to_checksum_address(task_sink)
-                and ledger.matches_open(amount, self._now())
+            confirmer=lambda to, amount: ledger.matches_open(
+                amount, self._now(), to
             ),
+            prepare=prepare_payment,
+            vendor_directory=ledger.vendor_directory,
+            contact_vendor=ledger.contact_vendor,
         )
         token = self.wallet_registry.issue(wallet)
         try:
-            port = build_adapter(
-                bundle.transport_kind,
-                endpoint=bundle.transport_endpoint,
-                secret=self._load_secret(bundle),
-                wallet_mcp_url=self.wallet_mcp_url,
-                wallet_token=token.token,
-                timeout=30.0,
-            )
+            if (
+                bundle.manifest.attestation_tier == SOFTTEE
+                and bundle.config_bundle is not None
+            ):
+                config = bundle.config_bundle
+                port = ModelAgentPort(
+                    prompt=str(config.get("prompt", "")),
+                    base_url=str(config.get("base_url", "")),
+                    model=str(config.get("model", "")),
+                    api_key=str(config.get("api_key", "")),
+                    wallet_mcp_url=self.wallet_mcp_url,
+                    wallet_token=token.token,
+                    timeout=120.0,
+                )
+            else:
+                port = build_adapter(
+                    bundle.transport_kind,
+                    endpoint=bundle.transport_endpoint,
+                    secret=self._load_secret(bundle),
+                    wallet_mcp_url=self.wallet_mcp_url,
+                    wallet_token=token.token,
+                    timeout=120.0,
+                )
         except ValueError as exc:
             raise ByoaServiceError(422, str(exc)) from None
 
@@ -419,8 +624,12 @@ class ByoaService:
             defender_consent=bundle.defender_data_consent,
             miss_threshold=request.miss_threshold,
             now=self._now,
-            chain_issue=lambda amount, task_deadline, task_hash: self.gateway.issue_task(
-                contest_id, amount, task_deadline, task_hash
+            chain_issue=lambda amount, task_deadline, task_hash, payee_commit: self.gateway.issue_task(
+                contest_id,
+                amount,
+                task_deadline,
+                task_hash,
+                payee_commit,
             ),
         )
         pull_token = (
@@ -442,6 +651,9 @@ class ByoaService:
             defender_data_consent=bundle.defender_data_consent,
             created_at=self._now(),
             pull_token=pull_token,
+            reply_signer=bundle.reply_signer,
+            config_commitment=bundle.config_hash,
+            timeouts=0,
         )
         with self._lock:
             bundle.contest_id = contest_id
@@ -452,7 +664,7 @@ class ByoaService:
             "wallet": bundle.runtime.wallet_address,
             "defender": bundle.defender,
             "tee_signer": bundle.runtime.tee_signer,
-            "config_commitment": bundle.manifest.commitment(),
+            "config_commitment": bundle.config_hash,
             "runtime_measurement": bundle.manifest.runtime_measurement,
             "attestation_tier": bundle.manifest.attestation_tier,
             "end": end,
@@ -469,6 +681,13 @@ class ByoaService:
         text: str,
         amount: int,
         deadline: int,
+        kind: str = "closed",
+        payee: str | None = None,
+        salt: str | None = None,
+        vendor: str | None = None,
+        invoice: str | None = None,
+        directory_account: str | None = None,
+        account_changed: bool = False,
     ) -> dict[str, Any]:
         record = self._contest(contest_id)
         if amount > record.bundle.max_task_amount:
@@ -478,7 +697,18 @@ class ByoaService:
         if len(record.ledger.open_specs()) >= MAX_TASKS:
             raise ByoaServiceError(409, "too many open tasks")
         try:
-            spec = record.session.issue_task(text, amount=amount, deadline=deadline)
+            spec = record.session.issue_task(
+                text,
+                amount=amount,
+                deadline=deadline,
+                kind=kind,
+                payee=payee,
+                salt=salt,
+                vendor=vendor,
+                invoice=invoice,
+                directory_account=directory_account,
+                account_changed=account_changed,
+            )
         except DefenderUnavailable:
             raise ByoaServiceError(502, "defender transport is unavailable") from None
         return {
@@ -487,6 +717,8 @@ class ByoaService:
             "task_hash": spec.task_hash,
             "amount": str(spec.amount),
             "deadline": spec.deadline,
+            "kind": spec.kind,
+            "payee": spec.payee,
         }
 
     def generate_tasks(
@@ -522,6 +754,8 @@ class ByoaService:
                 now=self._now(),
                 min_amount=max(1, record.bundle.max_task_amount // 10),
                 max_amount=record.bundle.max_task_amount,
+                open_ratio=record.bundle.open_ratio,
+                difficulty=record.bundle.difficulty,
             )
             generated = generator.generate(count)
         except ValueError as exc:
@@ -532,6 +766,13 @@ class ByoaService:
                 text=item.text,
                 amount=item.amount,
                 deadline=item.deadline,
+                kind=item.kind,
+                payee=item.payee,
+                salt=item.salt,
+                vendor=item.vendor,
+                invoice=item.invoice,
+                directory_account=item.directory_account,
+                account_changed=item.account_changed,
             )
             for item in generated
         ]
@@ -672,7 +913,50 @@ class ByoaService:
                 attacker_consent=consent,
             )
         except DefenderUnavailable:
-            raise ByoaServiceError(502, "defender transport is unavailable") from None
+            self._handle_timeout(record, attacker, msg_hash)
+            raise ByoaServiceError(
+                504, "defender did not reply in time"
+            ) from None
+
+        reply_meta = dict(result.reply.metadata or {})
+        is_self_hosted = (
+            record.bundle.manifest.attestation_tier == SELF_HOSTED
+        )
+        if is_self_hosted:
+            config_hash_value = str(
+                reply_meta.get("config_hash")
+                or reply_meta.get("configHash")
+                or ""
+            ).lower()
+            reply_signature = str(
+                reply_meta.get("reply_signature")
+                or reply_meta.get("replySignature")
+                or ""
+            )
+            if not config_hash_value or not reply_signature:
+                self._handle_timeout(record, attacker, msg_hash)
+                raise ByoaServiceError(
+                    504, "self-hosted reply is missing its v2 signature"
+                ) from None
+            if config_hash_value != record.config_commitment.lower():
+                # The defender signed a different configuration than the one
+                # committed at contest creation.  Publish the evidence and
+                # treat the turn as a defender fault.
+                self._handle_timeout(record, attacker, msg_hash)
+                record.bundle.config_mismatch_evidence = {
+                    "contest_id": contest_id,
+                    "attacker": attacker,
+                    "msg_hash": msg_hash,
+                    "claimed_config_hash": config_hash_value,
+                    "committed_config_hash": record.config_commitment,
+                    "reply_signature": reply_signature,
+                }
+                raise ByoaServiceError(
+                    409, "self-hosted config hash does not match the commitment"
+                ) from None
+        else:
+            config_hash_value = record.config_commitment
+            reply_signature = ""
 
         try:
             reply_envelope = runtime.seal_reply(
@@ -686,13 +970,29 @@ class ByoaService:
         except EnvelopeError:
             raise ByoaServiceError(500, "reply encryption failed") from None
         reply_hash = envelope_hash(reply_envelope)
-        reply_signature = runtime.sign_reply(
+        if not is_self_hosted:
+            reply_signature = runtime.sign_reply(
+                contest_id=contest_id,
+                attacker=attacker,
+                msg_hash=msg_hash,
+                reply_hash=reply_hash,
+                seq=result.seq,
+                config_hash=config_hash_value,
+            )
+        if not verify_reply_signature_v2(
+            reply_signature,
+            reply_signer=record.reply_signer,
             contest_id=contest_id,
             attacker=attacker,
             msg_hash=msg_hash,
             reply_hash=reply_hash,
             seq=result.seq,
-        )
+            config_hash=config_hash_value,
+        ):
+            self._handle_timeout(record, attacker, msg_hash)
+            raise ByoaServiceError(
+                502, "defender reply signature is invalid"
+            ) from None
         try:
             self.gateway.mark_delivered_reply(
                 contest_id, attacker, msg_hash, reply_hash
@@ -704,6 +1004,25 @@ class ByoaService:
         with self._lock:
             self._delivered_turns.add(turn_key)
         record.sealed = True
+        if consent and self.transcript_root is not None:
+            self._write_transcript(
+                contest_id,
+                attacker,
+                {
+                    "kind": "turn",
+                    "purpose": "defender_dataset",
+                    "consent": True,
+                    "rsi_only": False,
+                    "attacker": _address(attacker, "attacker"),
+                    "seq": result.seq,
+                    "at": self._now(),
+                    "channel": "counterparty",
+                    "contentKind": kind.value,
+                    "content": plaintext,
+                    "reply": result.reply.text,
+                    "toolCalls": [dict(item) for item in result.reply.tool_calls],
+                },
+            )
         return {
             "contest_id": contest_id,
             "seq": result.seq,
@@ -711,6 +1030,8 @@ class ByoaService:
             "reply_envelope": reply_envelope,
             "reply_hash": reply_hash,
             "reply_signature": reply_signature,
+            "config_hash": config_hash_value,
+            "reply_signer": record.reply_signer,
             "tee_signer": record.bundle.runtime.tee_signer,
             "completed_tasks": [task.task_id for task in result.completed_tasks],
             "transfers": [
@@ -770,9 +1091,28 @@ class ByoaService:
             "wallet": record.wallet.wallet_address,
             "tee_signer": record.bundle.runtime.tee_signer,
             "tee_pubkey": record.manifest.tee_pubkey,
-            "config_commitment": record.manifest.commitment(),
+            "config_commitment": record.config_commitment,
+            "config_hash": record.config_commitment,
             "runtime_measurement": record.manifest.runtime_measurement,
             "attestation_tier": record.manifest.attestation_tier,
+            "reply_signer": record.reply_signer,
+            "open_ratio": record.bundle.open_ratio,
+            "difficulty": record.bundle.difficulty,
+            "timeouts": record.timeouts,
+            "config_mismatch_evidence": record.bundle.config_mismatch_evidence,
+            "attestation": {
+                "tier": record.attestation.tier,
+                "measurement": record.attestation.measurement,
+                "configCommitment": record.attestation.config_commitment,
+                "teeSigner": record.attestation.tee_signer,
+                "teePubKey": record.attestation.tee_pubkey,
+                "rootOfTrust": record.attestation.root_of_trust,
+                "tpmRooted": record.attestation.tpm_rooted,
+                "tpmQuote": record.attestation.tpm_quote,
+                "issuedAt": record.attestation.issued_at,
+                "runtime": dict(record.attestation.runtime),
+                "quote": record.attestation.quote,
+            },
             "policy_fingerprint": record.policy.fingerprint(),
             "defender_data_consent": record.defender_data_consent,
             "manifest": record.manifest.public_dict(),
@@ -832,6 +1172,39 @@ class ByoaService:
             raise ByoaServiceError(401, "invalid pull token")
 
     # -- helpers --------------------------------------------------------
+
+    def _write_transcript(
+        self, contest_id: str, attacker: str, record: Mapping[str, Any]
+    ) -> None:
+        if self.transcript_root is None:
+            return
+        directory = self.transcript_root / contest_id.lower()
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{attacker.lower()}.jsonl"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(dict(record), ensure_ascii=False, sort_keys=True) + "\n"
+            )
+
+    def _handle_timeout(
+        self, record: _ContestRecord, attacker: str, msg_hash: str
+    ) -> None:
+        """Refund one undelivered message and count a defender strike."""
+
+        with self._lock:
+            record.timeouts += 1
+            strikes = record.timeouts
+        try:
+            self.gateway.refund_unserved(record.contest_id, attacker, msg_hash)
+        except Exception:
+            # The fee may already be refunded, or Treasury may not have
+            # authorised Arena.  The strike still counts.
+            pass
+        if strikes >= 3:
+            try:
+                self.gateway.report_defender_fault(record.contest_id)
+            except Exception:
+                pass
 
     def _contest(self, contest_id: str) -> _ContestRecord:
         with self._lock:

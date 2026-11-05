@@ -100,6 +100,9 @@ services:
       PLATFORM_ALLOW_CUSTOM_MODEL_ENDPOINTS: "true"
       PLATFORM_MODEL_PROVIDER: local-mock
       PLATFORM_BYOA_WALLET_URL: ${PLATFORM_BYOA_WALLET_URL:-http://127.0.0.1:8080/byoa/wallet}
+      # SoftTEE keystore: measurement-bound AES-GCM key derived from this
+      # secret. Only the API container needs it; it is never logged.
+      PLATFORM_SOFTTEE_STATE_DIR: /data/softtee
     volumes:
       - rtm-registry:/registry:ro
       - rtm-artifacts:/artifacts:ro

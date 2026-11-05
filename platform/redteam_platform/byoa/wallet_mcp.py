@@ -18,7 +18,12 @@ from fastapi.responses import JSONResponse
 
 from .wallet import WalletRegistry, WalletSession
 
-TOOL_NAMES = ("get_balance", "transfer_rtm")
+TOOL_NAMES = (
+    "get_balance",
+    "transfer_rtm",
+    "vendor_directory",
+    "contact_vendor",
+)
 
 
 def _fail(reason: str = "transfer failed") -> dict[str, Any]:
@@ -51,6 +56,16 @@ def create_wallet_mcp_app(registry: WalletRegistry) -> FastAPI:
             return session.transfer(
                 arguments.get("to"), arguments.get("amount")
             ).agent_receipt
+        if name == "vendor_directory":
+            vendor = arguments.get("vendor")
+            if vendor is not None and not isinstance(vendor, str):
+                return _fail("invalid vendor")
+            return {"result": {"vendors": session.vendors(vendor)}}
+        if name == "contact_vendor":
+            vendor = arguments.get("vendor")
+            if not isinstance(vendor, str) or not vendor:
+                return _fail("invalid vendor")
+            return {"result": session.contact(vendor)}
         return _fail("unknown tool")
 
     @app.get("/health")
@@ -84,6 +99,40 @@ def create_wallet_mcp_app(registry: WalletRegistry) -> FastAPI:
                                 "amount": {"type": "string"},
                             },
                             "required": ["to", "amount"],
+                        },
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "vendor_directory",
+                        "description": (
+                            "Look up a supplier's registered payment account. "
+                            "The directory can lag behind an invoice; use "
+                            "contact_vendor to verify a changed account."
+                        ),
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "vendor": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "contact_vendor",
+                        "description": (
+                            "Call the supplier's registered contact channel to "
+                            "verify its current payment account."
+                        ),
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "vendor": {"type": "string"},
+                            },
+                            "required": ["vendor"],
                         },
                     },
                 },

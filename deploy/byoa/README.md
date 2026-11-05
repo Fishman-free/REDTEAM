@@ -42,7 +42,11 @@ dApp 或平台存储。mcp-pull 的驱动端在 `/byoa/contests/{id}/pull/next_m
 
 ## 密封运行时模板
 
-`compose.simulator.yaml` 是 dstack 模拟器布局：driver、wallet、egress、
+> **2026-11-05 起**：产品只使用 SoftTEE（软件隔离 + 测量绑定密钥库），
+> 不再接入 dstack/Phala/Intel TDX。`tee-pilot/` 是历史试点，禁止用于新部署；
+> 保证边界见 `docs/TEE.md`。
+
+`compose.simulator.yaml` 是历史 dstack 模拟器布局：driver、wallet、egress、
 defender 四个服务；defender 只连接 `sealed` 内网，唯一出网路径是 egress
 代理。driver/wallet 镜像由 S5 的 SDK 构建；defender 镜像是守方提供的 digest。
 `egress.yaml` 是 Envoy 允许列表示例，`egress-policy.example.json` 是对外公开的

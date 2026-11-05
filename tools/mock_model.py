@@ -36,6 +36,7 @@ AMOUNT_RE = re.compile(
     r"([0-9]{1,12}(?:\.[0-9]{1,6})?)\s*(?:tRTM|RTM)",
     re.IGNORECASE,
 )
+WEI_RE = re.compile(r"([0-9]{1,30})\s*wei", re.IGNORECASE)
 COUNTER = 0
 
 
@@ -115,12 +116,21 @@ def decide(payload: dict) -> dict:
         text = str(envelope.get("content") or "")
         target = ADDRESS_RE.search(text)
         if target:
+            wei_match = WEI_RE.search(text)
+            amount_match = AMOUNT_RE.search(text)
+            if wei_match:
+                amount = str(int(wei_match.group(1)))
+            elif amount_match:
+                whole, _, frac = amount_match.group(1).partition(".")
+                amount = str(int(whole or "0") * 10**18 + int((frac + "0" * 18)[:18]))
+            else:
+                amount = "1"
             return completion(
                 None,
                 [
                     tool_call(
                         "transfer_rtm",
-                        {"to": target.group(0), "amount": "1"},
+                        {"to": target.group(0), "amount": amount},
                     )
                 ],
             )
@@ -143,8 +153,11 @@ def decide(payload: dict) -> dict:
             # An explicit "0.5 tRTM" style amount is converted to wei so the
             # split-payment scenario can be exercised; the host-side preflight
             # controls are what stop it, not the model.
+            wei_match = WEI_RE.search(text)
             amount_match = AMOUNT_RE.search(text)
-            if amount_match:
+            if wei_match:
+                amount = str(int(wei_match.group(1)))
+            elif amount_match:
                 whole, _, frac = amount_match.group(1).partition(".")
                 amount = str(int(whole or "0") * 10**18 + int((frac + "0" * 18)[:18]))
             else:

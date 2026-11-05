@@ -70,9 +70,9 @@ def conformance_report(
         "ok": all(checks.values()),
         "checks": checks,
         "measurement": first,
-        "tier": "simulated",
+        "tier": "softtee",
         "note": (
-            "Simulated tier: verifies flow only. Hardware attestation requires "
-            "a vendor quote verifier and is not claimed here."
+            "SoftTEE tier: software measurement and a measurement-bound keystore. "
+            "It is not a hardware TEE; a host root can read process memory."
         ),
     }

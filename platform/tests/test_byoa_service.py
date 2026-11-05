@@ -26,7 +26,7 @@ from redteam_platform.byoa.envelope import (
 from redteam_platform.byoa.policy import WalletPolicy
 from redteam_platform.byoa.sealed import (
     SimulatedSealedRuntime,
-    verify_reply_signature,
+    verify_reply_signature_v2,
 )
 from redteam_platform.byoa.service import (
     BundleRequest,
@@ -90,11 +90,30 @@ class FakeGateway:
     def wallet_tools(self, wallet_address, private_key):
         return self.executor
 
-    def issue_task(self, contest_id, amount, deadline, task_hash):
+    def issue_task(
+        self, contest_id, amount, deadline, task_hash, payee_commit=None
+    ):
         self.task_seq += 1
         task_id = "0x" + f"{self.task_seq:064x}"
-        self.tasks.append((contest_id, amount, deadline, task_hash, task_id))
+        self.tasks.append(
+            (contest_id, amount, deadline, task_hash, payee_commit, task_id)
+        )
         return task_id, "0x" + "ee" * 32
+
+    def arm_task(self, contest_id, task_id, payee, salt):
+        self.armed = getattr(self, "armed", [])
+        self.armed.append((contest_id, task_id, payee, salt))
+        return "0x" + "ef" * 32
+
+    def refund_unserved(self, contest_id, attacker, msg_hash):
+        self.refunded = getattr(self, "refunded", [])
+        self.refunded.append((contest_id, attacker, msg_hash))
+        return "0x" + "f0" * 32
+
+    def report_defender_fault(self, contest_id):
+        self.faults = getattr(self, "faults", [])
+        self.faults.append(contest_id)
+        return "0x" + "f1" * 32
 
     def expire_task(self, contest_id, task_id):
         self.expired.append((contest_id, task_id))
@@ -232,10 +251,11 @@ def test_register_create_task_turn_finalize():
             "defender": account.address,
             "wallet": record.runtime.wallet_address,
             "teeSigner": record.runtime.tee_signer,
+            "replySigner": record.reply_signer,
             "stake": 50 * ONE,
             "duration": 6 * 3600,
             "stakeBps": 1000,
-            "configCommitment": bundle["commitment"],
+            "configCommitment": bundle["config_hash"],
             "runtimeMeasurement": bundle["runtime_measurement"],
             "teePubKey": bundle["tee_pubkey"],
             "attestationTier": 0,
@@ -268,7 +288,7 @@ def test_register_create_task_turn_finalize():
         )
         assert gateway.executor.transfers == []
         assert gateway.tasks[0][1] == 2 * ONE
-        assert task["task_id"] == gateway.tasks[0][4]
+        assert task["task_id"] == gateway.tasks[0][5]
 
         turn = service.turn(
             CONTEST,
@@ -323,10 +343,11 @@ def test_sealed_turn_decrypts_in_tee_and_returns_ciphertext():
             "defender": account.address,
             "wallet": record.runtime.wallet_address,
             "teeSigner": record.runtime.tee_signer,
+            "replySigner": record.reply_signer,
             "stake": 50 * ONE,
             "duration": 6 * 3600,
             "stakeBps": 1000,
-            "configCommitment": bundle["commitment"],
+            "configCommitment": bundle["config_hash"],
             "runtimeMeasurement": bundle["runtime_measurement"],
             "teePubKey": bundle["tee_pubkey"],
             "attestationTier": 0,
@@ -397,14 +418,15 @@ def test_sealed_turn_decrypts_in_tee_and_returns_ciphertext():
             ),
         )
         assert plaintext.decode("utf-8") == f"seen:counterparty:{response['seq']}"
-        assert verify_reply_signature(
+        assert verify_reply_signature_v2(
             response["reply_signature"],
-            tee_signer=record.runtime.tee_signer,
+            reply_signer=record.reply_signer,
             contest_id=CONTEST,
             attacker=attacker.address,
             msg_hash=msg_hash,
             reply_hash=response["reply_hash"],
             seq=response["seq"],
+            config_hash=response["config_hash"],
         )
         assert gateway.delivered == (
             CONTEST,

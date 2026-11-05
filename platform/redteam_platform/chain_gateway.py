@@ -473,6 +473,24 @@ class Web3ChainGateway:
         )
         return tx
 
+    def refund_unserved(
+        self, contest_id: str, attacker: str, msg_hash: str
+    ) -> str:
+        """Refund one paid BYOA message that was never delivered in time."""
+
+        cid = normalize_contest_id(contest_id)
+        account = _require_address(attacker, "attacker")
+        digest = _bytes32(msg_hash, "msg_hash")
+        tx, _receipt = self._send_operator(
+            purpose="refund_unserved",
+            context={"contest_id": cid, "wallet_address": account},
+            build=lambda sender: self._arena.functions.refundUnserved(
+                bytes.fromhex(cid[2:]), account, digest
+            ),
+            gas=GAS_FAULT,
+        )
+        return tx
+
     def report_defender_fault(self, contest_id: str) -> str:
         cid = normalize_contest_id(contest_id)
         tx, _receipt = self._send_operator(
@@ -537,6 +555,7 @@ class Web3ChainGateway:
             "defender",
             "wallet",
             "teeSigner",
+            "replySigner",
             "stake",
             "duration",
             "stakeBps",
@@ -557,6 +576,7 @@ class Web3ChainGateway:
             _require_address(params["defender"], "defender"),
             _require_address(params["wallet"], "wallet"),
             _require_address(params["teeSigner"], "teeSigner"),
+            _require_address(params["replySigner"], "replySigner"),
             _require_amount(params["stake"], "stake"),
             _require_amount(params["duration"], "duration"),
             _require_amount(params["stakeBps"], "stakeBps"),
@@ -570,8 +590,16 @@ class Web3ChainGateway:
             _require_amount(params["nonce"], "nonce"),
             _require_amount(params["deadline"], "deadline"),
         )
-        if tuple_params[9] not in (0, 1):
-            raise GatewayError("attestationTier must be 0 or 1")
+        tier = tuple_params[10]
+        if tier not in (0, 1, 2):
+            raise GatewayError("attestationTier must be 0, 1 or 2")
+        if tier == 2:
+            if tuple_params[3] == tuple_params[2]:
+                raise GatewayError("self-hosted replySigner must differ from teeSigner")
+            if tuple_params[4] < 100 * 10**18:
+                raise GatewayError("self-hosted stake must be at least 100 tRTM")
+        elif tuple_params[3] != tuple_params[2]:
+            raise GatewayError("SoftTEE replySigner must equal teeSigner")
         defender_bytes = _signature_bytes(defender_signature, "defender_signature")
         tee_bytes = _signature_bytes(tee_signature, "tee_signature")
         tx, receipt = self._send_operator(
@@ -590,13 +618,23 @@ class Web3ChainGateway:
         amount: int,
         deadline: int,
         task_hash: str,
+        payee_commit: str | None = None,
     ) -> tuple[str, str]:
-        """Issue an on-chain TaskSink task and return ``(taskId, txHash)``."""
+        """Issue an on-chain TaskSink task and return ``(taskId, txHash)``.
+
+        ``payee_commit`` binds a random, keyless payee address; None keeps the
+        legacy simulated path that pays the TaskSink directly.
+        """
 
         if self._task_sink is None:
             raise GatewayError("TaskSink is not deployed in this registry")
         cid = normalize_contest_id(contest_id)
         digest = _bytes32(task_hash, "task_hash")
+        commit = (
+            _bytes32(payee_commit, "payee_commit")
+            if payee_commit is not None
+            else b"\x00" * 32
+        )
         amount = _require_amount(amount, "amount")
         deadline = _require_amount(deadline, "deadline")
         if amount == 0 or deadline == 0:
@@ -605,12 +643,61 @@ class Web3ChainGateway:
             purpose="issue_byoa_task",
             context={"contest_id": cid},
             build=lambda sender: self._task_sink.functions.issueTask(
-                bytes.fromhex(cid[2:]), amount, deadline, digest
+                bytes.fromhex(cid[2:]), amount, deadline, digest, commit
             ),
-            gas=GAS_MARK_DELIVERED,
+            # issueTask writes a new task struct, an open-task slot and an
+            # event; 200k was enough only before payeeCommit was added.
+            gas=GAS_CREATE_CONTEST,
         )
         task_id = _task_id_from_receipt(self._task_sink, receipt)
         return task_id, tx
+
+    def arm_task(
+        self,
+        contest_id: str,
+        task_id: str,
+        payee: str,
+        salt: str,
+    ) -> str:
+        """Reveal and lock the random payee immediately before the W transfer."""
+
+        if self._task_sink is None:
+            raise GatewayError("TaskSink is not deployed in this registry")
+        cid = normalize_contest_id(contest_id)
+        task = _bytes32(task_id, "task_id")
+        to = _require_address(payee, "payee")
+        salt_bytes = _bytes32(salt, "salt")
+        tx, _receipt = self._send_operator(
+            purpose="arm_byoa_task",
+            context={"contest_id": cid},
+            build=lambda sender: self._task_sink.functions.armTask(
+                bytes.fromhex(cid[2:]), task, to, salt_bytes
+            ),
+            gas=GAS_FAULT,
+        )
+        return tx
+
+    def reply_signer_of(self, contest_id: str) -> str:
+        cid = normalize_contest_id(contest_id)
+        return str(
+            self._call(
+                lambda: self._arena.functions.replySignerOf(
+                    bytes.fromhex(cid[2:])
+                ).call(),
+                "replySignerOf",
+            )
+        )
+
+    def attestation_tier_of(self, contest_id: str) -> int:
+        cid = normalize_contest_id(contest_id)
+        return int(
+            self._call(
+                lambda: self._arena.functions.attestationTierOf(
+                    bytes.fromhex(cid[2:])
+                ).call(),
+                "attestationTierOf",
+            )
+        )
 
     def report_byoa_utility_breach(self, contest_id: str) -> str:
         cid = normalize_contest_id(contest_id)

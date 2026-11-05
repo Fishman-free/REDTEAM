@@ -259,10 +259,20 @@ class ByoaBundleRequest(BaseModel):
     max_task_amount: str = Field(min_length=1, max_length=64)
     defender_data_consent: bool
     compose_files: dict[str, str]
-    attestation_tier: str = Field(default="simulated", pattern=r"^(simulated|hardware)$")
+    attestation_tier: str = Field(
+        default="simulated",
+        pattern=r"^(simulated|softtee|self-hosted)$",
+    )
     nonce: int = Field(ge=0, le=2**64 - 1)
     deadline: int = Field(ge=0, le=2**64 - 1)
     signature: str = Field(min_length=1, max_length=4096)
+    config_bundle: dict[str, Any] | None = None
+    config_commitment: str | None = Field(
+        default=None, pattern=r"^0x[0-9a-fA-F]{64}$"
+    )
+    reply_signer: str | None = Field(default=None, min_length=1, max_length=64)
+    open_ratio: float = Field(default=0.30, ge=0.0, le=1.0)
+    difficulty: str = Field(default="standard", pattern=r"^(easy|standard)$")
 
 
 class ByoaContestRequest(BaseModel):
@@ -283,6 +293,13 @@ class ByoaTaskRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     amount: str = Field(min_length=1, max_length=64)
     deadline: int = Field(ge=0)
+    kind: str = Field(default="closed", pattern=r"^(closed|open)$")
+    payee: str | None = Field(default=None, min_length=1, max_length=64)
+    salt: str | None = Field(default=None, pattern=r"^0x[0-9a-fA-F]{64}$")
+    vendor: str | None = Field(default=None, max_length=200)
+    invoice: str | None = Field(default=None, max_length=200)
+    directory_account: str | None = Field(default=None, max_length=64)
+    account_changed: bool = False
 
 
 class ByoaGenerateTasksRequest(BaseModel):
@@ -1737,6 +1754,10 @@ def create_app(
 
     if byoa is not None:
 
+        @app.get("/byoa/softtee/pubkey", dependencies=[Depends(require_auth)])
+        def softtee_pubkey(defender: str = Query(min_length=1, max_length=64)) -> dict[str, Any]:
+            return byoa.softtee_public_key(defender)
+
         @app.post("/byoa/bundles", status_code=201, dependencies=[Depends(require_auth)])
         def register_byoa_bundle(payload: ByoaBundleRequest) -> dict[str, Any]:
             return byoa.register_bundle(_bundle_request(payload))
@@ -1768,6 +1789,13 @@ def create_app(
                 text=payload.text,
                 amount=_parse_rtm(payload.amount),
                 deadline=payload.deadline,
+                kind=payload.kind,
+                payee=payload.payee,
+                salt=payload.salt,
+                vendor=payload.vendor,
+                invoice=payload.invoice,
+                directory_account=payload.directory_account,
+                account_changed=payload.account_changed,
             )
 
         @app.post(
@@ -1938,6 +1966,11 @@ def _bundle_request(payload: ByoaBundleRequest) -> BundleRequest:
         nonce=payload.nonce,
         deadline=payload.deadline,
         signature=payload.signature,
+        config_bundle=payload.config_bundle,
+        config_commitment_hex=payload.config_commitment,
+        reply_signer=payload.reply_signer,
+        open_ratio=payload.open_ratio,
+        difficulty=payload.difficulty,
     )
 
 
@@ -2125,7 +2158,13 @@ def build_app(
             "byoa": bool(addresses.get("taskSink")),
         },
         "byoa": {
-            "attestationTiers": ["simulated"],
+            "attestationTiers": (
+                ["simulated", "softtee", "self-hosted"]
+                if settings.softtee_host_secret
+                else ["simulated", "self-hosted"]
+            ),
+            "softteeEnabled": settings.softtee_host_secret is not None,
+            "selfHostedEnabled": True,
             "transports": ["hosted-mcp", "a2a", "webhook", "mcp-pull"],
             "walletMcpUrl": os.environ.get(
                 "PLATFORM_BYOA_WALLET_URL", "http://127.0.0.1:8080/byoa/wallet"
@@ -2210,6 +2249,9 @@ def build_app(
             "PLATFORM_BYOA_WALLET_URL", "http://127.0.0.1:8080/byoa/wallet"
         ),
         indexer=indexer,
+        softtee_host_secret=settings.softtee_host_secret,
+        softtee_state_dir=settings.softtee_state_dir,
+        transcript_root=settings.data_dir / "transcripts",
     )
 
     rsi_dir = settings.data_dir / "rsi"

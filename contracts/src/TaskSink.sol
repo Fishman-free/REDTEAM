@@ -33,6 +33,10 @@ contract TaskSink {
         uint64 deadline;
         uint32 seq;
         bytes32 taskHash;
+        /// @dev keccak256(abi.encode(taskHash, payee, salt))；0 表示旧的 TaskSink 直付任务。
+        bytes32 payeeCommit;
+        address payee;
+        bool armed;
         bool open;
         bool completed;
         bool expired;
@@ -57,7 +61,14 @@ contract TaskSink {
         bytes32 indexed taskId,
         uint256 amount,
         uint64 deadline,
-        bytes32 taskHash
+        bytes32 taskHash,
+        bytes32 payeeCommit
+    );
+    /// @notice 收款地址在 agent 做出付款决定后才揭示并锁定。
+    event TaskArmed(
+        bytes32 indexed contestId,
+        bytes32 indexed taskId,
+        address indexed payee
     );
     event TaskCompleted(
         bytes32 indexed contestId,
@@ -90,6 +101,8 @@ contract TaskSink {
     error UnknownTask();
     error TaskNotOpen();
     error TaskNotExpired();
+    error AlreadyArmed();
+    error BadCommit();
 
     constructor(address arena_, address rtm_) {
         if (arena_ == address(0) || rtm_ == address(0)) revert ZeroAddress();
@@ -100,13 +113,15 @@ contract TaskSink {
         rtm = ITaskRTM(rtm_);
     }
 
-    /// @notice 登记一个 owner 委托任务。仅 operator 或该场 TEE signer 可调用。
-    /// @param taskHash 任务文本的承诺 hash（原文留在 TEE 内）。
+    /// @notice 登记一个委托任务。仅 operator 或该场 TEE signer 可调用。
+    /// @param payeeCommit keccak256(abi.encode(taskHash, payee, salt))；
+    ///        simulated 回退路径传 0，表示只能通过向 TaskSink 直付完成。
     function issueTask(
         bytes32 contestId,
         uint256 amount,
         uint64 deadline,
-        bytes32 taskHash
+        bytes32 taskHash,
+        bytes32 payeeCommit
     ) external returns (bytes32 taskId) {
         if (!arena.isContestTaskIssuer(contestId, msg.sender)) revert NotIssuer();
         if (arena.taskSink() != address(this)) revert NotWired();
@@ -127,27 +142,58 @@ contract TaskSink {
         task.deadline = deadline;
         task.seq = seq;
         task.taskHash = taskHash;
+        task.payeeCommit = payeeCommit;
         task.open = true;
 
         openTaskIds[contestId].push(taskId);
         openIndex[contestId][taskId] = openTaskIds[contestId].length;
         openTaskCount[contestId] += 1;
-        emit TaskIssued(contestId, taskId, amount, deadline, taskHash);
+        emit TaskIssued(contestId, taskId, amount, deadline, taskHash, payeeCommit);
     }
 
-    /// @notice RTMToken 在靶钱包转出到本合约时调用；精确匹配则消费一个任务。
-    /// @dev 只由 RTM 调用；调用方已确认 `from` 是本场 W。返回 false 时 RTM revert。
-    function consume(bytes32 contestId, address from, uint256 value)
-        external
-        returns (bool)
-    {
+    /// @notice 在 agent 决定付款后揭示并锁定收款地址。
+    /// @dev 仅任务签发人；承诺绑定 taskHash、payee 与 salt，签发人不能临时换成别的地址。
+    function armTask(
+        bytes32 contestId,
+        bytes32 taskId,
+        address payee,
+        bytes32 salt
+    ) external {
+        if (!arena.isContestTaskIssuer(contestId, msg.sender)) revert NotIssuer();
+        Task storage task = tasks[contestId][taskId];
+        if (task.id == bytes32(0)) revert UnknownTask();
+        if (!task.open) revert TaskNotOpen();
+        if (task.armed) revert AlreadyArmed();
+        if (task.payeeCommit == bytes32(0)) revert BadParams();
+        if (payee == address(0) || payee == address(this)) revert BadParams();
+        if (payee == arena.contestWallet(contestId)) revert BadParams();
+        if (block.timestamp > task.deadline) revert BadDeadline();
+        if (
+            keccak256(abi.encode(task.taskHash, payee, salt)) != task.payeeCommit
+        ) revert BadCommit();
+        task.payee = payee;
+        task.armed = true;
+        emit TaskArmed(contestId, taskId, payee);
+    }
+
+    /// @notice RTMToken 在靶钱包转出时调用；收款地址与金额精确匹配才消费一个任务。
+    /// @dev 只由 RTM 调用。`to` 是本合约时匹配旧式直付任务；否则必须匹配已锁定 payee。
+    ///      返回 false 时 RTM 会按攻破或 revert 处理。
+    function consume(
+        bytes32 contestId,
+        address from,
+        address to,
+        uint256 value
+    ) external returns (bool) {
         if (msg.sender != address(rtm)) revert NotRTM();
         if (arena.contestState(contestId) != STATE_LIVE) return false;
         if (!arena.isByoaContest(contestId)) return false;
         if (from == address(0) || from != arena.contestWallet(contestId)) {
             return false;
         }
+        if (to == address(0)) return false;
 
+        bool directSink = to == address(this);
         bytes32[] storage list = openTaskIds[contestId];
         uint256 bestIndex;
         uint64 bestDeadline;
@@ -159,6 +205,13 @@ contract TaskSink {
             if (!candidate.open) continue;
             if (candidate.amount != value) continue;
             if (candidate.deadline < nowTs) continue;
+            if (directSink) {
+                // 旧式任务：只接受向 TaskSink 直付。
+                if (candidate.payeeCommit != bytes32(0)) continue;
+            } else {
+                // 新式任务：必须在 agent 决定付款后才被 armTask 锁定。
+                if (!candidate.armed || candidate.payee != to) continue;
+            }
             if (
                 bestIndex == 0 || candidate.deadline < bestDeadline
                     || (candidate.deadline == bestDeadline && candidate.seq < bestSeq)

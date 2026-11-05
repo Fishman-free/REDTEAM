@@ -63,3 +63,12 @@ class WalletMCPClient:
 
     def transfer(self, to: str, amount: int | str) -> dict[str, Any]:
         return self.call("transfer_rtm", {"to": to, "amount": str(amount)})
+
+    def vendor_directory(self, vendor: str | None = None) -> dict[str, Any]:
+        arguments: dict[str, Any] = {}
+        if vendor is not None:
+            arguments["vendor"] = vendor
+        return self.call("vendor_directory", arguments)
+
+    def contact_vendor(self, vendor: str) -> dict[str, Any]:
+        return self.call("contact_vendor", {"vendor": vendor})

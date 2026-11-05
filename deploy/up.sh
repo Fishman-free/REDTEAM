@@ -33,6 +33,7 @@ if [ ! -f .env.stack ]; then
 PLATFORM_MASTER_KEY=$(gen_hex 32)
 PLATFORM_API_TOKEN=$(gen_hex 24)
 PLATFORM_ADMIN_KEY=$(gen_hex 24)
+PLATFORM_SOFTTEE_HOST_SECRET=$(gen_hex 32)
 PLATFORM_MODEL_KEY=demo-key
 FAUCET_CAPTCHA_REQUIRED=false
 BESU_RPC_PORT=8546
@@ -44,6 +45,12 @@ fi
 
 # Older .env.stack files predate the compatibility RPC alias. Add one without
 # ever colliding with the configured primary port.
+# SoftTEE keystore root: only the API container receives it. Older stacks
+# predate SoftTEE, so add it without printing the value.
+if ! grep -q '^PLATFORM_SOFTTEE_HOST_SECRET=' .env.stack; then
+  printf 'PLATFORM_SOFTTEE_HOST_SECRET=%s\n' "$(gen_hex 32)" >> .env.stack
+fi
+
 if ! grep -q '^BESU_ALIAS_RPC_PORT=' .env.stack; then
   primary=$(grep '^BESU_RPC_PORT=' .env.stack | cut -d= -f2- || true)
   if [ "${primary:-8546}" = "8546" ]; then

@@ -52,10 +52,13 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
 
     // ---- BYOA / EIP-712 ----
     uint8 public constant ATTESTATION_SIMULATED = 0;
-    uint8 public constant ATTESTATION_HARDWARE = 1;
+    uint8 public constant ATTESTATION_SOFTTEE = 1;
+    uint8 public constant ATTESTATION_SELF_HOSTED = 2;
+    /// @notice 自托管档的最低守方质押；SoftTEE/simulated 不适用。
+    uint256 public constant MIN_SELF_HOSTED_STAKE = 100e18;
     /// @dev 字段顺序必须与 `_mandateHash` 的 abi.encode 完全一致。
     bytes32 public constant BYOA_MANDATE_TYPEHASH = keccak256(
-        "ByoaMandate(address defender,address wallet,address teeSigner,uint256 stake,uint64 duration,uint32 stakeBps,bytes32 configCommitment,bytes32 runtimeMeasurement,bytes32 teePubKey,uint8 attestationTier,bool defenderDataConsent,uint16 utilityMissThreshold,uint16 utilityPenaltyBps,uint64 nonce,uint64 deadline)"
+        "ByoaMandate(address defender,address wallet,address teeSigner,address replySigner,uint256 stake,uint64 duration,uint32 stakeBps,bytes32 configCommitment,bytes32 runtimeMeasurement,bytes32 teePubKey,uint8 attestationTier,bool defenderDataConsent,uint16 utilityMissThreshold,uint16 utilityPenaltyBps,uint64 nonce,uint64 deadline)"
     );
     bytes32 public constant TEE_WALLET_BINDING_TYPEHASH = keccak256(
         "TeeWalletBinding(address defender,address wallet,bytes32 configCommitment,bytes32 runtimeMeasurement,bytes32 teePubKey,uint64 nonce,uint64 deadline)"
@@ -87,6 +90,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         // ---- BYOA ----
         bool isByoa;
         address teeSigner;
+        address replySigner;
         bytes32 teePubKey;
         bytes32 runtimeMeasurement;
         uint8 attestationTier;
@@ -100,6 +104,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         address defender;
         address wallet;
         address teeSigner;
+        address replySigner;
         uint256 stake;
         uint64 duration;
         uint32 stakeBps;
@@ -118,6 +123,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     struct ByoaInfo {
         bool isByoa;
         address teeSigner;
+        address replySigner;
         bytes32 teePubKey;
         bytes32 runtimeMeasurement;
         bytes32 configCommitment;
@@ -229,6 +235,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         address indexed defender,
         address indexed wallet,
         address teeSigner,
+        address replySigner,
         bytes32 configCommitment,
         bytes32 runtimeMeasurement,
         bytes32 teePubKey,
@@ -454,7 +461,10 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     ) external onlyOperator nonReentrant returns (bytes32 id) {
         if (address(rtm) == address(0)) revert NotInitialized();
         if (taskSink == address(0)) revert TaskSinkNotSet();
-        if (p.defender == address(0) || p.teeSigner == address(0)) {
+        if (
+            p.defender == address(0) || p.teeSigner == address(0)
+                || p.replySigner == address(0)
+        ) {
             revert ZeroAddress();
         }
         if (p.stake == 0) revert BadParams();
@@ -464,7 +474,14 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
             p.configCommitment == bytes32(0) || p.runtimeMeasurement == bytes32(0)
                 || p.teePubKey == bytes32(0)
         ) revert BadParams();
-        if (p.attestationTier > ATTESTATION_HARDWARE) revert BadParams();
+        if (p.attestationTier > ATTESTATION_SELF_HOSTED) revert BadParams();
+        if (p.attestationTier == ATTESTATION_SELF_HOSTED) {
+            if (p.replySigner == p.teeSigner) revert BadParams();
+            if (p.stake < MIN_SELF_HOSTED_STAKE) revert BadParams();
+        } else if (p.replySigner != p.teeSigner) {
+            // SoftTEE/simulated replies must come from the measured runtime key.
+            revert BadParams();
+        }
         if (p.utilityMissThreshold > 64) revert BadParams();
         if (p.utilityPenaltyBps > 5000) revert BadParams();
         if (p.deadline < block.timestamp) revert SignatureExpired();
@@ -492,6 +509,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         c.state = State.Live;
         c.isByoa = true;
         c.teeSigner = p.teeSigner;
+        c.replySigner = p.replySigner;
         c.teePubKey = p.teePubKey;
         c.runtimeMeasurement = p.runtimeMeasurement;
         c.attestationTier = p.attestationTier;
@@ -510,6 +528,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
             p.defender,
             p.wallet,
             p.teeSigner,
+            p.replySigner,
             p.configCommitment,
             p.runtimeMeasurement,
             p.teePubKey,
@@ -523,7 +542,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
     function _mandateHash(ByoaParams calldata p) internal pure returns (bytes32) {
         bytes memory data = abi.encodePacked(
             BYOA_MANDATE_TYPEHASH,
-            abi.encode(p.defender, p.wallet, p.teeSigner, p.stake)
+            abi.encode(p.defender, p.wallet, p.teeSigner, p.replySigner, p.stake)
         );
         data = abi.encodePacked(
             data, abi.encode(p.duration, p.stakeBps, p.configCommitment)
@@ -1101,6 +1120,16 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         return contests[id].teeSigner;
     }
 
+    /// @notice 回复签名者；SoftTEE/simulated 等于 teeSigner，自托管档由守方提供。
+    function replySignerOf(bytes32 id) external view returns (address) {
+        return contests[id].replySigner;
+    }
+
+    /// @notice 0=simulated，1=softtee，2=self-hosted。
+    function attestationTierOf(bytes32 id) external view returns (uint8) {
+        return contests[id].attestationTier;
+    }
+
     /// @notice 任务签发人：operator，或该场 BYOA 的 TEE signer。
     function isContestTaskIssuer(bytes32 id, address who)
         public
@@ -1119,6 +1148,7 @@ contract Arena is Ownable, ReentrancyGuard, IRTMArena {
         return ByoaInfo({
             isByoa: c.isByoa,
             teeSigner: c.teeSigner,
+            replySigner: c.replySigner,
             teePubKey: c.teePubKey,
             runtimeMeasurement: c.runtimeMeasurement,
             configCommitment: c.defenseHash,

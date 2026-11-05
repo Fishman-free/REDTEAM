@@ -43,6 +43,8 @@ ENV_FAUCET_CAPTCHA_REQUIRED = "FAUCET_CAPTCHA_REQUIRED"
 ENV_INDEXER_ENABLED = "PLATFORM_INDEXER_ENABLED"
 ENV_INDEXER_INTERVAL = "PLATFORM_INDEXER_INTERVAL"
 ENV_INDEXER_START_BLOCK = "PLATFORM_INDEXER_START_BLOCK"
+ENV_SOFTTEE_HOST_SECRET = "PLATFORM_SOFTTEE_HOST_SECRET"
+ENV_SOFTTEE_STATE_DIR = "PLATFORM_SOFTTEE_STATE_DIR"
 
 
 class ConfigError(RuntimeError):
@@ -72,6 +74,8 @@ class Settings:
     indexer_enabled: bool = True
     indexer_interval: float = 1.5
     indexer_start_block: int = 0
+    softtee_host_secret: str | None = field(default=None, repr=False)
+    softtee_state_dir: Path | None = None
 
 
 def _env_value(env: Mapping[str, str], name: str) -> str | None:
@@ -292,6 +296,12 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     indexer_start_block = _resolve_non_negative_int(
         env_map, ENV_INDEXER_START_BLOCK, 0
     )
+    softtee_host_secret = _env_value(env_map, ENV_SOFTTEE_HOST_SECRET)
+    if softtee_host_secret is not None and len(softtee_host_secret) < 32:
+        raise ConfigError(f"{ENV_SOFTTEE_HOST_SECRET} must be at least 32 characters")
+    softtee_state_dir = _env_path(
+        env_map, ENV_SOFTTEE_STATE_DIR, data_dir / "softtee"
+    )
 
     # Directory paths: artifacts may be absent until `npx hardhat compile`
     # runs, but if present they must be directories.  The vault parent may be
@@ -324,4 +334,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         indexer_enabled=indexer_enabled,
         indexer_interval=indexer_interval,
         indexer_start_block=indexer_start_block,
+        softtee_host_secret=softtee_host_secret,
+        softtee_state_dir=softtee_state_dir,
     )

@@ -44,6 +44,7 @@ BYOA_MANDATE_TYPES: dict[str, list[dict[str, str]]] = {
         {"name": "defender", "type": "address"},
         {"name": "wallet", "type": "address"},
         {"name": "teeSigner", "type": "address"},
+        {"name": "replySigner", "type": "address"},
         {"name": "stake", "type": "uint256"},
         {"name": "duration", "type": "uint64"},
         {"name": "stakeBps", "type": "uint32"},
@@ -104,7 +105,7 @@ def arena_typed_data(
     # only the selected struct (plus the domain) rather than every Arena type.
     types = {**EIP712_DOMAIN_TYPE, primary_type: all_types[primary_type]}
     payload = dict(message)
-    for key in ("defender", "wallet", "teeSigner", "attacker"):
+    for key in ("defender", "wallet", "teeSigner", "replySigner", "attacker"):
         if key in payload:
             payload[key] = Web3.to_checksum_address(payload[key])
     return {

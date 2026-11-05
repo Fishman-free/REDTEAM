@@ -42,8 +42,10 @@ from redteam_platform.byoa.runtime import ByoaSession, MemoryTaskLedger, Transcr
 from redteam_platform.byoa.sealed import (
     AttestationError,
     BundleManifest,
+    SOFTTEE,
     SimulatedSealedRuntime,
     compute_measurement,
+    simulated_attestation,
     verify_attestation,
 )
 from redteam_platform.byoa.wallet import WalletRegistry, WalletSession
@@ -135,10 +137,7 @@ def make_byoa_session(*, attacker_consent=False, defender_consent=False, script=
         ),
         contest_id=CONTEST,
         now=now,
-        confirmer=lambda to, amount: (
-            Web3.to_checksum_address(to) == TASK_SINK
-            and ledger.matches_open(amount, now())
-        ),
+        confirmer=lambda to, amount: ledger.matches_open(amount, now(), to),
     )
     default_script = lambda message: ("ok", [])
     port = ScriptedPort(wallet, script or default_script)
@@ -535,21 +534,50 @@ def test_simulated_attestation_verifies_and_tampering_fails():
         verify_attestation(forged)
 
 
-def test_hardware_attestation_requires_a_verifier():
-    runtime = SimulatedSealedRuntime()
+def test_softtee_attestation_is_fail_closed():
+    key = Account.create().key.to_0x_hex()
+    signer = Account.from_key(key)
     measurement = compute_measurement({"compose.yaml": "x"})
-    attestation = runtime.attest(measurement=measurement, issued_at=1000)
-    hardware = type(attestation)(
-        tier="hardware",
-        measurement=attestation.measurement,
-        tee_pubkey=attestation.tee_pubkey,
-        tee_signer=attestation.tee_signer,
-        quote="vendor-quote",
-        issued_at=attestation.issued_at,
+    commitment = "0x" + "12" * 32
+    attestation = simulated_attestation(
+        measurement=measurement,
+        tee_pubkey="0x" + "34" * 32,
+        tee_signer_key=key,
+        issued_at=1000,
+        config_commitment_hex=commitment,
+        tier=SOFTTEE,
+        runtime={"driver": "1", "files": 1},
     )
-    with pytest.raises(AttestationError, match="verifier"):
-        verify_attestation(hardware)
-    assert verify_attestation(hardware, hardware_verifier=lambda quote: True) == "hardware"
+    assert signer.address == attestation.tee_signer
+    assert (
+        verify_attestation(
+            attestation,
+            expected_measurement=measurement,
+            expected_config_commitment=commitment,
+        )
+        == SOFTTEE
+    )
+    with pytest.raises(AttestationError, match="measurement"):
+        verify_attestation(
+            attestation,
+            expected_measurement=compute_measurement({"compose.yaml": "y"}),
+        )
+    with pytest.raises(AttestationError, match="config commitment"):
+        verify_attestation(
+            attestation,
+            expected_config_commitment="0x" + "56" * 32,
+        )
+    with pytest.raises(AttestationError, match="tpmQuote"):
+        attestation.__class__(
+            tier=SOFTTEE,
+            measurement=measurement,
+            tee_pubkey="0x" + "34" * 32,
+            tee_signer=signer.address,
+            quote="q",
+            issued_at=1000,
+            config_commitment=commitment,
+            tpm_rooted=True,
+        )
 
 
 def test_sealed_runtime_signs_the_onchain_wallet_binding():
@@ -718,18 +746,23 @@ def test_byoa_api_mounts_wallet_and_protects_routes():
     assert "ciphertext" in plaintext.text
 
 
-def test_qualification_runs_probe_and_task_smoke():
+def test_qualification_runs_closed_and_open_tasks():
     def script(message):
-        if "qualification" in message.metadata:
-            return ("probe", [(PROBE, 1)])
-        if "task" in message.metadata and message.metadata["task"]["amount"] == "1":
-            return ("task", [(TASK_SINK, 1)])
+        task = message.metadata.get("task")
+        if isinstance(task, dict) and task.get("amount") == "1":
+            return ("closed", [(task["payee"], 1)])
+        invoice = message.metadata.get("invoice")
+        if isinstance(invoice, dict) and invoice.get("amount") == "1":
+            return ("open", [(invoice["payee"], 1)])
         return ("ok", [])
 
     session, port, wallet, ledger = make_byoa_session(script=script)
     result = session.qualification(PROBE)
 
     assert result["ok"] is True
-    assert result["probe"] is True and result["task"] is True
+    assert result["closed"] is True and result["open"] is True
     assert wallet.spent == 2
-    assert ledger.report(miss_threshold=0).completed >= 1
+    assert ledger.report(miss_threshold=0).completed == 2
+    assert port.messages[0].channel is Channel.OWNER
+    assert port.messages[1].channel is Channel.COUNTERPARTY
+    assert port.messages[0].metadata["task"]["payee"] == PROBE

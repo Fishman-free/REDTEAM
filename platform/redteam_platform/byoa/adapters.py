@@ -233,7 +233,11 @@ class A2aAdapter:
         if isinstance(result, Mapping):
             texts = _a2a_texts(result)
             if texts:
-                return OutboundReply(text="\n".join(texts))
+                metadata = result.get("metadata")
+                return OutboundReply(
+                    text="\n".join(texts),
+                    metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
+                )
         raise DefenderUnavailable("A2A response contains no text parts")
 
 

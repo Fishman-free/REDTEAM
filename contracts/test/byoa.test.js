@@ -26,11 +26,14 @@ const {
 } = require('./arena.helpers');
 
 const ATTESTATION_SIMULATED = 0;
+const ATTESTATION_SOFTTEE = 1;
+const ATTESTATION_SELF_HOSTED = 2;
 const MANDATE_TYPES = {
   ByoaMandate: [
     { name: 'defender', type: 'address' },
     { name: 'wallet', type: 'address' },
     { name: 'teeSigner', type: 'address' },
+    { name: 'replySigner', type: 'address' },
     { name: 'stake', type: 'uint256' },
     { name: 'duration', type: 'uint64' },
     { name: 'stakeBps', type: 'uint32' },
@@ -74,6 +77,7 @@ async function byoaMessage(game, overrides = {}) {
     defender: game.defender.address,
     wallet: overrides.wallet ?? game.w.address,
     teeSigner: teeSigner.address,
+    replySigner: overrides.replySigner ?? teeSigner.address,
     stake: overrides.stake ?? STAKE,
     duration: overrides.duration ?? DURATION,
     stakeBps: overrides.stakeBps ?? BPS,
@@ -131,10 +135,58 @@ async function createByoa(game, overrides = {}) {
 async function issueTask(game, id, amount, deadline, label, signer) {
   const tx = await game.taskSink
     .connect(signer ?? game.operator)
-    .issueTask(id, amount, deadline, ethers.id(label));
+    .issueTask(
+      id,
+      amount,
+      deadline,
+      ethers.id(label),
+      ethers.ZeroHash
+    );
   const receipt = await tx.wait();
   const ev = findEvent(receipt, game.taskSink, 'TaskIssued');
   return { taskId: ev.args.taskId, receipt };
+}
+
+function payeeCommit(taskHash, payee, salt) {
+  return ethers.keccak256(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ['bytes32', 'address', 'bytes32'],
+      [taskHash, payee, salt]
+    )
+  );
+}
+
+async function issueArmedTask(
+  game,
+  id,
+  amount,
+  deadline,
+  label,
+  payee,
+  salt,
+  signer
+) {
+  const taskHash = ethers.id(label);
+  const commit = payeeCommit(taskHash, payee, salt);
+  const tx = await game.taskSink
+    .connect(signer ?? game.operator)
+    ['issueTask(bytes32,uint256,uint64,bytes32,bytes32)'](
+      id,
+      amount,
+      deadline,
+      taskHash,
+      commit
+    );
+  const receipt = await tx.wait();
+  const ev = findEvent(receipt, game.taskSink, 'TaskIssued');
+  return { taskId: ev.args.taskId, taskHash, payee, salt, payeeCommit: commit, receipt };
+}
+
+async function armTask(game, id, task, signer, salt) {
+  const tx = await game.taskSink
+    .connect(signer ?? game.operator)
+    .armTask(id, task.taskId, task.payee, salt ?? task.salt);
+  return tx.wait();
 }
 
 describe('BYOA contracts', function () {
@@ -259,6 +311,270 @@ describe('BYOA contracts', function () {
             signed.teeSignature
           )
       ).to.be.revertedWithCustomError(game.arena, 'NotOperator');
+    });
+  });
+
+  describe('attestation tiers and reply signer', function () {
+    it('accepts a SoftTEE tier where the runtime key signs replies', async function () {
+      const game = this.game;
+      const created = await createByoa(game, {
+        attestationTier: ATTESTATION_SOFTTEE
+      });
+      expect(await game.arena.attestationTierOf(created.id)).to.equal(ATTESTATION_SOFTTEE);
+      expect(await game.arena.replySignerOf(created.id)).to.equal(
+        created.message.teeSigner
+      );
+    });
+
+    it('rejects a SoftTEE tier with a detached reply signer', async function () {
+      const game = this.game;
+      const signed = await signByoa(game, {
+        attestationTier: ATTESTATION_SOFTTEE,
+        replySigner: game.attackerA.address
+      });
+      await game.rtm.connect(game.defender).approve(game.arena.target, signed.message.stake);
+      await expect(
+        game.arena
+          .connect(game.operator)
+          .createByoaContest(signed.message, signed.defenderSignature, signed.teeSignature)
+      ).to.be.revertedWithCustomError(game.arena, 'BadParams');
+    });
+
+    it('accepts self-hosted only with a separate reply signer and 100 tRTM stake', async function () {
+      const game = this.game;
+      const created = await createByoa(game, {
+        attestationTier: ATTESTATION_SELF_HOSTED,
+        stake: RTM(100),
+        replySigner: game.attackerA.address
+      });
+      expect(await game.arena.attestationTierOf(created.id)).to.equal(
+        ATTESTATION_SELF_HOSTED
+      );
+      expect(await game.arena.replySignerOf(created.id)).to.equal(
+        game.attackerA.address
+      );
+    });
+
+    it('splits data sales 50/50 for self-hosted and 70/30 for SoftTEE', async function () {
+      const game = this.game;
+      const DataMarket = await ethers.getContractFactory('DataMarket');
+      const market = await DataMarket.deploy(
+        game.owner.address,
+        game.rtm.target,
+        game.arena.target,
+        game.treasury.target
+      );
+      await market.waitForDeployment();
+      await market.connect(game.owner).setOperator(game.operator.address);
+
+      async function saleCut(tier, wallet) {
+        const created = await createByoa(game, {
+          wallet,
+          attestationTier: tier,
+          stake: tier === ATTESTATION_SELF_HOSTED ? RTM(100) : STAKE,
+          replySigner:
+            tier === ATTESTATION_SELF_HOSTED
+              ? game.attackerB.address
+              : game.signers[7].address
+        });
+        await joinAs(game, game.attackerA, created.id);
+        await time.increaseTo((await game.arena.contestInfo(created.id)).end);
+        await game.arena.connect(game.outsider).expire(created.id);
+        await market
+          .connect(game.operator)
+          .publish(created.id, ethers.id(`dataset-${tier}`));
+
+        const price = await market.attackerDataPrice();
+        await game.rtm
+          .connect(game.defender)
+          .approve(market.target, price);
+        const treasuryBefore = await game.rtm.balanceOf(game.treasury.target);
+        const attackerBefore = await game.rtm.balanceOf(game.attackerA.address);
+        await market
+          .connect(game.defender)
+          .buyFromAttacker(created.id, game.attackerA.address);
+        return {
+          treasury: (await game.rtm.balanceOf(game.treasury.target)) - treasuryBefore,
+          attacker: (await game.rtm.balanceOf(game.attackerA.address)) - attackerBefore,
+          price
+        };
+      }
+
+      const softtee = await saleCut(ATTESTATION_SOFTTEE, game.w.address);
+      expect(softtee.treasury).to.equal((softtee.price * 7000n) / 10_000n);
+      expect(softtee.attacker).to.equal((softtee.price * 3000n) / 10_000n);
+
+      const selfHosted = await saleCut(
+        ATTESTATION_SELF_HOSTED,
+        game.w2.address
+      );
+      expect(selfHosted.treasury).to.equal((selfHosted.price * 5000n) / 10_000n);
+      expect(selfHosted.attacker).to.equal((selfHosted.price * 5000n) / 10_000n);
+    });
+
+    it('rejects self-hosted below the minimum stake or with the tee signer', async function () {
+      const game = this.game;
+      const low = await signByoa(game, {
+        attestationTier: ATTESTATION_SELF_HOSTED,
+        stake: RTM(99),
+        replySigner: game.attackerA.address
+      });
+      await game.rtm.connect(game.defender).approve(game.arena.target, low.message.stake);
+      await expect(
+        game.arena
+          .connect(game.operator)
+          .createByoaContest(low.message, low.defenderSignature, low.teeSignature)
+      ).to.be.revertedWithCustomError(game.arena, 'BadParams');
+
+      const same = await signByoa(game, {
+        attestationTier: ATTESTATION_SELF_HOSTED,
+        stake: RTM(100),
+        replySigner: game.signers[7].address
+      });
+      await game.rtm.connect(game.defender).approve(game.arena.target, same.message.stake);
+      await expect(
+        game.arena
+          .connect(game.operator)
+          .createByoaContest(same.message, same.defenderSignature, same.teeSignature)
+      ).to.be.revertedWithCustomError(game.arena, 'BadParams');
+    });
+  });
+
+  describe('payeeCommit / armTask', function () {
+    it('only completes a payee task after armTask locks the exact address', async function () {
+      const game = this.game;
+      const created = await createByoa(game);
+      const end = (await game.arena.contestInfo(created.id)).end;
+      const payee = ethers.Wallet.createRandom().address;
+      const task = await issueArmedTask(
+        game,
+        created.id,
+        RTM(5),
+        end - 100n,
+        'open-invoice-1',
+        payee,
+        ethers.id('salt-1')
+      );
+
+      await expect(
+        game.rtm.connect(game.w).transfer(payee, RTM(5))
+      ).to.be.revertedWithCustomError(game.rtm, 'TargetTransferRestricted');
+
+      await expect(
+        armTask(game, created.id, task, game.outsider)
+      ).to.be.revertedWithCustomError(game.taskSink, 'NotIssuer');
+      await expect(
+        armTask(game, created.id, task, game.operator, ethers.id('wrong-salt'))
+      ).to.be.revertedWithCustomError(game.taskSink, 'BadCommit');
+
+      const armed = await armTask(game, created.id, task);
+      findEvent(armed, game.taskSink, 'TaskArmed');
+
+      const tx = await game.rtm.connect(game.w).transfer(payee, RTM(5));
+      const receipt = await tx.wait();
+      const completed = findEvent(receipt, game.taskSink, 'TaskCompleted');
+      expect(completed.args.taskId).to.equal(task.taskId);
+      expect(await game.taskSink.held(created.id)).to.equal(RTM(5));
+      expect(await game.rtm.balanceOf(game.taskSink.target)).to.equal(RTM(5));
+      expect(await game.rtm.balanceOf(payee)).to.equal(0n);
+      const info = await game.taskSink.taskInfo(created.id, task.taskId);
+      expect(info.completed).to.equal(true);
+      expect(info.payee).to.equal(payee);
+    });
+
+    it('does not let a direct sink payment complete a payee task', async function () {
+      const game = this.game;
+      const created = await createByoa(game);
+      const end = (await game.arena.contestInfo(created.id)).end;
+      const payee = ethers.Wallet.createRandom().address;
+      const task = await issueArmedTask(
+        game,
+        created.id,
+        RTM(5),
+        end - 100n,
+        'open-invoice-2',
+        payee,
+        ethers.id('salt-2')
+      );
+      await armTask(game, created.id, task);
+
+      await expect(
+        game.rtm.connect(game.w).transfer(game.taskSink.target, RTM(5))
+      ).to.be.revertedWithCustomError(game.rtm, 'TargetTransferRestricted');
+    });
+
+    it('matches the exact payee when several tasks share an amount', async function () {
+      const game = this.game;
+      const created = await createByoa(game);
+      const end = (await game.arena.contestInfo(created.id)).end;
+      const payeeA = ethers.Wallet.createRandom().address;
+      const payeeB = ethers.Wallet.createRandom().address;
+      const taskA = await issueArmedTask(
+        game,
+        created.id,
+        RTM(5),
+        end - 100n,
+        'invoice-a',
+        payeeA,
+        ethers.id('salt-a')
+      );
+      const taskB = await issueArmedTask(
+        game,
+        created.id,
+        RTM(5),
+        end - 200n,
+        'invoice-b',
+        payeeB,
+        ethers.id('salt-b')
+      );
+      await armTask(game, created.id, taskA);
+      await armTask(game, created.id, taskB);
+
+      const receipt = await (
+        await game.rtm.connect(game.w).transfer(payeeA, RTM(5))
+      ).wait();
+      const completed = findEvent(receipt, game.taskSink, 'TaskCompleted');
+      expect(completed.args.taskId).to.equal(taskA.taskId);
+      expect(
+        (await game.taskSink.taskInfo(created.id, taskB.taskId)).open
+      ).to.equal(true);
+      expect(
+        (await game.taskSink.taskInfo(created.id, taskA.taskId)).completed
+      ).to.equal(true);
+    });
+
+    it('rejects arming after the deadline or to the contest wallet', async function () {
+      const game = this.game;
+      const created = await createByoa(game);
+      const end = (await game.arena.contestInfo(created.id)).end;
+      const deadline = BigInt(await time.latest()) + 60n;
+      const payee = ethers.Wallet.createRandom().address;
+      const task = await issueArmedTask(
+        game,
+        created.id,
+        RTM(5),
+        deadline,
+        'expired-arm',
+        payee,
+        ethers.id('salt-expired')
+      );
+      await time.increase(61);
+      await expect(
+        armTask(game, created.id, task)
+      ).to.be.revertedWithCustomError(game.taskSink, 'BadDeadline');
+
+      const selfTask = await issueArmedTask(
+        game,
+        created.id,
+        RTM(6),
+        end - 100n,
+        'self-payee',
+        game.w.address,
+        ethers.id('salt-self')
+      );
+      await expect(
+        armTask(game, created.id, selfTask)
+      ).to.be.revertedWithCustomError(game.taskSink, 'BadParams');
     });
   });
 

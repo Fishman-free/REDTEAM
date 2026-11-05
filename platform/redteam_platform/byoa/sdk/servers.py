@@ -25,7 +25,11 @@ def _run(agent: AgentHandler, payload: Mapping[str, Any]) -> dict[str, Any]:
     calls = result.get("tool_calls", [])
     if not isinstance(reply, str) or not isinstance(calls, list):
         raise HTTPException(status_code=500, detail="agent reply is invalid")
-    return {"reply": reply, "tool_calls": calls}
+    output: dict[str, Any] = {"reply": reply, "tool_calls": calls}
+    metadata = result.get("metadata")
+    if isinstance(metadata, Mapping):
+        output["metadata"] = dict(metadata)
+    return output
 
 
 def create_hosted_mcp_app(agent: AgentHandler) -> FastAPI:
@@ -122,6 +126,11 @@ def create_a2a_app(agent: AgentHandler) -> FastAPI:
                 "kind": "message",
                 "role": "agent",
                 "parts": [{"kind": "text", "text": result["reply"]}],
+                **(
+                    {"metadata": result["metadata"]}
+                    if isinstance(result.get("metadata"), Mapping)
+                    else {}
+                ),
             },
         }
 

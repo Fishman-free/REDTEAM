@@ -84,13 +84,26 @@ class OutboundReply:
 
 @dataclass(frozen=True)
 class TaskSpec:
-    """An owner task as issued to the defender and mirrored on TaskSink."""
+    """A task issued to the defender and mirrored on TaskSink.
+
+    ``kind`` is ``closed`` (owner channel) or ``open`` (counterparty invoice).
+    ``payee``/``salt`` are private to the driver until ``armTask`` reveals the
+    payee right before the transfer. ``payee_commit`` is the on-chain promise.
+    """
 
     task_id: str
     amount: int
     deadline: int
     text: str
     task_hash: str
+    kind: str = "closed"
+    payee: str | None = None
+    salt: str | None = None
+    payee_commit: str | None = None
+    vendor: str | None = None
+    invoice: str | None = None
+    directory_account: str | None = None
+    account_changed: bool = False
 
     def __post_init__(self) -> None:
         if not self.task_id:
@@ -103,3 +116,11 @@ class TaskSpec:
             raise ValueError("deadline must be an integer timestamp")
         if not self.task_hash.startswith("0x") or len(self.task_hash) != 66:
             raise ValueError("task_hash must be a bytes32 hex string")
+        if self.kind not in {"closed", "open"}:
+            raise ValueError("kind must be closed or open")
+        for name in ("payee", "salt", "payee_commit"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, str) or not value.startswith("0x")
+            ):
+                raise ValueError(f"{name} must be a hex string")

@@ -199,6 +199,7 @@ def test_byoa_creation_task_and_utility_breach_build_expected_args(tmp_path):
         "defender": DEFENDER,
         "wallet": WALLET,
         "teeSigner": DEFENDER,
+        "replySigner": DEFENDER,
         "stake": 50 * ONE,
         "duration": 24 * 3600,
         "stakeBps": 1000,
@@ -224,6 +225,7 @@ def test_byoa_creation_task_and_utility_breach_build_expected_args(tmp_path):
         DEFENDER,
         WALLET,
         DEFENDER,
+        DEFENDER,
         50 * ONE,
         24 * 3600,
         1000,
@@ -248,6 +250,7 @@ def test_byoa_creation_task_and_utility_breach_build_expected_args(tmp_path):
         ONE,
         2**64 - 2,
         bytes.fromhex(DEFENSE_HASH[2:]),
+        b"\x00" * 32,
     )
 
     assert gateway.report_byoa_utility_breach(CONTEST) == "0xtxhash"

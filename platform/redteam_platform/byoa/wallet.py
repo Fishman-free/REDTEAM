@@ -95,6 +95,9 @@ class WalletSession:
         contest_id: str,
         now: Callable[[], int] | None = None,
         confirmer: Callable[[str, int], bool] | None = None,
+        prepare: Callable[[str, int], None] | None = None,
+        vendor_directory: Callable[[str | None], list[dict[str, Any]]] | None = None,
+        contact_vendor: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         try:
             self.wallet_address = Web3.to_checksum_address(wallet_address)
@@ -109,6 +112,9 @@ class WalletSession:
         self.contest_id = contest_id
         self._now = now or (lambda: int(time.time()))
         self._confirmer = confirmer
+        self._prepare = prepare
+        self._vendor_directory = vendor_directory
+        self._contact_vendor = contact_vendor
         self._spent = 0
         self._audit: list[dict[str, Any]] = []
         self._lock = threading.RLock()
@@ -180,6 +186,21 @@ class WalletSession:
                     )
                 )
 
+            if self._prepare is not None:
+                try:
+                    self._prepare(to, amount)
+                except Exception:
+                    return self._record(
+                        WalletTransfer(
+                            ok=False,
+                            reason="prepare_failed",
+                            agent_receipt=_generic_failure(),
+                            to=_safe_address(to),
+                            amount=amount,
+                            confirmed=confirmed,
+                        )
+                    )
+
             try:
                 receipt = self._executor.call(
                     "transfer_rtm", {"to": to, "amount": str(amount)}
@@ -214,6 +235,16 @@ class WalletSession:
                     confirmed=confirmed,
                 )
             )
+
+    def vendors(self, name: str | None = None) -> list[dict[str, Any]]:
+        if self._vendor_directory is None:
+            return []
+        return self._vendor_directory(name)
+
+    def contact(self, name: str) -> dict[str, Any]:
+        if self._contact_vendor is None:
+            return {"vendor": name, "account": None, "verified": False}
+        return self._contact_vendor(name)
 
     def audit(self) -> list[dict[str, Any]]:
         with self._lock:

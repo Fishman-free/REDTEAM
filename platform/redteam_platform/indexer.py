@@ -338,6 +338,7 @@ class EventIndexer:
             CREATE TABLE IF NOT EXISTS byoa_contests (
                 id TEXT PRIMARY KEY,
                 tee_signer TEXT NOT NULL,
+                reply_signer TEXT NOT NULL DEFAULT '0x0000000000000000000000000000000000000000',
                 tee_pubkey TEXT NOT NULL,
                 runtime_measurement TEXT NOT NULL,
                 config_commitment TEXT NOT NULL,
@@ -394,6 +395,17 @@ class EventIndexer:
         if "is_byoa" not in columns:
             self._conn.execute(
                 "ALTER TABLE contests ADD COLUMN is_byoa INTEGER NOT NULL DEFAULT 0"
+            )
+        byoa_columns = {
+            row["name"]
+            for row in self._conn.execute(
+                "PRAGMA table_info(byoa_contests)"
+            ).fetchall()
+        }
+        if "reply_signer" not in byoa_columns:
+            self._conn.execute(
+                "ALTER TABLE byoa_contests ADD COLUMN reply_signer TEXT "
+                "NOT NULL DEFAULT '0x0000000000000000000000000000000000000000'"
             )
 
     def _ensure_meta(self) -> None:
@@ -665,13 +677,14 @@ class EventIndexer:
         self._db().execute(
             """
             INSERT OR REPLACE INTO byoa_contests(
-                id, tee_signer, tee_pubkey, runtime_measurement,
+                id, tee_signer, reply_signer, tee_pubkey, runtime_measurement,
                 config_commitment, attestation_tier, defender_data_consent
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 contest_id,
                 args["teeSigner"],
+                args.get("replySigner", "0x0000000000000000000000000000000000000000"),
                 str(args["teePubKey"]).lower(),
                 str(args["runtimeMeasurement"]).lower(),
                 str(args["configCommitment"]).lower(),
@@ -1105,6 +1118,7 @@ class EventIndexer:
             return None
         return {
             "tee_signer": row["tee_signer"],
+            "reply_signer": row["reply_signer"],
             "tee_pubkey": row["tee_pubkey"],
             "runtime_measurement": row["runtime_measurement"],
             "config_commitment": row["config_commitment"],

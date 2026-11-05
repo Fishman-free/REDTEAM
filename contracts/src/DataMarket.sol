@@ -25,12 +25,15 @@ interface IArena {
     function contestInfo(bytes32 id) external view returns (ContestInfo memory);
     function isRegisteredAttacker(bytes32 id, address who) external view returns (bool);
     function dataConsent(bytes32 id, address who) external view returns (bool);
+    /// @notice 0=simulated，1=softtee，2=self-hosted。
+    function attestationTierOf(bytes32 id) external view returns (uint8);
 }
 
 /// @title DataMarket —— 比赛数据市场
 /// @notice 平台 operator 发布已结束普通比赛的数据根；守方可购买自己的数据或
-///         该场注册攻方在加入时已一次性同意出售的进攻数据。成交额 70% 归 Treasury，
-///         30% 归数据提供方。挖矿赛数据仅用于 RSI，不发布、不出售。
+///         该场注册攻方在加入时已一次性同意出售的进攻数据。SoftTEE/simulated 档
+///         成交额 70% 归 Treasury、30% 归数据提供方；自托管档为 50%/50%。
+///         挖矿赛数据仅用于 RSI，不发布、不出售。
 /// @dev 安全约束：
 ///      - 买家不能自行传入 stake/身份，S 与 defender 全部从 Arena 读取；
 ///      - 攻方数据是否可售以 Arena.dataConsent 为唯一事实源：同意在 join 时一次性
@@ -155,7 +158,7 @@ contract DataMarket is Ownable {
 
         uint256 amount = (info.stake * dataPriceBps) / 10_000;
         boughtOwn[contestId][msg.sender] = true;
-        uint256 platformCut = _split(amount, msg.sender, msg.sender);
+        uint256 platformCut = _split(contestId, amount, msg.sender, msg.sender);
         emit DataSold(msg.sender, msg.sender, contestId, amount, platformCut);
     }
 
@@ -172,17 +175,22 @@ contract DataMarket is Ownable {
 
         uint256 amount = attackerDataPrice;
         boughtAttacker[contestId][attacker][msg.sender] = true;
-        uint256 platformCut = _split(amount, msg.sender, attacker);
+        uint256 platformCut = _split(contestId, amount, msg.sender, attacker);
         emit DataSold(msg.sender, attacker, contestId, amount, platformCut);
     }
 
-    /// @dev 从买家直接分账：平台 70% -> Treasury，其余 -> 数据提供方。
-    ///      调用方必须先更新已购标记；本合约不持有资金。
-    function _split(uint256 amount, address buyer, address seller)
-        internal
-        returns (uint256 platformCut)
-    {
-        platformCut = (amount * platformShareBps) / 10_000;
+    /// @dev 从买家直接分账：自托管档平台 50% -> Treasury，其余档 70%；
+    ///      剩余归数据提供方。调用方必须先更新已购标记；本合约不持有资金。
+    function _split(
+        bytes32 contestId,
+        uint256 amount,
+        address buyer,
+        address seller
+    ) internal returns (uint256 platformCut) {
+        uint256 platformBps = arena.attestationTierOf(contestId) == 2
+            ? 5000
+            : platformShareBps;
+        platformCut = (amount * platformBps) / 10_000;
         if (platformCut > 0) {
             rtm.safeTransferFrom(buyer, treasury, platformCut);
         }

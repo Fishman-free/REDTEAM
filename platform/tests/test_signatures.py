@@ -77,8 +77,8 @@ def test_byoa_type_strings_match_the_contract():
         return f"{name}(" + ",".join(f"{field['type']} {field['name']}" for field in fields) + ")"
 
     assert encode("ByoaMandate", BYOA_MANDATE_TYPES["ByoaMandate"]) == (
-        "ByoaMandate(address defender,address wallet,address teeSigner,uint256 stake,"
-        "uint64 duration,uint32 stakeBps,bytes32 configCommitment,bytes32 runtimeMeasurement,"
+        "ByoaMandate(address defender,address wallet,address teeSigner,address replySigner,"
+        "uint256 stake,uint64 duration,uint32 stakeBps,bytes32 configCommitment,bytes32 runtimeMeasurement,"
         "bytes32 teePubKey,uint8 attestationTier,bool defenderDataConsent,"
         "uint16 utilityMissThreshold,uint16 utilityPenaltyBps,uint64 nonce,uint64 deadline)"
     )
