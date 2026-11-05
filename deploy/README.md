@@ -137,11 +137,14 @@ bash deploy/migrate-softtee.sh
 1. 生成/追加 `PLATFORM_SOFTTEE_HOST_SECRET`（不打印）；
 2. 备份当前 registry 为 `addresses.pre-softtee.json`；
 3. 在**同一条** Besu 链上部署新的 Treasury / Arena / RTM / Faucet / DataMarket / TaskSink；
-4. 切换 registry，重建 api / web / mock-model；
-5. 校验 `/api/meta` 含 `taskSink` 和 `softtee` 档位。
+4. 把旧的 `index.sqlite3` / `platform-state.sqlite3` 归档为 `.pre-softtee`，
+   让新 API 从新部署块重建索引；vault 与链数据不动；
+5. 切换 registry，重建 api / web / mock-model；
+6. 校验 `/api/meta` 含 `taskSink` 和 `softtee` 档位。
 
-旧比赛仍留在旧合约上，不会被迁移；链本身、旧区块和 vault 都保留。迁移前请备份
-`rtm-arena_rtm-platform-data` 卷。不要用 `down -v` 代替这个脚本。
+旧比赛仍留在旧合约上，不会被迁移；链本身、旧区块、transcripts 和 vault 都保留。
+迁移前请备份 `rtm-arena_rtm-platform-data` 卷。不要用 `down -v` 代替这个脚本。
+守方需要在迁移后重新注册（旧注册指向旧合约/UUID）。
 
 ### 重置
 

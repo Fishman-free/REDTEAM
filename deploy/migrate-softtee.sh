@@ -54,11 +54,27 @@ cp -R artifacts/. /artifacts/
 echo "registry switched"
 '
 
-log "4/5 recreating api, web and mock-model"
+log "4/6 archiving the old index and registration state"
+# The chain and vault stay. The index/registration DBs are derived state tied
+# to the old Arena; keep them as .pre-softtee backups and re-index from the
+# new deployment block so the UI does not show orphaned contests.
+"${COMPOSE[@]}" stop api web >/dev/null 2>&1 || true
+"${COMPOSE[@]}" run --rm --no-deps --entrypoint /bin/sh api -c '
+set -eu
+for f in index.sqlite3 platform-state.sqlite3; do
+  if [ -f "/data/$f" ]; then
+    mv "/data/$f" "/data/$f.pre-softtee"
+    echo "archived /data/$f"
+  fi
+done
+'
+
+log "5/6 recreating api, web and mock-model"
 "${COMPOSE[@]}" up -d --force-recreate api web mock-model
 
-log "5/5 waiting for health and verifying metadata"
+log "6/6 waiting for health and verifying metadata"
 API_PORT=$(grep '^API_PORT=' deploy/.env.stack | cut -d= -f2)
+WEB_PORT=$(grep '^WEB_PORT=' deploy/.env.stack | cut -d= -f2)
 deadline=$((SECONDS + 90))
 while [ "$SECONDS" -lt "$deadline" ]; do
   if curl -fsS "http://127.0.0.1:${API_PORT}/health" >/dev/null 2>&1; then
@@ -66,7 +82,8 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   fi
   sleep 2
 done
-curl -fsS "http://127.0.0.1:${API_PORT}/meta" > /tmp/rtm-meta-softtee.json
+# /api/meta is the public BFF route; it injects the platform API token.
+curl -fsS "http://127.0.0.1:${WEB_PORT}/api/meta" > /tmp/rtm-meta-softtee.json
 python3 - <<'PY' || die "metadata verification failed"
 import json
 meta = json.load(open("/tmp/rtm-meta-softtee.json", encoding="utf-8"))
