@@ -181,4 +181,11 @@ class TaskGenerator:
             if len(kinds) != count:
                 raise ValueError("kinds length must match count")
             return [self.next(kind) for kind in kinds]
-        return [self.next() for _ in range(count)]
+        if self.open_ratio > 0:
+            # Guarantee the minimum open share for every batch, including
+            # small batches where a shuffled 10-card deck could be all closed.
+            open_count = max(1, min(count, round(count * self.open_ratio)))
+            batch = [OPEN] * open_count + [CLOSED] * (count - open_count)
+            self._rng.shuffle(batch)
+            return [self.next(kind) for kind in batch]
+        return [self.next(CLOSED) for _ in range(count)]
