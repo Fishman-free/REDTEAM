@@ -64,7 +64,6 @@ class ChainGatewayPort(Protocol):
     def defense_hash_retired(self, defense_hash: str) -> bool: ...
     def active_defense_hash(self, defense_hash: str) -> str: ...
     def contest_info(self, contest_id: str) -> dict[str, Any]: ...
-    def fund_wallet(self, wallet: str, amount: int) -> str: ...
     def mint_test_tokens(self, to: str, amount: int) -> str: ...
     def create_contest(
         self, defender: str, wallet: str, stake: int, duration: int, stake_bps: int
@@ -369,17 +368,6 @@ class Web3ChainGateway:
         }
 
     # -- writes ---------------------------------------------------------
-
-    def fund_wallet(self, wallet: str, amount: int) -> str:
-        wallet = _require_address(wallet, "wallet")
-        amount = _require_amount(amount, "amount")
-        tx, _receipt = self._send_operator(
-            purpose="wallet_funding",
-            context={"wallet_address": wallet},
-            build=lambda sender: self._rtm.functions.transfer(wallet, amount),
-            gas=GAS_TRANSFER,
-        )
-        return tx
 
     def mint_test_tokens(self, to: str, amount: int) -> str:
         """Testnet-only faucet mint executed on the platform's configured chain."""

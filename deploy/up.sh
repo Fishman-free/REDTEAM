@@ -67,6 +67,15 @@ log "Building and starting the stack..."
 # Keep the gitignored host copy in step with the volume the stack reads.
 bash ./sync-registry.sh || log "warning: could not sync contracts/deploy/addresses.json; run deploy/sync-registry.sh once the api is up"
 
+# Export the stack's generated deployer key for tooling that drives the chain
+# from the host (platform e2e). The key is already in the besu volume; this
+# copy stays next to .env.stack and is gitignored. Never printed.
+if "${COMPOSE[@]}" exec -T besu sh -c 'cat /shared/keydir/key' > .stack-key 2>/dev/null; then
+  chmod 600 .stack-key 2>/dev/null || true
+else
+  log "warning: could not export deploy/.stack-key from the besu volume"
+fi
+
 log ""
 log "Stack started."
 log "  dApp:      http://localhost:$(grep '^WEB_PORT=' .env.stack | cut -d= -f2-)"

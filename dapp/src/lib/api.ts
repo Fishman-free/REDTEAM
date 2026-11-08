@@ -60,10 +60,18 @@ async function request<T>(
     }
   }
   if (!response.ok) {
-    const detail =
+    let detail =
       payload && typeof payload === "object" && "detail" in payload
         ? (payload as { detail: unknown }).detail
         : payload;
+    // A CDN/proxy error page (HTML or "error code: 502") replaces the API's
+    // JSON on some 5xx responses; show a retry hint instead of raw markup.
+    if (
+      typeof detail === "string" &&
+      (detail.trimStart().startsWith("<") || /^error code:/i.test(detail.trim()))
+    ) {
+      detail = `server error (HTTP ${response.status}); please retry`;
+    }
     throw new ApiClientError(response.status, detail);
   }
   return payload as T;

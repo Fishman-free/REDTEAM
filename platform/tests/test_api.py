@@ -98,8 +98,8 @@ class FakeGateway:
             },
         }
 
-    def fund_wallet(self, wallet, amount):
-        self.calls.append(("fund_wallet", wallet, amount))
+    def mint_test_tokens(self, to, amount):
+        self.calls.append(("mint_test_tokens", to, amount))
         return "0xfund"
 
     def allowance(self, owner):
@@ -455,7 +455,7 @@ def test_register_qualification_and_contest(api_bundle):
     assert body["qualification"] == "passed"
     assert body["wallet"] == WALLET
     assert api_bundle.model_calls == [("glm", "sk-test-123456")]
-    assert api_bundle.gateway.calls[0] == ("fund_wallet", WALLET, 1)
+    assert api_bundle.gateway.calls[0] == ("mint_test_tokens", WALLET, 1)
     qualification_session = api_bundle.runners.sessions[0]
     assert qualification_session.qualification_addresses == [OPERATOR]
 
