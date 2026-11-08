@@ -42,7 +42,14 @@ RPC = "http://127.0.0.1:8546"
 CHAIN_ID = 48850
 ONE = 10**18
 ZERO_HASH = "0x" + "00" * 32
-KEY_PATH = REPO_ROOT / "infra" / "besu-testnet" / "keydir" / "key"
+# deploy/up.sh exports the Docker stack's generated deployer key here; the
+# legacy path only matches old bare-metal validators and can be a different key.
+STACK_KEY_PATH = REPO_ROOT / "deploy" / ".stack-key"
+KEY_PATH = (
+    STACK_KEY_PATH
+    if STACK_KEY_PATH.is_file()
+    else REPO_ROOT / "infra" / "besu-testnet" / "keydir" / "key"
+)
 SMOKE_HASH = "0xba7ca5938e79b4ebfaef41cf78ea37e51130cab361de418b2cf5b938a2df7ebb"
 
 
@@ -172,8 +179,6 @@ class Harness:
         )
         if int(self.arena.functions.activeMiningCount().call()) != 0:
             pytest.skip("active mining contest exists; refusing to interfere")
-        if int(self.rtm.functions.balanceOf(deployer.address).call()) < 1:
-            pytest.skip("deployer has no RTM for the 1 wei qualification funding")
         if self.faucet_before < 4 * 200 * ONE:
             pytest.skip("faucet balance is too low for e2e drips")
 

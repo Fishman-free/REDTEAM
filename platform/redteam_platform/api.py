@@ -808,7 +808,10 @@ class PlatformService:
             self._cleanup_registration(defender, wallet, wallet_entry, byok_entry)
             raise
         try:
-            self.gateway.fund_wallet(wallet, 1)
+            # 资格测试需要钱包里有 1 wei 可转，这里用测试网自己的 mint 注入（与水龙头
+            # 同源）。不能从 operator 余额转：只有部署烟测会留给 operator 1 RTM，
+            # migrate-softtee.sh 关掉了烟测，operator 余额为 0，注册必然失败。
+            self.gateway.mint_test_tokens(wallet, 1)
         except Exception:
             self._cleanup_registration(defender, wallet, wallet_entry, byok_entry)
             raise ApiError(502, "cannot fund the qualification wallet") from None
